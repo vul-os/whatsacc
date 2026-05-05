@@ -161,26 +161,26 @@ deno task test:contract:resend
 
 **Contract suites** hit live test endpoints at `api.paystack.co` and `api.resend.com`. Each test skips cleanly if its required env var is missing — only when the keys are present do they actually exercise the real APIs.
 
-| Suite       | Required env                                        | What it does                                                                                                                |
-|-------------|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| `paystack`  | `PAYSTACK_TEST_SECRET_KEY` (`sk_test_...`)          | Creates + deletes recipients; initiates a R 1 transfer; charges a test card and verifies wallet credit end-to-end via the real API. Test mode only — no real money. |
-| `resend`    | `RESEND_TEST_API_KEY` + `RESEND_TEST_TO_EMAIL`      | Sends real emails to the inbox you configure; verifies your from-domain is set up.                                          |
+| Suite       | Required env                                  | What it does                                                                                                                                                       |
+|-------------|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `paystack`  | `PAYSTACK_SECRET_KEY` (`sk_test_...`)         | Creates + deletes recipients; initiates a R 1 transfer; charges a test card and verifies wallet credit end-to-end via the real API. Refuses to run against `sk_live_…`. |
+| `resend`    | `RESEND_API_KEY` + `RESEND_TEST_TO_EMAIL`     | Sends real emails to the inbox you configure; verifies your from-domain is set up.                                                                                  |
 
 **Side effects**:
 
 - Paystack contract tests leave **transactions** in your test dashboard (cannot be deleted). Recipients are deleted on test completion. Transfers in test mode draw from your test balance — top up test funds in the Paystack dashboard if a transfer test reports `insufficient balance` (it auto-skips with a console warning).
 - Resend contract tests deliver real emails to the inbox you set in `RESEND_TEST_TO_EMAIL`. Use a throwaway address or filter rule.
 
-Add the test keys to `.env`:
+Add the test-mode key to `.env` (or set `RESEND_TEST_TO_EMAIL` directly in your shell when you want to run the resend suite ad-hoc):
 
 ```bash
-# Paystack test mode — do NOT use live keys here.
-PAYSTACK_TEST_SECRET_KEY=sk_test_xxx
-PAYSTACK_TEST_PUBLIC_KEY=pk_test_xxx
+# Paystack — use sk_test_… while developing.
+PAYSTACK_SECRET_KEY=sk_test_xxx
+PAYSTACK_PUBLIC_KEY=pk_test_xxx
 
 # Resend
-RESEND_TEST_API_KEY=re_xxx
-RESEND_TEST_TO_EMAIL=ops@yourdomain.com
+RESEND_API_KEY=re_xxx
+RESEND_TEST_TO_EMAIL=ops@yourdomain.com         # only needed to run tests/contract/resend.test.ts
 RESEND_TEST_FROM=whatsacc <noreply@yourdomain.com>
 ```
 

@@ -7,7 +7,7 @@ import type { SVGProps } from 'react';
 export function AuthAside({ className, ...rest }: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 480 720"
+      viewBox="0 0 480 600"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
@@ -86,26 +86,6 @@ export function AuthAside({ className, ...rest }: SVGProps<SVGSVGElement>) {
         strokeOpacity="0.45"
         strokeWidth="2"
       />
-
-      {/* chat bubble badge — the WhatsApp message that opened the gate */}
-      <g transform="translate(110 600)">
-        <rect width="172" height="82" rx="22" fill="#f4ede2" />
-        <path d="M28 82 L28 98 L48 82 Z" fill="#f4ede2" />
-        <text
-          x="22"
-          y="36"
-          fill="#1a1f36"
-          fontFamily="Inter, system-ui, sans-serif"
-          fontSize="14"
-          fontWeight={500}
-          letterSpacing="0.3"
-        >
-          open
-        </text>
-        <rect x="22" y="48" width="48" height="3" rx="1.5" fill="#d6624d" />
-        <rect x="22" y="58" width="120" height="2" rx="1" fill="#1a1f36" opacity="0.20" />
-        <rect x="22" y="64" width="84" height="2" rx="1" fill="#1a1f36" opacity="0.15" />
-      </g>
 
       {/* small ringing dot — signal */}
       <g transform="translate(380 130)">

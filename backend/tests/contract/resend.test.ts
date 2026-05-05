@@ -1,9 +1,9 @@
-// Real-Resend contract tests. SKIPPED unless RESEND_TEST_API_KEY and
+// Real-Resend contract tests. SKIPPED unless RESEND_API_KEY and
 // RESEND_TEST_TO_EMAIL are set. Each successful test sends ONE real email
 // to the configured address; configure your inbox so they don't pile up.
 //
 // Required env to actually run:
-//   RESEND_TEST_API_KEY=re_xxx
+//   RESEND_API_KEY=re_xxx
 //   RESEND_TEST_TO_EMAIL=you@yourdomain.com   (a real inbox you own)
 //   RESEND_TEST_FROM=whatsacc <noreply@yourdomain.com>   (optional override)
 //
@@ -17,26 +17,20 @@
 
 import { assertEquals, assertExists } from '@std/assert';
 import { contractTest, envValue } from '../helpers/contract.ts';
-import { resetEnvCache } from '@/lib/env.ts';
 import { sendEmail } from '@/lib/email.ts';
 
-function setupRealResendEnv() {
-  Deno.env.set('RESEND_API_KEY', envValue('RESEND_TEST_API_KEY')!);
-  resetEnvCache();
-}
 
 contractTest(
   'resend: sendEmail delivers a basic transactional message',
-  ['RESEND_TEST_API_KEY', 'RESEND_TEST_TO_EMAIL'],
+  ['RESEND_API_KEY', 'RESEND_TEST_TO_EMAIL'],
   async () => {
-    setupRealResendEnv();
     const to = envValue('RESEND_TEST_TO_EMAIL')!;
     const from = Deno.env.get('RESEND_TEST_FROM') ?? undefined;
 
     // sendEmail returns void; if Resend rejects (bad domain, bad key, bad
     // payload), it logs to stderr but doesn't throw. Wrap with our own
     // direct fetch so we can assert.
-    const key = envValue('RESEND_TEST_API_KEY')!;
+    const key = envValue('RESEND_API_KEY')!;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -72,12 +66,11 @@ contractTest(
 
 contractTest(
   'resend: from-domain is verified (sending to a fresh recipient succeeds)',
-  ['RESEND_TEST_API_KEY', 'RESEND_TEST_TO_EMAIL'],
+  ['RESEND_API_KEY', 'RESEND_TEST_TO_EMAIL'],
   async () => {
-    setupRealResendEnv();
     const to = envValue('RESEND_TEST_TO_EMAIL')!;
     const from = Deno.env.get('RESEND_TEST_FROM') ?? 'whatsacc <noreply@whatsacc.com>';
-    const key = envValue('RESEND_TEST_API_KEY')!;
+    const key = envValue('RESEND_API_KEY')!;
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
