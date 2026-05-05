@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { LinkButton } from '@/components/ui/Button';
+import { CurrencySelector } from '@/components/nav/CurrencySelector';
 import { cn } from '@/lib/cn';
 
 const links = [
@@ -69,6 +70,7 @@ export function TopNav() {
           >
             Open app
           </Link>
+          <CurrencySelector className="hidden sm:inline-block" />
           <LinkButton
             to="/signup"
             variant="ink"
@@ -145,6 +147,13 @@ export function TopNav() {
           </ul>
 
           <div className="mt-8">
+            <p className="mb-2 text-[11px] uppercase tracking-[0.22em] text-ink/45">
+              Display currency
+            </p>
+            <CurrencySelector variant="block" />
+          </div>
+
+          <div className="mt-6">
             <LinkButton to="/signup" variant="ink" size="lg" className="w-full">
               Get started
             </LinkButton>

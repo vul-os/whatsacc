@@ -116,12 +116,12 @@ function ChatBubbleVisual() {
 
 function GeofenceVisual() {
   return (
-    <svg viewBox="0 0 200 130" className="block w-full max-w-[200px] h-auto" aria-hidden>
-      <circle cx="100" cy="70" r="50" fill="none" stroke="#1a1f36" strokeWidth="1.5" strokeDasharray="3 4" />
-      <circle cx="100" cy="70" r="30" fill="none" stroke="#d6624d" strokeWidth="1.5" />
-      <circle cx="100" cy="70" r="3" fill="#d6624d" />
-      <circle cx="80" cy="82" r="4" fill="#1a1f36" />
-      <text x="60" y="118" fontFamily="Inter" fontSize="9" fill="#1a1f36" opacity="0.6">
+    <svg viewBox="0 0 200 160" className="block w-full max-w-[200px] h-auto" aria-hidden>
+      <circle cx="100" cy="65" r="50" fill="none" stroke="#1a1f36" strokeWidth="1.5" strokeDasharray="3 4" />
+      <circle cx="100" cy="65" r="30" fill="none" stroke="#d6624d" strokeWidth="1.5" />
+      <circle cx="100" cy="65" r="3" fill="#d6624d" />
+      <circle cx="80" cy="77" r="4" fill="#1a1f36" />
+      <text x="100" y="142" textAnchor="middle" fontFamily="Inter" fontSize="10" fill="#1a1f36" opacity="0.65">
         within 80m
       </text>
     </svg>

@@ -1,6 +1,7 @@
 import { TopNav } from '@/components/nav/TopNav';
 import { Footer } from '@/components/landing/Footer';
 import { Pricing as PricingBlock } from '@/components/landing/Pricing';
+import { PricingEstimator } from '@/components/landing/PricingEstimator';
 
 const tiers = [
   ['Free', '$0', '100', '1', '1', '30 days', 'Email'],
@@ -15,6 +16,7 @@ export default function PricingPage() {
     <div className="bg-paper">
       <TopNav />
       <PricingBlock />
+      <PricingEstimator />
 
       <section className="mx-auto max-w-[1280px] px-6 lg:px-10 pb-24">
         <h2 className="font-display-tight text-4xl mb-8">Compare in detail</h2>
