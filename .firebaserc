@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "whats-acc"
+  },
+  "targets": {
+    "whats-acc": {
+      "hosting": {
+        "main": ["whats-acc"],
+        "dev": ["whats-acc-dev"]
+      }
+    }
+  }
+}
