@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1A1F36"/>
+      <stop offset="1" stop-color="#0F1326"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- soft horizon line -->
+  <line x1="0" y1="500" x2="1200" y2="500" stroke="#F4EDE2" stroke-opacity="0.08" stroke-width="1"/>
+
+  <!-- editorial label -->
+  <g font-family="Helvetica, Arial, sans-serif" fill="#F4EDE2" fill-opacity="0.55" font-size="20" letter-spacing="6">
+    <text x="100" y="100">WHATSACC · ACCESS, BY MESSAGE</text>
+  </g>
+
+  <!-- arch motif, scaled from favicon (originally 64x64 viewBox) -->
+  <g transform="translate(880, 180) scale(5.5)">
+    <path d="M16 50 V32 a16 16 0 0 1 32 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z"
+          fill="none" stroke="#F4EDE2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="32" cy="40" r="2.5" fill="#D6624D"/>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="100" y="335" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="148" fill="#F4EDE2">whatsacc</text>
+
+  <text x="100" y="410" font-family="Helvetica, Arial, sans-serif" font-size="34" fill="#F4EDE2" fill-opacity="0.78">Texts that open gates.</text>
+
+  <!-- accent rule -->
+  <line x1="100" y1="455" x2="200" y2="455" stroke="#D6624D" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- footer caption -->
+  <g font-family="Helvetica, Arial, sans-serif" fill="#F4EDE2" fill-opacity="0.5" font-size="22">
+    <text x="100" y="555">whatsacc.com</text>
+    <text x="1100" y="555" text-anchor="end">Geofenced · Audited · Multi-tenant</text>
+  </g>
+</svg>

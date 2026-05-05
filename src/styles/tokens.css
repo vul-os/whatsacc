@@ -1,0 +1,33 @@
+/* whatsacc design tokens
+   palette derived from the favicon arch motif:
+   deep navy ink, warm cream paper, terracotta hot accent.
+   supporting tones: muted gold for editorial moments,
+   soft slate for body text, clay for surface variation. */
+
+:root {
+  --ink: #1a1f36;
+  --ink-soft: #2c3350;
+  --ink-faint: rgba(26, 31, 54, 0.6);
+  --ink-whisper: rgba(26, 31, 54, 0.12);
+
+  --paper: #f4ede2;
+  --paper-warm: #ece2d1;
+  --paper-cool: #f8f3ea;
+  --paper-edge: rgba(26, 31, 54, 0.08);
+
+  --terracotta: #d6624d;
+  --terracotta-deep: #b14b39;
+  --terracotta-soft: #e8a293;
+
+  --gold: #c8a45c;
+  --gold-soft: #e3c98a;
+
+  --slate: #6b7188;
+  --moss: #4a6b58;
+  --clay: #cab39a;
+
+  --signal: #2c5f4f; /* successful gate-open green, not whatsapp */
+
+  --shadow-paper: 0 1px 0 rgba(26, 31, 54, 0.04), 0 12px 32px -16px rgba(26, 31, 54, 0.18);
+  --shadow-deep: 0 24px 48px -24px rgba(26, 31, 54, 0.4);
+}

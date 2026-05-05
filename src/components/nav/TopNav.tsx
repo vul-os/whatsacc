@@ -1,0 +1,160 @@
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { ArchMark } from '@/components/illustrations/ArchMark';
+import { LinkButton } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
+
+const links = [
+  { to: '/pricing', label: 'Pricing' },
+  { to: '/security', label: 'Security' },
+  { to: '/docs', label: 'Docs' },
+  { to: '/login', label: 'Login' },
+];
+
+export function TopNav() {
+  const [open, setOpen] = useState(false);
+  const loc = useLocation();
+
+  // close menu on route change
+  useEffect(() => {
+    setOpen(false);
+  }, [loc.pathname]);
+
+  // lock scroll while panel is open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  return (
+    <header
+      className={cn(
+        'sticky top-0 z-30 transition-colors',
+        open ? 'bg-paper' : 'bg-paper/85 backdrop-blur',
+      )}
+    >
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 flex items-center justify-between gap-4">
+        <Link to="/" className="flex items-center gap-2.5 shrink-0" aria-label="whatsacc home">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-ink">
+            <ArchMark className="h-5 w-5 text-paper" />
+          </span>
+          <span className="font-display italic text-xl tracking-tight">whatsacc</span>
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-1">
+          {links.map((l) => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) =>
+                cn(
+                  'px-3.5 py-2 text-sm rounded-full transition-colors',
+                  isActive ? 'text-ink' : 'text-ink/60 hover:text-ink',
+                )
+              }
+            >
+              {l.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Link
+            to="/app"
+            className="hidden lg:inline-flex text-sm text-ink/60 hover:text-ink px-3 py-2"
+          >
+            Open app
+          </Link>
+          <LinkButton
+            to="/signup"
+            variant="ink"
+            size="sm"
+            className="hidden sm:inline-flex"
+          >
+            Get started
+          </LinkButton>
+          <button
+            type="button"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="md:hidden grid h-10 w-10 place-items-center rounded-full text-ink/80 hover:bg-ink/5"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+              {open ? (
+                <path
+                  d="M5 5 L19 19 M19 5 L5 19"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="M4 8 H20 M4 16 H20"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* mobile panel — slides in below sticky header */}
+      <div
+        className={cn(
+          'md:hidden fixed inset-x-0 bottom-0 top-[72px] z-20 bg-paper transition-opacity duration-200',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        aria-hidden={!open}
+      >
+        <div className="px-5 pt-4 pb-10 flex flex-col h-full">
+          <ul className="flex flex-col">
+            {links.map((l) => (
+              <li key={l.to} className="border-b border-ink/10">
+                <NavLink
+                  to={l.to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center justify-between py-4 font-display text-2xl',
+                      isActive ? 'text-ink' : 'text-ink/80',
+                    )
+                  }
+                >
+                  <span>{l.label}</span>
+                  <span aria-hidden className="text-terracotta">
+                    &rarr;
+                  </span>
+                </NavLink>
+              </li>
+            ))}
+            <li className="border-b border-ink/10">
+              <Link
+                to="/app"
+                className="flex items-center justify-between py-4 font-display text-2xl text-ink/80"
+              >
+                <span>Open app</span>
+                <span aria-hidden className="text-terracotta">&rarr;</span>
+              </Link>
+            </li>
+          </ul>
+
+          <div className="mt-8">
+            <LinkButton to="/signup" variant="ink" size="lg" className="w-full">
+              Get started
+            </LinkButton>
+          </div>
+
+          <p className="mt-auto pt-10 text-[11px] uppercase tracking-[0.22em] text-ink/45">
+            texts that open gates
+          </p>
+        </div>
+      </div>
+    </header>
+  );
+}

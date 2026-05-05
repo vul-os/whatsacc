@@ -1,0 +1,63 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/cli@1": "1.0.29",
+    "jsr:@std/internal@^1.0.12": "1.0.13",
+    "npm:@hono/zod-validator@~0.4.2": "0.4.3_hono@4.12.16_zod@3.25.76",
+    "npm:hash-wasm@^4.11.0": "4.12.0",
+    "npm:hono@^4.6.0": "4.12.16",
+    "npm:jose@^5.9.6": "5.10.0",
+    "npm:postgres@^3.4.4": "3.4.9",
+    "npm:zod@^3.23.8": "3.25.76"
+  },
+  "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/cli@1.0.29": {
+      "integrity": "fa4ef29130baa834d8a13b7d138240c3a2fcfba740bfb7afa646a360a15ec84f"
+    },
+    "@std/internal@1.0.13": {
+      "integrity": "2f9546691d4ac2d32859c82dff284aaeac980ddeca38430d07941e7e288725c0"
+    }
+  },
+  "npm": {
+    "@hono/zod-validator@0.4.3_hono@4.12.16_zod@3.25.76": {
+      "integrity": "sha512-xIgMYXDyJ4Hj6ekm9T9Y27s080Nl9NXHcJkOvkXPhubOLj8hZkOL8pDnnXfvCf5xEE8Q4oMFenQUZZREUY2gqQ==",
+      "dependencies": [
+        "hono",
+        "zod"
+      ]
+    },
+    "hash-wasm@4.12.0": {
+      "integrity": "sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ=="
+    },
+    "hono@4.12.16": {
+      "integrity": "sha512-jN0ZewiNAWSe5khM3EyCmBb250+b40wWbwNILNfEvq84VREWwOIkuUsFONk/3i3nqkz7Oe1PcpM2mwQEK2L9Kg=="
+    },
+    "jose@5.10.0": {
+      "integrity": "sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg=="
+    },
+    "postgres@3.4.9": {
+      "integrity": "sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw=="
+    },
+    "zod@3.25.76": {
+      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1",
+      "npm:@hono/zod-validator@~0.4.2",
+      "npm:hash-wasm@^4.11.0",
+      "npm:hono@^4.6.0",
+      "npm:jose@^5.9.6",
+      "npm:postgres@^3.4.4",
+      "npm:zod@^3.23.8"
+    ]
+  }
+}
