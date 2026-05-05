@@ -18,6 +18,7 @@ import {
 } from '../lib/google.ts';
 import { BadRequest, Conflict, Forbidden, NotFound, Unauthorized } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
+import { isValidSlug, randomSlug } from '../lib/slug.ts';
 import type { TxSql } from '../lib/db.ts';
 
 const ACCESS_TTL = 15 * 60; // 15 min
@@ -27,6 +28,18 @@ const registerSchema = z
     email: z.string().email().toLowerCase(),
     password: z.string().min(8).max(256),
     display_name: z.string().min(1).max(120),
+    country_code: z
+      .string()
+      .length(2)
+      .transform((v) => v.toUpperCase())
+      .default('ZA'),
+    account_type: z.enum(['personal', 'business']).default('personal'),
+    referral_slug: z
+      .string()
+      .min(3)
+      .max(30)
+      .transform((v) => v.toLowerCase())
+      .optional(),
   })
   .strict();
 
@@ -42,6 +55,12 @@ const logoutSchema = z.object({ refresh_token: z.string().min(1) }).strict();
 const forgotSchema = z.object({ email: z.string().email().toLowerCase() }).strict();
 const resetSchema = z
   .object({ token: z.string().min(1), new_password: z.string().min(8).max(256) })
+  .strict();
+const updatePasswordSchema = z
+  .object({
+    current_password: z.string().min(1).max(256),
+    new_password: z.string().min(8).max(256),
+  })
   .strict();
 const verifyEmailSchema = z.object({ token: z.string().min(1) }).strict();
 
@@ -63,6 +82,83 @@ type RefreshRow = {
   revoked_at: Date | null;
   replaced_by: string | null;
 };
+
+async function assignNewUserSlug(tx: TxSql, userId: string): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const candidate = randomSlug(8);
+    if (!isValidSlug(candidate)) continue;
+    const rows = await tx<{ id: string }[]>`
+      update users set referral_slug = ${candidate}
+      where id = ${userId} and referral_slug is null
+      returning id
+    `;
+    if (rows.length > 0) return candidate;
+    // Conflict path: slug taken; loop and try again.
+    const existing = await tx<{ referral_slug: string | null }[]>`
+      select referral_slug from users where id = ${userId}
+    `;
+    if (existing[0]?.referral_slug) return existing[0].referral_slug;
+  }
+  throw new Error('failed_to_mint_slug');
+}
+
+async function attributeReferral(
+  tx: TxSql,
+  refereeUserId: string,
+  rawSlug: string,
+): Promise<void> {
+  const slug = rawSlug.toLowerCase();
+  if (!isValidSlug(slug)) return;
+  const rows = await tx<{ id: string }[]>`
+    select id from users where referral_slug = ${slug}
+  `;
+  const referrer = rows[0];
+  if (!referrer || referrer.id === refereeUserId) return;
+  await tx`
+    update users
+    set referred_by_user_id = ${referrer.id},
+        referral_attributed_at = now()
+    where id = ${refereeUserId} and referred_by_user_id is null
+  `;
+  await tx`
+    insert into referral_attributions (referrer_user_id, referee_user_id, via_slug)
+    values (${referrer.id}, ${refereeUserId}, ${slug})
+    on conflict (referee_user_id) do nothing
+  `;
+}
+
+async function bootstrapPersonalAccount(
+  tx: TxSql,
+  opts: { userId: string; name: string; countryCode: string; billingType?: 'personal' | 'business' },
+): Promise<string> {
+  const country = await tx<{ code: string }[]>`
+    select code from countries where code = ${opts.countryCode}
+  `;
+  const code = country[0]?.code ?? 'ZA';
+
+  const [acct] = await tx<{ id: string }[]>`
+    insert into accounts (name, billing_type, status, country_code)
+    values (${opts.name}, ${opts.billingType ?? 'personal'}, 'active', ${code})
+    returning id
+  `;
+  const accountId = acct!.id;
+
+  await tx`
+    insert into account_members (account_id, user_id, role, status)
+    values (${accountId}, ${opts.userId}, 'owner', 'active')
+  `;
+
+  await tx`insert into wallets (account_id, currency) values (${accountId}, 'ZAR')`;
+
+  const [plan] = await tx<{ id: string }[]>`select id from plans where code = 'free' limit 1`;
+  if (plan) {
+    await tx`
+      insert into account_subscriptions (account_id, plan_id, status)
+      values (${accountId}, ${plan.id}, 'active')
+    `;
+  }
+  return accountId;
+}
 
 async function issueTokens(
   tx: TxSql,
@@ -110,7 +206,8 @@ function authRouter() {
   const app = new Hono<AppEnv>();
 
   app.post('/register', zValidator('json', registerSchema), async (c) => {
-    const { email, password, display_name } = c.req.valid('json');
+    const { email, password, display_name, country_code, account_type, referral_slug } =
+      c.req.valid('json');
     const password_hash = await hashPassword(password);
     const verifyTokenPlain = randomToken(32);
     const verifyTokenHash = await hashToken(verifyTokenPlain);
@@ -127,8 +224,8 @@ function authRouter() {
       const userId = user!.id;
 
       await tx`
-        insert into profiles (id, display_name)
-        values (${userId}, ${display_name})
+        insert into profiles (id, display_name, country_code)
+        values (${userId}, ${display_name}, ${country_code})
       `;
 
       const expires = new Date(Date.now() + 60 * 60 * 24 * 1000); // 24h
@@ -137,7 +234,20 @@ function authRouter() {
         values (${verifyTokenHash}, ${userId}, ${expires})
       `;
 
-      return { userId };
+      const accountId = await bootstrapPersonalAccount(tx, {
+        userId,
+        name: display_name,
+        countryCode: country_code,
+        billingType: account_type,
+      });
+
+      await assignNewUserSlug(tx, userId);
+
+      if (referral_slug) {
+        await attributeReferral(tx, userId, referral_slug);
+      }
+
+      return { userId, accountId };
     });
 
     const env = getEnv();
@@ -149,7 +259,7 @@ function authRouter() {
       text: `Verify your email: ${verifyUrl}`,
     });
 
-    return c.json({ id: result.userId }, 201);
+    return c.json({ id: result.userId, account_id: result.accountId }, 201);
   });
 
   app.post('/login', zValidator('json', loginSchema), async (c) => {
@@ -185,7 +295,10 @@ function authRouter() {
     const ua = c.req.header('User-Agent') ?? null;
     const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? null;
 
-    const tokens = await withAnonDb(async (tx) => {
+    // Reuse detection happens in its own transaction so the family-revoke
+    // commits even though we then throw 401. Throwing inside withAnonDb's
+    // sql.begin() would roll the UPDATE back and leave a live family.
+    const reuseFamily = await withAnonDb(async (tx) => {
       const rows = await tx<RefreshRow[]>`
         select id, family_id, user_id, token_hash, expires_at, revoked_at, replaced_by
         from refresh_tokens
@@ -193,21 +306,37 @@ function authRouter() {
         for update
       `;
       const row = rows[0];
-      if (!row) throw Unauthorized('invalid_refresh_token');
-
-      // reuse detection: token already revoked or already replaced -> kill family
+      if (!row) return { kind: 'invalid' as const };
       if (row.revoked_at || row.replaced_by) {
         await tx`
           update refresh_tokens
           set revoked_at = now()
           where family_id = ${row.family_id} and revoked_at is null
         `;
-        throw Unauthorized('refresh_token_reused');
+        return { kind: 'reused' as const };
       }
-
       if (row.expires_at.getTime() <= Date.now()) {
         await tx`update refresh_tokens set revoked_at = now() where id = ${row.id}`;
-        throw Unauthorized('refresh_token_expired');
+        return { kind: 'expired' as const };
+      }
+      return { kind: 'ok' as const };
+    });
+
+    if (reuseFamily.kind === 'invalid') throw Unauthorized('invalid_refresh_token');
+    if (reuseFamily.kind === 'reused') throw Unauthorized('refresh_token_reused');
+    if (reuseFamily.kind === 'expired') throw Unauthorized('refresh_token_expired');
+
+    const tokens = await withAnonDb(async (tx) => {
+      // Re-fetch the row inside this transaction; rotate atomically.
+      const rows = await tx<RefreshRow[]>`
+        select id, family_id, user_id, token_hash, expires_at, revoked_at, replaced_by
+        from refresh_tokens
+        where token_hash = ${tokenHash}
+        for update
+      `;
+      const row = rows[0];
+      if (!row || row.revoked_at || row.replaced_by) {
+        throw Unauthorized('invalid_refresh_token');
       }
 
       const userRows = await tx<UserRow[]>`
@@ -362,6 +491,46 @@ function authRouter() {
     return c.body(null, 204);
   });
 
+  // Authenticated update — user provides current password to change to a new
+  // one. Revokes all other refresh-token families so any logged-in sessions
+  // elsewhere are killed; the caller's bearer JWT remains valid until expiry.
+  app.post(
+    '/update-password',
+    requireAuth(),
+    zValidator('json', updatePasswordSchema),
+    async (c) => {
+      const me = getUser(c);
+      const { current_password, new_password } = c.req.valid('json');
+      if (current_password === new_password) {
+        throw BadRequest('same_password', 'New password must differ from the current one');
+      }
+      const newHash = await hashPassword(new_password);
+
+      await withAnonDb(async (tx) => {
+        const rows = await tx<{ password_hash: string | null }[]>`
+          select password_hash from users where id = ${me.sub}
+        `;
+        const row = rows[0];
+        if (!row || !row.password_hash) {
+          throw BadRequest('no_password_set', 'This account has no password (Google sign-in only)');
+        }
+        const ok = await verifyPassword(current_password, row.password_hash);
+        if (!ok) throw Unauthorized('invalid_current_password');
+
+        await tx`
+          update users set password_hash = ${newHash}, updated_at = now()
+          where id = ${me.sub}
+        `;
+        await tx`
+          update refresh_tokens set revoked_at = now()
+          where user_id = ${me.sub} and revoked_at is null
+        `;
+      });
+
+      return c.body(null, 204);
+    },
+  );
+
   app.get('/me', requireAuth(), async (c) => {
     const user = getUser(c);
     const data = await withUserDb(c, async (tx) => {
@@ -371,8 +540,9 @@ function authRouter() {
         status: string;
         email_verified_at: Date | null;
         is_platform_admin: boolean;
+        referral_slug: string | null;
       }[]>`
-        select id, email, status, email_verified_at, is_platform_admin
+        select id, email, status, email_verified_at, is_platform_admin, referral_slug
         from users where id = ${user.sub}
       `;
       const u = userRows[0];
@@ -410,8 +580,13 @@ function authRouter() {
   app.get('/google/start', async (c) => {
     const { codeVerifier, codeChallenge } = await makePkce();
     const state = randomToken(16);
+    const refSlug = c.req.query('ref');
     const cookieJwt = await signShortToken(
-      { code_verifier: codeVerifier, state },
+      {
+        code_verifier: codeVerifier,
+        state,
+        ref_slug: refSlug && isValidSlug(refSlug.toLowerCase()) ? refSlug.toLowerCase() : null,
+      },
       600,
     );
     setCookie(c, 'gauth', cookieJwt, {
@@ -454,6 +629,7 @@ function authRouter() {
       `;
 
       let userId: string;
+      let createdNewUser = false;
       if (ident[0]) {
         userId = ident[0].user_id;
       } else {
@@ -473,11 +649,26 @@ function authRouter() {
             insert into profiles (id, display_name, avatar_url)
             values (${userId}, ${idClaims.name ?? idClaims.email}, ${idClaims.picture ?? null})
           `;
+          createdNewUser = true;
         }
         await tx`
           insert into oauth_identities (user_id, provider, provider_sub, email)
           values (${userId}, 'google', ${idClaims.sub}, ${idClaims.email})
         `;
+      }
+
+      if (createdNewUser) {
+        await bootstrapPersonalAccount(tx, {
+          userId,
+          name: idClaims.name ?? idClaims.email,
+          countryCode: 'ZA',
+          billingType: 'personal',
+        });
+        await assignNewUserSlug(tx, userId);
+        const refSlug = stateClaims.ref_slug;
+        if (typeof refSlug === 'string') {
+          await attributeReferral(tx, userId, refSlug);
+        }
       }
 
       const userRows = await tx<UserRow[]>`

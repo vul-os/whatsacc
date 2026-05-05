@@ -76,6 +76,16 @@ class Assumptions:
     stripe_pct: float = 0.029
     stripe_fixed_per_charge: float = 0.30
 
+    # Resend (transactional email) ────────────────────────────────────────────
+    # Pro plan starts at $20/mo for 50k emails; per-email amortised ~ $0.0004.
+    # Volume drivers: invite emails, password reset, email verification,
+    # payout success/failure notices.
+    resend_fixed_monthly: float = 20.0       # base plan
+    resend_per_email: float = 0.0004
+    resend_included_per_month: int = 50_000
+    # Heuristic: ~3 transactional emails per active user per month.
+    emails_per_user_per_month: float = 3.0
+
 
 # ── Regions ──────────────────────────────────────────────────────────────────
 
@@ -200,7 +210,12 @@ def model(users: int, a: Assumptions) -> dict:
     # Stripe: % of revenue + fixed per location/charge
     stripe_cost = revenue * a.stripe_pct + locations * a.stripe_fixed_per_charge
 
-    total_cost = whatsapp_cost + server_cost + db_cost + devices_cost + fixed + stripe_cost
+    # Resend: fixed plan + overage above the included pool
+    emails = users * a.emails_per_user_per_month
+    resend_overage = max(0.0, emails - a.resend_included_per_month) * a.resend_per_email
+    resend_cost = a.resend_fixed_monthly + resend_overage
+
+    total_cost = whatsapp_cost + server_cost + db_cost + devices_cost + fixed + stripe_cost + resend_cost
     profit = revenue - total_cost
     margin = (profit / revenue * 100) if revenue > 0 else 0.0
 
@@ -219,6 +234,8 @@ def model(users: int, a: Assumptions) -> dict:
         'devices_cost': devices_cost,
         'fixed': fixed,
         'stripe': stripe_cost,
+        'resend': resend_cost,
+        'emails': emails,
         'total_cost': total_cost,
         'profit': profit,
         'margin': margin,
@@ -315,11 +332,11 @@ def chart_revenue_vs_cost(rows, out: Path):
 
 def chart_cost_breakdown(rows, out: Path):
     user_labels = [fmt_users(r['users']) for r in rows]
-    categories = ['WhatsApp', 'Devices (GSM)', 'Hosting + DB', 'Stripe', 'Server', 'Fixed misc']
-    colors = [TERRACOTTA, GOLD, INK, SLATE, CLAY, MOSS]
+    categories = ['WhatsApp', 'Devices (GSM)', 'Hosting + DB', 'Stripe', 'Resend', 'Server', 'Fixed misc']
+    colors = [TERRACOTTA, GOLD, INK, SLATE, '#A56F8E', CLAY, MOSS]
 
     data = np.array([
-        [r['whatsapp'], r['devices_cost'], r['db'], r['stripe'], r['server'], r['fixed']]
+        [r['whatsapp'], r['devices_cost'], r['db'], r['stripe'], r['resend'], r['server'], r['fixed']]
         for r in rows
     ]).T
 

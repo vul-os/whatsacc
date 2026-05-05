@@ -24,6 +24,10 @@ const routes: RouteObject[] = [
   { path: '/security', element: wrap(() => import('@/pages/Security')) },
   { path: '/login', element: wrap(() => import('@/pages/Login')) },
   { path: '/signup', element: wrap(() => import('@/pages/Signup')) },
+  { path: '/forgot-password', element: wrap(() => import('@/pages/ForgotPassword')) },
+  { path: '/reset-password', element: wrap(() => import('@/pages/ResetPassword')) },
+  { path: '/auth/callback', element: wrap(() => import('@/pages/AuthCallback')) },
+  { path: '/r/:slug', element: wrap(() => import('@/pages/ReferralLanding')) },
   {
     path: '/docs',
     element: wrap(() => import('@/pages/docs/DocsLayout')),
@@ -49,6 +53,9 @@ const routes: RouteObject[] = [
       { path: 'members', element: wrap(() => import('@/pages/app/Members')) },
       { path: 'billing', element: wrap(() => import('@/pages/app/Billing')) },
       { path: 'analytics', element: wrap(() => import('@/pages/app/Analytics')) },
+      { path: 'referrals', element: wrap(() => import('@/pages/app/Referrals')) },
+      { path: 'grants', element: wrap(() => import('@/pages/app/Grants')) },
+      { path: 'security', element: wrap(() => import('@/pages/app/SecuritySettings')) },
     ],
   },
 ];

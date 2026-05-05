@@ -6,6 +6,8 @@ import { withUserDb, withAnonDb } from '../middleware/rls.ts';
 import { BadRequest, NotFound } from '../lib/errors.ts';
 import { randomToken } from '../lib/random.ts';
 import { hashToken } from '../lib/refresh.ts';
+import { sendEmail } from '../lib/email.ts';
+import { getEnv } from '../lib/env.ts';
 
 const createAccountSchema = z
   .object({
@@ -112,16 +114,32 @@ function accountsRouter() {
     const tokenHash = await hashToken(tokenPlain);
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const inviteId = await withUserDb(c, async (tx) => {
-      const [row] = await tx<{ id: string }[]>`
+    const result = await withUserDb(c, async (tx) => {
+      const [invite] = await tx<{ id: string }[]>`
         insert into account_invites (account_id, email, role, token_hash, expires_at)
         values (${id}, ${email}, ${role}, ${tokenHash}, ${expires})
         returning id
       `;
-      return row!.id;
+      const accountRows = await tx<{ name: string }[]>`
+        select name from accounts where id = ${id}
+      `;
+      return { invite_id: invite!.id, account_name: accountRows[0]?.name ?? 'whatsacc account' };
     });
-    // TODO: send invite email with the plaintext token link
-    return c.json({ id: inviteId, token: tokenPlain }, 201);
+
+    const env = getEnv();
+    const acceptUrl =
+      `${env.APP_PUBLIC_URL}/accept-invite?token=${encodeURIComponent(tokenPlain)}`;
+    await sendEmail({
+      to: email,
+      subject: `You've been invited to ${result.account_name} on whatsacc`,
+      html: `
+        <p>You've been invited to join <strong>${result.account_name}</strong> on whatsacc as <strong>${role}</strong>.</p>
+        <p>Click <a href="${acceptUrl}">here</a> to accept. Link expires in 7 days.</p>
+      `,
+      text: `Accept your whatsacc invite to ${result.account_name}: ${acceptUrl}`,
+    });
+
+    return c.json({ id: result.invite_id }, 201);
   });
 
   // accepting an invite cannot use the user's account scope (not a member yet)

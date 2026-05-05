@@ -1,99 +1,202 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
-import { ArchMark } from '@/components/illustrations/ArchMark';
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
+import { ApiError, api, type CountryRef } from '@/lib/api';
+import { clearReferral, getReferral } from '@/lib/referral';
 
 export default function Signup() {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [country, setCountry] = useState('ZA');
   const [kind, setKind] = useState<'personal' | 'business'>('personal');
-  const { signIn } = useAuth();
+  const [countries, setCountries] = useState<CountryRef[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { registerWithPassword } = useAuth();
   const navigate = useNavigate();
 
-  function onSubmit(e: FormEvent) {
+  const referral = useMemo(() => getReferral(), []);
+  const googleUrl = referral
+    ? `${api.googleStartUrl()}?ref=${encodeURIComponent(referral.slug)}`
+    : api.googleStartUrl();
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .countries()
+      .then((r) => !cancelled && setCountries(r.countries))
+      .catch(() => {
+        if (!cancelled) {
+          setCountries([
+            { code: 'ZA', name: 'South Africa', flag: '🇿🇦', currency_code: 'ZAR', msg_cost_zar: 0.148 },
+          ]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    console.log('signup', { name, phone, kind });
-    signIn({ name, phone });
-    navigate('/app');
+    setErrorMsg(null);
+    setSubmitting(true);
+    try {
+      await registerWithPassword({
+        email,
+        password,
+        display_name: name,
+        country_code: country,
+        account_type: kind,
+        referral_slug: referral?.slug,
+      });
+      clearReferral();
+      navigate('/app');
+    } catch (err) {
+      setErrorMsg(toMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-paper">
-      <aside className="lg:col-span-5 bg-ink text-paper relative order-last lg:order-first overflow-hidden">
-        <div className="absolute inset-0 grain pointer-events-none" />
-        <div className="relative h-full flex flex-col p-10">
-          <Link to="/" className="inline-flex items-center gap-2.5">
-            <ArchMark className="h-8 w-8 text-paper" />
-            <span className="font-display italic text-xl">whatsacc</span>
-          </Link>
+    <AuthLayout
+      asideOrder="last"
+      asideKicker="Get started"
+      asideTitle="First gate is on us."
+      asideBody={
+        <p>
+          The free signup is real. Create your account, set up your locations, and pair a device
+          when you’re ready.
+        </p>
+      }
+    >
+      <h1 className="font-display-tight text-3xl sm:text-4xl">Create your account</h1>
+      <p className="mt-2 text-sm text-ink/60">Two minutes. No credit card.</p>
 
-          <div className="mt-auto">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-paper/55 mb-4">
-              Create an account
-            </p>
-            <p className="font-display-tight text-5xl leading-[0.95] max-w-md">
-              First gate is on us.
-            </p>
-            <p className="mt-6 text-paper/65 max-w-md leading-relaxed">
-              The free plan is real. 100 messages a month, 1 location, 1 device. Most homeowners
-              never need more.
-            </p>
-          </div>
+      {referral && (
+        <p className="mt-4 px-3 py-2 rounded-xl bg-moss/10 border border-moss/30 text-sm text-ink/80">
+          You were invited by{' '}
+          <span className="font-medium">{referral.displayName ?? referral.slug}</span>.
+        </p>
+      )}
+
+      <a
+        href={googleUrl}
+        className="mt-5 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+      >
+        <GoogleMark />
+        <span className="text-sm font-medium">Continue with Google</span>
+      </a>
+
+      <div className="my-4 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
+        <span className="flex-1 h-px bg-ink/15" />
+        or sign up with email
+        <span className="flex-1 h-px bg-ink/15" />
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-3">
+        <Field
+          label="Your name"
+          value={name}
+          onChange={setName}
+          placeholder="e.g. Yusuf Adams"
+          autoComplete="name"
+          required
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field
+            label="Email"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            placeholder="you@example.com"
+            autoComplete="email"
+            required
+          />
+          <Field
+            label="Password"
+            type="password"
+            hint="8+ chars"
+            value={password}
+            onChange={setPassword}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            required
+          />
         </div>
-      </aside>
 
-      <main className="lg:col-span-7 flex items-center">
-        <div className="w-full max-w-md mx-auto px-6 py-16">
-          <h1 className="font-display-tight text-4xl">Create your account</h1>
-          <p className="mt-2 text-ink/60">Two minutes. No credit card.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-sm font-medium text-ink/85 block mb-1.5">Country</span>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
+            >
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <form onSubmit={onSubmit} className="mt-10 space-y-5">
-            <Field label="Your name" value={name} onChange={setName} placeholder="e.g. Yusuf Adams" />
-            <Field
-              label="WhatsApp number"
-              hint="With country code"
-              value={phone}
-              onChange={setPhone}
-              placeholder="+27 82 555 0144"
-            />
+          <fieldset>
+            <legend className="text-sm font-medium text-ink/85 mb-1.5">Account type</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(['personal', 'business'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  className={`h-11 rounded-xl border text-sm capitalize transition-colors ${
+                    kind === k
+                      ? 'bg-ink text-paper border-ink'
+                      : 'bg-paper-cool text-ink border-ink/15 hover:border-ink/35'
+                  }`}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
 
-            <fieldset>
-              <legend className="text-sm font-medium text-ink/85 mb-2">Account type</legend>
-              <div className="grid grid-cols-2 gap-3">
-                {(['personal', 'business'] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setKind(k)}
-                    className={`h-12 rounded-xl border text-sm capitalize transition-colors ${
-                      kind === k
-                        ? 'bg-ink text-paper border-ink'
-                        : 'bg-paper-cool text-ink border-ink/15 hover:border-ink/35'
-                    }`}
-                  >
-                    {k}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <Button type="submit" variant="ink" size="lg" className="w-full">
-              Create account
-            </Button>
-          </form>
-
-          <p className="mt-8 text-sm text-ink/60">
-            Already with us?{' '}
-            <Link to="/login" className="underline underline-offset-4 decoration-terracotta">
-              Sign in
-            </Link>
-            .
+        {errorMsg && (
+          <p className="text-sm text-terracotta-deep" role="alert">
+            {errorMsg}
           </p>
-        </div>
-      </main>
-    </div>
+        )}
+
+        <Button type="submit" variant="ink" size="lg" className="w-full mt-4" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
+        </Button>
+      </form>
+
+      <p className="mt-5 text-sm text-ink/60">
+        Already with us?{' '}
+        <Link to="/login" className="underline underline-offset-4 decoration-terracotta">
+          Sign in
+        </Link>
+        .
+      </p>
+    </AuthLayout>
   );
+}
+
+function toMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'email_taken') return 'That email is already in use. Try signing in.';
+    if (err.code === 'invalid_credentials') return 'Could not sign in after registration.';
+    return err.detail ?? err.code;
+  }
+  if (err instanceof Error) return err.message;
+  return 'Something went wrong.';
 }
 
 function Field({
@@ -102,25 +205,45 @@ function Field({
   value,
   onChange,
   placeholder,
+  type = 'text',
+  autoComplete,
+  required,
 }: {
   label: string;
   hint?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  type?: string;
+  autoComplete?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block">
-      <span className="flex items-baseline justify-between">
+      <span className="flex items-baseline justify-between mb-1.5">
         <span className="text-sm font-medium text-ink/85">{label}</span>
         {hint && <span className="text-xs text-ink/50">{hint}</span>}
       </span>
       <input
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full h-12 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
+        autoComplete={autoComplete}
+        required={required}
+        className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
       />
     </label>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 18 18" className="h-4 w-4" aria-hidden>
+      <path fill="#EA4335" d="M9 3.48c1.7 0 2.86.74 3.52 1.36l2.6-2.54C13.46 0.95 11.43 0 9 0 5.48 0 2.44 2.02 0.96 4.96l3.02 2.34C4.7 5.07 6.66 3.48 9 3.48Z" />
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.13 4.13 0 0 1-1.8 2.71l2.92 2.27c1.71-1.58 2.68-3.91 2.68-6.62Z" />
+      <path fill="#FBBC05" d="M3.96 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.16.28-1.7L0.96 4.96A9 9 0 0 0 0 9c0 1.46.35 2.83.96 4.04l3-2.33Z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.27c-.81.55-1.86.87-3.04.87-2.34 0-4.31-1.59-5.02-3.72L0.96 13.04C2.44 15.98 5.48 18 9 18Z" />
+    </svg>
   );
 }

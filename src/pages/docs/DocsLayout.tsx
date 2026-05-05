@@ -31,9 +31,35 @@ export default function DocsLayout() {
     <div className="bg-paper">
       <TopNav />
 
-      <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-12">
-        <div className="grid grid-cols-12 gap-10">
-          <aside className="hidden lg:block col-span-3">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-8 sm:py-12">
+        {/* Mobile chip nav */}
+        <nav className="lg:hidden -mx-5 sm:-mx-6 mb-6 px-5 sm:px-6 overflow-x-auto">
+          <ul className="flex items-center gap-2 whitespace-nowrap pb-1">
+            {groups.flatMap((g) =>
+              g.items.map((it) => (
+                <li key={it.to}>
+                  <NavLink
+                    to={it.to}
+                    end={it.to === '/docs'}
+                    className={({ isActive }) =>
+                      cn(
+                        'inline-block px-3 py-1.5 rounded-full text-xs border transition-colors',
+                        isActive
+                          ? 'bg-ink text-paper border-ink'
+                          : 'bg-paper-cool text-ink/70 border-ink/10 hover:border-ink/30',
+                      )
+                    }
+                  >
+                    {it.label}
+                  </NavLink>
+                </li>
+              )),
+            )}
+          </ul>
+        </nav>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
+          <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-6">
               <p className="text-[11px] uppercase tracking-[0.22em] text-ink/55 mb-4">
                 Documentation
@@ -68,7 +94,7 @@ export default function DocsLayout() {
             </div>
           </aside>
 
-          <article className="col-span-12 lg:col-span-9 max-w-3xl">
+          <article className="lg:col-span-9 max-w-3xl">
             <Outlet />
           </article>
         </div>
@@ -89,10 +115,10 @@ export function DocLead({
   intro: string;
 }) {
   return (
-    <header className="mb-10 border-b border-ink/10 pb-8">
-      <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">{kicker}</span>
-      <h1 className="font-display-tight text-5xl lg:text-6xl mt-3 leading-[1]">{title}</h1>
-      <p className="mt-5 text-lg text-ink/70 leading-relaxed max-w-prose">{intro}</p>
+    <header className="mb-8 sm:mb-10 border-b border-ink/10 pb-6 sm:pb-8">
+      <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">{kicker}</span>
+      <h1 className="font-display-tight text-4xl sm:text-5xl lg:text-6xl mt-2 sm:mt-3 leading-[1.05]">{title}</h1>
+      <p className="mt-4 sm:mt-5 text-base sm:text-lg text-ink/70 leading-relaxed max-w-prose">{intro}</p>
     </header>
   );
 }
@@ -105,8 +131,8 @@ export function DocSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-12">
-      <h2 className="font-display text-3xl mb-4">{heading}</h2>
+    <section className="mb-10 sm:mb-12">
+      <h2 className="font-display text-2xl sm:text-3xl mb-3 sm:mb-4">{heading}</h2>
       <div className="prose-content space-y-4 text-ink/80 leading-relaxed">{children}</div>
     </section>
   );

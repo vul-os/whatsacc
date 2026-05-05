@@ -2,9 +2,19 @@ import { assert, assertEquals, assertRejects } from '@std/assert';
 import { resetEnvCache } from '@/lib/env.ts';
 import { signAccessToken, verifyAccessToken } from '@/lib/jwt.ts';
 
+// Set only the env vars the JWT helpers actually need. Crucially do NOT
+// touch DATABASE_URL — these tests share a process with the integration
+// suite, and a poisoned URL there causes the postgres pool to try to
+// connect to a host literally named "test".
 function setTestEnv() {
-  Deno.env.set('DATABASE_URL', 'postgres://test/test');
-  Deno.env.set('JWT_SECRET', 'test-secret-do-not-use-in-prod');
+  if (!Deno.env.get('DATABASE_URL')) {
+    // Fallback for stand-alone runs that have no real DB configured. The
+    // jwt module never opens a connection, so any non-empty value is fine.
+    Deno.env.set('DATABASE_URL', 'postgres://localhost/__no_connect__');
+  }
+  if (!Deno.env.get('JWT_SECRET')) {
+    Deno.env.set('JWT_SECRET', 'test-secret-do-not-use-in-prod');
+  }
   resetEnvCache();
 }
 

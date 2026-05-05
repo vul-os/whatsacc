@@ -101,7 +101,7 @@ export function Hero() {
         <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-3 flex items-center justify-between gap-4 text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">
           <span className="shrink-0">Vol. 01 &mdash; Issue 04</span>
           <span className="hidden md:inline">&mdash; a quiet revolution at the threshold &mdash;</span>
-          <span className="shrink-0 text-right">Cape Town &middot; Lagos &middot; Lisbon</span>
+          <span className="shrink-0 text-right">Durban &middot; Lagos &middot; Lisbon</span>
         </div>
       </div>
     </section>

@@ -1,0 +1,38 @@
+make a billing model that scales, in any region, each region for whatsapp has its own pricing. make it competitive but very profitable
+look at the output of the billing model yourself, see if it makes sense, then tell ai to use that for quota and tiers
+make an extra billing system with a wallet you can load.
+infinite access through web portal, mention that in pricing
+When system is running out, whatsapp must say when it opens and closes "you have 5 opens left, contact system admin to avoid being locked out or use web portal"
+billing system also working off a scheduler system for susbscription payments, make something for it in cron, for scalability it needs to handle lots, so mabe it must batch and do twice or three times a day?
+we need invoices, backend must make pdf, our company details must be in .env also if we have vat number charge vat have vat rate in config if vat number not set dont charge relevant
+use logo make it look amazing, it must be available on frontend
+
+
+we need paystack, test payouts, referrals, normal billing
+have tests so that we cant get caught with referals, like if you cancel and come back etc
+
+buy domain on namecheap, whatsacc.com
+resend setup, connect dns settings
+create firebase project, then setup hosting, after that create another site for firebase project for dev
+email templates, logo is in public folder
+login, reset password etc
+setup google oauth, need to go to console.cloud.google.com, ask if you need help
+
+test google login, after 30 mins, are you still logged on? do refresh token system work?
+
+improve docs, have a nice docs home page, have a search for docs
+
+light / dark mode with toggle in top bar
+
+imrpove and test analytics
+
+landing page issues, as discussed
+
+basic api system in backend, allow locations to generate api keys, to be able to do basic things.
+Also expose api to allow 3rd parties to make devices, with pairing system and signed keys etc for a device.
+keep this secure. have pen tests for this. Then have nice docs with python/go/deno/curl examples, keep within theme
+
+need to test whatsapp system yourself, open and close gate, have multiple acceess points for a location be able to choose, make it easy to use.
+User messages a number if they already know options for location. or they can send a location first but either way they need to send a location and choose access point if theres only 1 access point then only location is needed, when user meesages hi or nothing relevant give them instructuons and list locations they are linked to or tell them they are not linked.
+
+"fold" the migrations, which means, put all the migrations into a few files, example, all billing related ones go into billing.sql etc.

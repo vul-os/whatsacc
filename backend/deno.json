@@ -9,8 +9,18 @@
     "migrate": "deno run -A --env-file=../.env cmd/migrate/main.ts",
     "migrate:dev": "deno run -A --env-file=../.env.dev cmd/migrate/main.ts",
     "migrate:main": "deno run -A --env-file=../.env.main cmd/migrate/main.ts",
-    "test": "deno test -A",
-    "check": "deno check cmd/ src/"
+    "payouts": "deno run -A --env-file=../.env cmd/cron/run-monthly-payouts.ts",
+    "payouts:dev": "deno run -A --env-file=../.env.dev cmd/cron/run-monthly-payouts.ts",
+    "payouts:main": "deno run -A --env-file=../.env.main cmd/cron/run-monthly-payouts.ts",
+    "test": "deno test -A --env-file=../.env",
+    "test:dev": "deno test -A --env-file=../.env.dev",
+    "test:unit": "deno test -A tests/lib/",
+    "test:integration": "deno test -A --env-file=../.env tests/integration/",
+    "test:security": "deno test -A --env-file=../.env tests/security/",
+    "test:contract": "deno test -A --env-file=../.env tests/contract/",
+    "test:contract:paystack": "deno test -A --env-file=../.env tests/contract/paystack.test.ts",
+    "test:contract:resend": "deno test -A --env-file=../.env tests/contract/resend.test.ts",
+    "check": "deno check cmd/ src/ tests/"
   },
   "imports": {
     "@/": "./src/",

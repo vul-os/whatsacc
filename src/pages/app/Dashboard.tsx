@@ -1,17 +1,91 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from './AppLayout';
 import { Card, StatBlock } from '@/components/ui/Card';
-import { activity } from '@/mocks/activity';
-import { locations } from '@/mocks/locations';
+import { useAuth } from '@/lib/auth';
+import {
+  api,
+  type AccountBilling,
+  type AccountSummary,
+  type LocationRow,
+} from '@/lib/api';
+
+const ZAR = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
+
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60_000) return 'just now';
+  if (ms < 60 * 60_000) return `${Math.round(ms / 60_000)} min ago`;
+  if (ms < 24 * 60 * 60_000) return `${Math.round(ms / (60 * 60_000))} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function trendDelta(today: number, yesterday: number): string {
+  if (yesterday === 0) {
+    return today === 0 ? '—' : `+${today} new`;
+  }
+  const diff = today - yesterday;
+  if (diff === 0) return 'same as yesterday';
+  return `${diff > 0 ? '+' : ''}${diff} vs yesterday`;
+}
 
 export default function Dashboard() {
+  const { user, currentAccount } = useAuth();
+  const [summary, setSummary] = useState<AccountSummary | null>(null);
+  const [billing, setBilling] = useState<AccountBilling | null>(null);
+  const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentAccount) return;
+    let cancelled = false;
+    Promise.all([
+      api.accountSummary(currentAccount.id),
+      api.accountBilling(currentAccount.id).catch(() => null),
+      api.locationsList(currentAccount.id),
+    ])
+      .then(([s, b, l]) => {
+        if (cancelled) return;
+        setSummary(s);
+        setBilling(b);
+        setLocations(l.locations);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentAccount]);
+
+  const greeting = greetForHour(new Date().getHours());
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
+
   return (
     <>
       <PageHeader
         kicker="Today"
-        title="Good afternoon, Yusuf."
-        description="Three of your locations have had activity in the last hour. Everything is running."
+        title={`${greeting}, ${firstName}.`}
+        description={
+          summary
+            ? summary.opens_today > 0
+              ? `${summary.opens_today.toLocaleString()} ${summary.opens_today === 1 ? 'gate has' : 'gates have'} been opened today across your portfolio.`
+              : 'No opens yet today. The system is quiet.'
+            : 'Loading your portfolio…'
+        }
       />
+
+      {error && (
+        <Card className="mb-6 border-terracotta/40">
+          <p className="text-sm text-terracotta-deep">{error}</p>
+        </Card>
+      )}
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <Card className="lg:col-span-8 p-0 overflow-hidden">
@@ -21,44 +95,78 @@ export default function Dashboard() {
               View all
             </Link>
           </div>
-          <ul className="divide-y divide-ink/10">
-            {activity.map((a) => (
-              <li
-                key={a.id}
-                className="px-6 lg:px-8 py-3.5 flex items-center gap-4 text-sm hover:bg-paper-warm/50 transition-colors"
-              >
-                <span className="font-mono text-xs text-ink/55 w-12">{a.time}</span>
-                <Verdict kind={a.kind} />
-                <span className="font-medium">{a.who}</span>
-                <span className="text-ink/55">·</span>
-                <span className="text-ink/65 flex-1 min-w-0 truncate">{a.where}</span>
-                {a.note && (
-                  <span className="text-xs text-ink/50 hidden md:inline">{a.note}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {summary === null ? (
+            <p className="px-6 lg:px-8 py-6 text-ink/55 text-sm">Loading…</p>
+          ) : summary.recent_activity.length === 0 ? (
+            <p className="px-6 lg:px-8 py-6 text-ink/65 text-sm">No activity yet.</p>
+          ) : (
+            <ul className="divide-y divide-ink/10">
+              {summary.recent_activity.map((a) => (
+                <li
+                  key={a.id}
+                  className="px-6 lg:px-8 py-3.5 flex items-center gap-4 text-sm hover:bg-paper-warm/50 transition-colors"
+                >
+                  <span className="font-mono text-xs text-ink/55 w-12 shrink-0">{shortTime(a.ts)}</span>
+                  <Verdict command={a.command} success={a.success} />
+                  <span className="font-medium truncate">
+                    {a.actor_email ?? <span className="text-ink/55">unknown</span>}
+                  </span>
+                  <span className="text-ink/35 hidden sm:inline">·</span>
+                  <span className="text-ink/65 flex-1 min-w-0 truncate hidden sm:inline">
+                    {a.access_point_name ?? a.location_name ?? '—'}
+                  </span>
+                  {a.source && (
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 hidden md:inline">
+                      {a.source}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         <div className="lg:col-span-4 grid grid-cols-2 gap-4 content-start">
           <Card className="col-span-2 bg-ink text-paper">
-            <StatBlock label="Opens today" value="118" hint="+12 vs yesterday" className="text-paper [&_*]:!text-paper" />
+            <StatBlock
+              label="Opens today"
+              value={summary ? summary.opens_today.toLocaleString() : '—'}
+              hint={summary ? trendDelta(summary.opens_today, summary.opens_yesterday) : ''}
+              className="text-paper [&_*]:!text-paper"
+            />
           </Card>
           <Card>
-            <StatBlock label="Locations" value={String(locations.length)} hint="active" />
+            <StatBlock
+              label="Locations"
+              value={summary ? summary.location_count.toString() : '—'}
+              hint="active"
+            />
           </Card>
           <Card>
-            <StatBlock label="Members" value="193" hint="across portfolio" />
+            <StatBlock
+              label="Members"
+              value={summary ? summary.member_count.toString() : '—'}
+              hint="across portfolio"
+            />
           </Card>
           <Card className="col-span-2 bg-paper-warm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-ink/55 mb-3">
-              Wallet
+            <p className="text-[11px] uppercase tracking-[0.18em] text-ink/55 mb-3">Wallet</p>
+            <p className="font-display text-3xl">
+              {billing?.wallet
+                ? ZAR.format(billing.wallet.balance_cents / 100)
+                : 'R 0.00'}
             </p>
-            <p className="font-display text-3xl">1,243 / 2,000</p>
-            <p className="text-sm text-ink/60 mt-1">messages this month</p>
-            <div className="mt-4 h-1.5 rounded-full bg-ink/10 overflow-hidden">
-              <div className="h-full bg-terracotta" style={{ width: '62%' }} />
-            </div>
+            <p className="text-sm text-ink/60 mt-1">
+              {billing?.subscription
+                ? `Plan: ${billing.subscription.plan_code}`
+                : 'No active plan'}
+            </p>
+            <Link
+              to="/app/billing"
+              className="text-xs text-ink/60 hover:text-ink underline underline-offset-4 mt-3 inline-block"
+            >
+              Top up →
+            </Link>
           </Card>
         </div>
 
@@ -69,42 +177,70 @@ export default function Dashboard() {
               Manage
             </Link>
           </div>
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {locations.map((loc) => (
-              <li key={loc.id} className="rounded-2xl border border-ink/10 p-5 hover:border-ink/30 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">
-                    {loc.kind}
-                  </span>
-                  <span className="text-xs text-ink/45">{loc.city}</span>
-                </div>
-                <p className="font-display text-xl mt-2">{loc.name}</p>
-                <p className="text-sm text-ink/55 mt-2">
-                  {loc.accessPoints} access points · {loc.members} members
-                </p>
-                <p className="text-xs text-ink/45 mt-3">last opened {loc.lastOpened}</p>
-              </li>
-            ))}
-          </ul>
+          {locations.length === 0 ? (
+            <p className="text-ink/65 text-sm">
+              No locations yet.{' '}
+              <Link to="/app/locations" className="underline underline-offset-4 decoration-terracotta">
+                Create your first
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {locations.map((loc) => (
+                <li
+                  key={loc.id}
+                  className="rounded-2xl border border-ink/10 p-5 hover:border-ink/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">
+                      {loc.type}
+                    </span>
+                    <span className="text-xs text-ink/45">
+                      {(loc.address?.city as string | undefined) ?? '—'}
+                    </span>
+                  </div>
+                  <p className="font-display text-xl mt-2">{loc.name}</p>
+                  <p className="text-sm text-ink/55 mt-2">
+                    {loc.access_point_count} access point{loc.access_point_count === 1 ? '' : 's'} ·{' '}
+                    {loc.member_count} member{loc.member_count === 1 ? '' : 's'}
+                  </p>
+                  <p className="text-xs text-ink/45 mt-3">
+                    last opened {loc.last_opened_at ? relativeTime(loc.last_opened_at) : '—'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </section>
     </>
   );
 }
 
-function Verdict({ kind }: { kind: string }) {
-  const map: Record<string, { dot: string; label: string }> = {
-    open: { dot: 'bg-moss', label: 'open' },
-    denied: { dot: 'bg-terracotta', label: 'denied' },
-    paired: { dot: 'bg-gold', label: 'paired' },
-    invite: { dot: 'bg-ink', label: 'invite' },
-    note: { dot: 'bg-slate', label: 'note' },
-  };
-  const m = map[kind] ?? map.note;
+function greetForHour(h: number): string {
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function Verdict({ command, success }: { command: string; success: boolean }) {
+  let dot = 'bg-slate';
+  let label: string = command;
+  if (command === 'open' && success) {
+    dot = 'bg-moss';
+    label = 'open';
+  } else if (command === 'close' && success) {
+    dot = 'bg-ink';
+    label = 'close';
+  } else if (!success) {
+    dot = 'bg-terracotta';
+    label = 'denied';
+  }
   return (
-    <span className="inline-flex items-center gap-2 w-20 text-xs text-ink/70 uppercase tracking-wider">
-      <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
-      {m.label}
+    <span className="inline-flex items-center gap-2 w-20 text-xs text-ink/70 uppercase tracking-wider shrink-0">
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      {label}
     </span>
   );
 }

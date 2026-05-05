@@ -1,16 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { cn } from '@/lib/cn';
-
-const items: { to: string; label: string; end?: boolean }[] = [
-  { to: '/app', label: 'Dashboard', end: true },
-  { to: '/app/locations', label: 'Locations' },
-  { to: '/app/access-points', label: 'Access points' },
-  { to: '/app/devices', label: 'Devices' },
-  { to: '/app/members', label: 'Members' },
-  { to: '/app/billing', label: 'Billing' },
-  { to: '/app/analytics', label: 'Analytics' },
-];
+import { APP_NAV_ITEMS } from './items';
 
 export function AppSidebar() {
   return (
@@ -23,7 +14,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {items.map((it) => (
+        {APP_NAV_ITEMS.map((it) => (
           <NavLink
             key={it.to}
             to={it.to}
@@ -41,15 +32,6 @@ export function AppSidebar() {
           </NavLink>
         ))}
       </nav>
-
-      <div className="mt-auto px-3 pt-6 border-t border-ink/10">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-ink/40 mb-2">Plan</p>
-        <p className="font-display text-lg leading-none">Starter</p>
-        <p className="text-xs text-ink/50 mt-1">1,243 / 2,000 msgs</p>
-        <div className="mt-2 h-1 bg-ink/10 rounded-full overflow-hidden">
-          <div className="h-full bg-terracotta" style={{ width: '62%' }} />
-        </div>
-      </div>
     </aside>
   );
 }

@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
+import { getCountry } from '@/lib/billing/data';
+
+const za = getCountry('ZA');
 
 const cols = [
   {
@@ -41,8 +44,12 @@ export function Footer() {
               <span className="font-display italic text-4xl sm:text-5xl leading-none">whatsacc</span>
             </Link>
             <p className="mt-5 sm:mt-6 text-paper/65 max-w-sm leading-relaxed">
-              A quieter way through the threshold. Built in Cape Town, deployed wherever
+              A quieter way through the threshold. Built in Durban, deployed wherever
               there&rsquo;s a gate that needs opening.
+            </p>
+            <p className="mt-5 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-paper/55">
+              <span aria-hidden className="text-base leading-none">{za?.flag}</span>
+              <span>Made in South Africa</span>
             </p>
           </div>
 
@@ -78,7 +85,7 @@ export function Footer() {
           <span>&copy; {new Date().getFullYear()} whatsacc</span>
           <span aria-hidden>&mdash;</span>
           <span>texts that open gates</span>
-          <span className="ml-auto">v 0.1 &middot; cape town</span>
+          <span className="ml-auto">v 0.1 &middot; durban</span>
         </div>
       </div>
     </footer>

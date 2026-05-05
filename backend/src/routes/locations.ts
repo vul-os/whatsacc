@@ -42,13 +42,36 @@ function locationsRouter() {
         name: string;
         slug: string | null;
         status: string;
+        address: unknown;
+        access_point_count: string;
+        member_count: string;
+        last_opened_at: Date | null;
       }[]>`
-        select id, parent_location_id, type, name, slug, status
-        from locations where account_id = ${accountId}
-        order by created_at asc
+        select
+          l.id, l.parent_location_id, l.type, l.name, l.slug, l.status, l.address,
+          (select count(*)::text from access_points ap where ap.location_id = l.id) as access_point_count,
+          (select count(*)::text from location_members lm where lm.location_id = l.id) as member_count,
+          (select max(al.ts) from access_logs al
+             where al.location_id = l.id and al.command = 'open' and al.success = true) as last_opened_at
+        from locations l
+        where l.account_id = ${accountId}
+        order by l.created_at asc
       `;
     });
-    return c.json({ locations: rows });
+    return c.json({
+      locations: rows.map((r) => ({
+        id: r.id,
+        parent_location_id: r.parent_location_id,
+        type: r.type,
+        name: r.name,
+        slug: r.slug,
+        status: r.status,
+        address: r.address,
+        access_point_count: Number(r.access_point_count),
+        member_count: Number(r.member_count),
+        last_opened_at: r.last_opened_at,
+      })),
+    });
   });
 
   app.post(

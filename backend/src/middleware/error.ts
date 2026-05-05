@@ -4,19 +4,25 @@ import { HttpError } from '../lib/errors.ts';
 import { ZodError } from 'zod';
 import type { AppEnv } from './auth.ts';
 
+// Flat error shape the frontend ApiError class expects:
+//   { error: <code>, detail: <human-readable message> }
+
 export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
   if (err instanceof HttpError) {
     return c.json(
-      { error: { code: err.code, message: err.message } },
+      {
+        error: err.code,
+        detail: err.message !== err.code ? err.message : undefined,
+      },
       err.status as ContentfulStatusCode,
     );
   }
   if (err instanceof ZodError) {
     return c.json(
-      { error: { code: 'validation_error', issues: err.issues } },
+      { error: 'validation_error', detail: err.issues[0]?.message, issues: err.issues },
       400,
     );
   }
   console.error('unhandled', err);
-  return c.json({ error: { code: 'internal_error', message: 'internal error' } }, 500);
+  return c.json({ error: 'internal_error', detail: 'internal error' }, 500);
 };
