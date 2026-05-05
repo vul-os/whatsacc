@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { getSql } from './lib/db.ts';
 import { getEnv } from './lib/env.ts';
 import type { AppEnv } from './middleware/auth.ts';
@@ -19,6 +20,22 @@ export function createApp() {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
+
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => {
+        if (!origin) return origin;
+        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+        if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+        return null;
+      },
+      credentials: true,
+      allowHeaders: ['Content-Type', 'Authorization'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      maxAge: 86400,
+    }),
+  );
 
   app.get('/', (c) => c.text('whatsacc'));
 

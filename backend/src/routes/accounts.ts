@@ -6,7 +6,7 @@ import { withUserDb, withAnonDb } from '../middleware/rls.ts';
 import { BadRequest, NotFound } from '../lib/errors.ts';
 import { randomToken } from '../lib/random.ts';
 import { hashToken } from '../lib/refresh.ts';
-import { sendEmail } from '../lib/email.ts';
+import { escapeHtml, renderEmail, sendEmail } from '../lib/email.ts';
 import { getEnv } from '../lib/env.ts';
 
 const createAccountSchema = z
@@ -129,14 +129,23 @@ function accountsRouter() {
     const env = getEnv();
     const acceptUrl =
       `${env.APP_PUBLIC_URL}/accept-invite?token=${encodeURIComponent(tokenPlain)}`;
+    const inviteMail = renderEmail({
+      preheader: `You've been invited to join ${result.account_name} on whatsacc.`,
+      heading: `Join ${escapeHtml(result.account_name)} on whatsacc`,
+      bodyParagraphs: [
+        `You've been invited to join <strong style="color:#1a1f36;">${escapeHtml(result.account_name)}</strong> as <strong style="color:#1a1f36;">${escapeHtml(role)}</strong>.`,
+        'Accept the invite to set up your account and start opening gates with a text.',
+        'This invitation expires in 7 days.',
+      ],
+      cta: { label: 'Accept invitation', url: acceptUrl },
+      footnote:
+        "If you weren't expecting this, you can safely ignore this email — no account will be created.",
+    });
     await sendEmail({
       to: email,
       subject: `You've been invited to ${result.account_name} on whatsacc`,
-      html: `
-        <p>You've been invited to join <strong>${result.account_name}</strong> on whatsacc as <strong>${role}</strong>.</p>
-        <p>Click <a href="${acceptUrl}">here</a> to accept. Link expires in 7 days.</p>
-      `,
-      text: `Accept your whatsacc invite to ${result.account_name}: ${acceptUrl}`,
+      html: inviteMail.html,
+      text: inviteMail.text,
     });
 
     return c.json({ id: result.invite_id }, 201);

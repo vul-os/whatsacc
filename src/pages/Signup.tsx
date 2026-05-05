@@ -15,6 +15,7 @@ export default function Signup() {
   const [countries, setCountries] = useState<CountryRef[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const { registerWithPassword } = useAuth();
   const navigate = useNavigate();
 
@@ -54,7 +55,7 @@ export default function Signup() {
         referral_slug: referral?.slug,
       });
       clearReferral();
-      navigate('/app');
+      setSubmittedEmail(email);
     } catch (err) {
       setErrorMsg(toMessage(err));
     } finally {
@@ -74,6 +75,40 @@ export default function Signup() {
         </p>
       }
     >
+      {submittedEmail ? (
+        <>
+          <h1 className="font-display-tight text-3xl sm:text-4xl">Check your email</h1>
+          <p className="mt-3 text-sm text-ink/70">
+            We sent a verification link to{' '}
+            <span className="font-medium text-ink">{submittedEmail}</span>. Click it to activate
+            your account, then sign in.
+          </p>
+          <div className="mt-6 rounded-xl bg-paper-cool border border-ink/10 px-4 py-3 text-sm text-ink/70">
+            The link expires in 24 hours. Check your spam folder if it doesn't arrive within a
+            minute.
+          </div>
+          <Button
+            variant="ink"
+            size="lg"
+            className="mt-6 w-full"
+            onClick={() => navigate('/login')}
+          >
+            Go to sign in
+          </Button>
+          <p className="mt-5 text-sm text-ink/60">
+            Wrong email?{' '}
+            <button
+              type="button"
+              onClick={() => setSubmittedEmail(null)}
+              className="underline underline-offset-4 decoration-terracotta"
+            >
+              Sign up again
+            </button>
+            .
+          </p>
+        </>
+      ) : (
+        <>
       <h1 className="font-display-tight text-3xl sm:text-4xl">Create your account</h1>
       <p className="mt-2 text-sm text-ink/60">Two minutes. No credit card.</p>
 
@@ -185,6 +220,8 @@ export default function Signup() {
         </Link>
         .
       </p>
+        </>
+      )}
     </AuthLayout>
   );
 }

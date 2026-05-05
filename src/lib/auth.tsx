@@ -129,11 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       setError(null);
       await api.register(input);
-      const tokens = await api.login({ email: input.email, password: input.password });
-      tokenStore.set(tokens.access_token, tokens.refresh_token);
-      await refreshMe();
     },
-    [refreshMe],
+    [],
   );
 
   const signOut = useCallback(async () => {

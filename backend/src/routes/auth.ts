@@ -9,7 +9,7 @@ import { hashPassword, verifyPassword } from '../lib/password.ts';
 import { signAccessToken, signShortToken, verifyShortToken } from '../lib/jwt.ts';
 import { mintRefreshToken, hashToken, REFRESH_TTL_SECONDS } from '../lib/refresh.ts';
 import { randomToken } from '../lib/random.ts';
-import { sendEmail } from '../lib/email.ts';
+import { renderEmail, sendEmail, escapeHtml } from '../lib/email.ts';
 import {
   buildAuthUrl,
   exchangeCode,
@@ -252,11 +252,21 @@ function authRouter() {
 
     const env = getEnv();
     const verifyUrl = `${env.APP_PUBLIC_URL}/auth/verify-email?token=${encodeURIComponent(verifyTokenPlain)}`;
+    const verifyMail = renderEmail({
+      preheader: 'Confirm your email to finish setting up whatsacc.',
+      heading: `Welcome, ${escapeHtml(display_name)}.`,
+      bodyParagraphs: [
+        "Thanks for signing up for whatsacc. Confirm your email so we know it's really you — it takes one click.",
+        'This link expires in 24 hours.',
+      ],
+      cta: { label: 'Verify my email', url: verifyUrl },
+      footnote: "If you didn't create a whatsacc account, you can safely ignore this email.",
+    });
     await sendEmail({
       to: email,
       subject: 'Verify your whatsacc email',
-      html: `<p>Hi ${display_name},</p><p>Click <a href="${verifyUrl}">here</a> to verify your email. Link expires in 24 hours.</p>`,
-      text: `Verify your email: ${verifyUrl}`,
+      html: verifyMail.html,
+      text: verifyMail.text,
     });
 
     return c.json({ id: result.userId, account_id: result.accountId }, 201);
@@ -408,11 +418,22 @@ function authRouter() {
     if (sent) {
       const env = getEnv();
       const url = `${env.APP_PUBLIC_URL}/auth/reset-password?token=${encodeURIComponent(tokenPlain)}`;
+      const resetMail = renderEmail({
+        preheader: 'Reset your whatsacc password.',
+        heading: 'Reset your password',
+        bodyParagraphs: [
+          'We received a request to reset the password on your whatsacc account. Use the button below to set a new one.',
+          'This link expires in 1 hour.',
+        ],
+        cta: { label: 'Reset password', url },
+        footnote:
+          "If you didn't request a password reset, you can ignore this email — your password won't change.",
+      });
       await sendEmail({
         to: email,
         subject: 'Reset your whatsacc password',
-        html: `<p>Click <a href="${url}">here</a> to reset your password. Link expires in 1 hour.</p>`,
-        text: `Reset your password: ${url}`,
+        html: resetMail.html,
+        text: resetMail.text,
       });
     }
 
