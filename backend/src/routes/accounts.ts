@@ -8,11 +8,13 @@ import { randomToken } from '../lib/random.ts';
 import { hashToken } from '../lib/refresh.ts';
 import { escapeHtml, renderEmail, sendEmail } from '../lib/email.ts';
 import { getEnv } from '../lib/env.ts';
+import { bootstrapPersonalAccount } from './auth.ts';
 
 const createAccountSchema = z
   .object({
     name: z.string().min(1).max(120),
     billing_type: z.enum(['personal', 'business']).default('personal'),
+    country_code: z.string().length(2).transform((v) => v.toUpperCase()).default('ZA'),
   })
   .strict();
 
@@ -51,21 +53,21 @@ function accountsRouter() {
 
   app.post('/', zValidator('json', createAccountSchema), async (c) => {
     const user = getUser(c);
-    const { name, billing_type } = c.req.valid('json');
-    const account = await withUserDb(c, async (tx) => {
-      const [a] = await tx<{ id: string }[]>`
-        insert into accounts (name, billing_type, status)
-        values (${name}, ${billing_type}, 'active')
-        returning id
-      `;
-      const accountId = a!.id;
-      await tx`
-        insert into account_members (account_id, user_id, role, status)
-        values (${accountId}, ${user.sub}, 'owner', 'active')
-      `;
-      return { id: accountId };
+    const { name, billing_type, country_code } = c.req.valid('json');
+    // Account creation must run with elevated privilege: the accounts RLS
+    // WITH CHECK clause requires is_account_admin(id), but at INSERT time no
+    // membership row exists yet. requireAuth() above already verified the
+    // caller; bootstrapPersonalAccount also wires up the wallet + free-plan
+    // subscription so the new account is fully usable.
+    const accountId = await withAnonDb(async (tx) => {
+      return await bootstrapPersonalAccount(tx, {
+        userId: user.sub,
+        name,
+        countryCode: country_code,
+        billingType: billing_type,
+      });
     });
-    return c.json(account, 201);
+    return c.json({ id: accountId }, 201);
   });
 
   app.get('/:id', async (c) => {

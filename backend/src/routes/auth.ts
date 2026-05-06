@@ -127,7 +127,7 @@ async function attributeReferral(
   `;
 }
 
-async function bootstrapPersonalAccount(
+export async function bootstrapPersonalAccount(
   tx: TxSql,
   opts: { userId: string; name: string; countryCode: string; billingType?: 'personal' | 'business' },
 ): Promise<string> {
