@@ -8,6 +8,7 @@ export interface Env {
   RESEND_API_KEY?: string;
   APP_PUBLIC_URL: string;
   WHATSAPP_APP_SECRET?: string;
+  WHATSAPP_VERIFY_TOKEN?: string;
   PAYSTACK_SECRET_KEY?: string;
   PAYSTACK_PUBLIC_KEY?: string;
   PAYSTACK_CALLBACK_URL?: string;
@@ -33,6 +34,7 @@ export function getEnv(): Env {
     RESEND_API_KEY: Deno.env.get('RESEND_API_KEY'),
     APP_PUBLIC_URL: Deno.env.get('APP_PUBLIC_URL') ?? 'http://localhost:8000',
     WHATSAPP_APP_SECRET: Deno.env.get('WHATSAPP_APP_SECRET'),
+    WHATSAPP_VERIFY_TOKEN: Deno.env.get('WHATSAPP_VERIFY_TOKEN'),
     PAYSTACK_SECRET_KEY: Deno.env.get('PAYSTACK_SECRET_KEY'),
     PAYSTACK_PUBLIC_KEY: Deno.env.get('PAYSTACK_PUBLIC_KEY'),
     PAYSTACK_CALLBACK_URL: Deno.env.get('PAYSTACK_CALLBACK_URL'),

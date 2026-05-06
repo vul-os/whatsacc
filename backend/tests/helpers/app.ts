@@ -39,7 +39,9 @@ export async function bootTestApp(): Promise<AppHandle> {
   // Required env vars for the production code paths to work in tests.
   if (!Deno.env.get('JWT_SECRET')) Deno.env.set('JWT_SECRET', 'test-jwt-secret');
   if (!Deno.env.get('APP_PUBLIC_URL')) Deno.env.set('APP_PUBLIC_URL', 'http://test.local');
-  if (!Deno.env.get('APP_ENV')) Deno.env.set('APP_ENV', 'test');
+  // Force APP_ENV=test even when .env sets APP_ENV=local — sendEmail() uses
+  // this flag to skip real Resend calls and avoid burning the daily quota.
+  Deno.env.set('APP_ENV', 'test');
   if (!Deno.env.get('PAYSTACK_SECRET_KEY')) Deno.env.set('PAYSTACK_SECRET_KEY', 'sk_test_dummy');
 
   const app = createApp();

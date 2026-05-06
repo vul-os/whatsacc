@@ -55,12 +55,14 @@ type WhatsAppPayload = {
 function whatsappRouter() {
   const app = new Hono<AppEnv>();
 
-  // Meta webhook verification handshake
+  // Meta webhook verification handshake. Verify token is sent in plaintext
+  // by Meta on the GET handshake — keep it distinct from the App Secret used
+  // to HMAC-sign POST payloads.
   app.get('/webhooks/whatsapp', (c) => {
     const mode = c.req.query('hub.mode');
     const token = c.req.query('hub.verify_token');
     const challenge = c.req.query('hub.challenge');
-    const expected = getEnv().WHATSAPP_APP_SECRET;
+    const expected = getEnv().WHATSAPP_VERIFY_TOKEN;
     if (mode === 'subscribe' && token && expected && token === expected) {
       return c.text(challenge ?? '');
     }

@@ -329,6 +329,11 @@ function referralsRouter() {
     const user = getUser(c);
     const { amount_zar_cents } = c.req.valid('json');
     const result = await withUserDb(c, async (tx) => {
+      // Serialise concurrent payout creates for this user. Without this,
+      // two simultaneous requests under READ COMMITTED can each see
+      // available=N before either inserts a pending row, then both insert
+      // and total pending > earned.
+      await tx`select pg_advisory_xact_lock(hashtextextended('payout:' || ${user.sub}, 0))`;
       const kyc = await loadKyc(tx, user.sub);
       if (!kycComplete(kyc)) throw Forbidden('kyc_incomplete');
       const balance = await computeBalance(tx, user.sub);
