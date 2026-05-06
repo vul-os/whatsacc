@@ -33,9 +33,11 @@ export function uniqRef(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${rnd}`;
 }
 
-/** Random unique email so reused signups don't collide on Paystack's side. */
+/** Random unique email so reused signups don't collide on Paystack's side.
+ * Uses example.com (RFC 2606 reserved) instead of .local — Paystack's email
+ * validator rejects .local as an invalid TLD. */
 export function uniqEmail(): string {
-  return `whatsacc-contract-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.local`;
+  return `whatsacc-contract-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
 export async function paystackCall<T>(

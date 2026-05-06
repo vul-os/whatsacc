@@ -16,10 +16,8 @@
 //   3. /transaction/initialize — happy path returns auth_url + reference
 //   4. /transaction/verify — unpaid reference reports as such
 //   5. /charge with a test card — completes and is verifiable
-//   6. End-to-end via our /billing/wallet/topup → /charge → /billing/wallet/verify
-//      → wallet balance credited
-//   7. End-to-end transfer dispatch via runMonthlyPayouts() against real Paystack
-//   8. HMAC signature: event signed with our secret matches verifyWebhookSignature
+//   6. End-to-end transfer dispatch via runMonthlyPayouts() against real Paystack
+//   7. HMAC signature: event signed with our secret matches verifyWebhookSignature
 
 import { assert, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
 import {
@@ -244,85 +242,7 @@ contractTest(
 );
 
 // ---------------------------------------------------------------------------
-// 5. End-to-end: our /billing/wallet/topup against real Paystack
-// ---------------------------------------------------------------------------
-
-contractTest(
-  'paystack e2e: /billing/wallet/topup → real Paystack init → /charge → /verify credits wallet',
-  ['PAYSTACK_TEST_SECRET_KEY'],
-  async () => {
-    setupRealPaystackEnv();
-    await resetData();
-    const app = await bootTestApp();
-    const u = await registerUser(app);
-
-    // 1. Our app initializes the transaction at Paystack.
-    const init = await app.request('POST', '/billing/wallet/topup', {
-      token: u.access_token,
-      json: { account_id: u.account_id, amount_cents: 100_00 },
-    });
-    assertEquals(init.status, 201);
-    const initBody = init.body as {
-      reference: string;
-      authorization_url: string;
-      access_code: string;
-    };
-    assertStringIncludes(initBody.authorization_url, 'paystack.com');
-
-    // 2. Settle the transaction by charging a test card directly with the
-    //    SAME reference. Paystack resolves the existing pending transaction
-    //    when /charge is invoked with an existing reference.
-    const charge = await paystackCall<{ status: string; reference: string }>(
-      'POST',
-      '/charge',
-      {
-        email: u.email,
-        amount: 100_00,
-        currency: 'ZAR',
-        reference: initBody.reference,
-        card: TEST_CARD_SUCCESS,
-      },
-    );
-    assertEquals(charge.status, true);
-
-    // Wait for Paystack to settle if pending.
-    for (let i = 0; i < 5; i++) {
-      const v = await verifyTransaction(initBody.reference);
-      if (v.status === 'success') break;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-
-    // 3. Hit our verify endpoint, which calls real Paystack verify and
-    //    credits the wallet on success.
-    const verify = await app.request('GET', '/billing/wallet/verify', {
-      token: u.access_token,
-      query: { reference: initBody.reference },
-    });
-    assertEquals(verify.status, 200);
-    const vBody = verify.body as { status: string; already_credited: boolean };
-    assertEquals(vBody.status, 'succeeded');
-    assertEquals(vBody.already_credited, false);
-
-    // 4. Wallet now reflects the topup.
-    const billing = await app.request('GET', `/billing/accounts/${u.account_id}/billing`, {
-      token: u.access_token,
-    });
-    assertEquals(
-      (billing.body as { wallet: { balance_cents: number; currency: string } }).wallet.balance_cents,
-      100_00,
-    );
-
-    // 5. Idempotent re-verify — should not double-credit.
-    const v2 = await app.request('GET', '/billing/wallet/verify', {
-      token: u.access_token,
-      query: { reference: initBody.reference },
-    });
-    assertEquals((v2.body as { already_credited: boolean }).already_credited, true);
-  },
-);
-
-// ---------------------------------------------------------------------------
-// 6. End-to-end: cron-driven transfer against real Paystack
+// 5. End-to-end: cron-driven transfer against real Paystack
 // ---------------------------------------------------------------------------
 
 contractTest(

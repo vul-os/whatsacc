@@ -32,7 +32,7 @@ export async function registerUser(
   opts: RegisterOpts = {},
 ): Promise<RegisteredUser> {
   userCounter += 1;
-  const email = opts.email ?? `user${userCounter}-${Date.now()}@test.local`;
+  const email = opts.email ?? `user${userCounter}-${Date.now()}@example.com`;
   const password = opts.password ?? 'Pa55word_test';
   const display_name = opts.display_name ?? `Test User ${userCounter}`;
 

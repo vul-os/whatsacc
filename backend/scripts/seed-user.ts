@@ -4,7 +4,7 @@
 // Usage:
 //   cd backend
 //   deno run -A --env-file=../.env scripts/seed-user.ts \
-//     --email=whatsaccsupport@gmail.com --password=happy123 --name=Support
+//     --email=whatsaccsupport@gmail.com --password=happy123 --name=Andile
 
 import postgres from 'postgres';
 import { parseArgs } from 'jsr:@std/cli@^1.0.0/parse-args';

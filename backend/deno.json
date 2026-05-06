@@ -1,6 +1,4 @@
 {
-  "name": "@whatsacc/backend",
-  "version": "0.0.0",
   "tasks": {
     "dev": "deno run -A --watch --env-file=../.env cmd/server/main.ts",
     "dev:dev": "deno run -A --watch --env-file=../.env.dev cmd/server/main.ts",
