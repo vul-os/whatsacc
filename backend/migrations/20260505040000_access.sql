@@ -11,8 +11,8 @@ CREATE TABLE devices (
     last_seen_at timestamptz NULL,
     public_key text NULL,
     status text NOT NULL DEFAULT 'unpaired',
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE devices IS 'Physical controllers paired to a location, receiving commands.';
 CREATE INDEX devices_location_id_idx ON devices (location_id);
@@ -29,8 +29,8 @@ CREATE TABLE access_points (
     long double precision,
     device_id uuid NULL REFERENCES devices(id) ON DELETE SET NULL,
     status text NOT NULL DEFAULT 'active',
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE access_points IS 'Gates, doors and barriers under a location, optionally bound to a device.';
 CREATE INDEX access_points_location_id_idx ON access_points (location_id);
@@ -44,12 +44,12 @@ CREATE TABLE device_commands (
     command text NOT NULL CHECK (command IN ('open','close')),
     status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','delivered','executed','failed','expired')),
     source text NOT NULL CHECK (source IN ('web','whatsapp','api')),
-    requested_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    requested_at timestamptz NOT NULL DEFAULT now(),
     delivered_at timestamptz NULL,
     executed_at timestamptz NULL,
     error text NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE device_commands IS 'Queue of open/close commands dispatched to devices.';
 CREATE INDEX device_commands_device_id_idx ON device_commands (device_id);
@@ -70,8 +70,8 @@ CREATE TABLE access_logs (
     distance_m numeric(10,2) NULL,
     success boolean NOT NULL,
     error text NULL,
-    ts timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    ts timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE access_logs IS 'Append-only audit log of access attempts; denormalised for analytics.';
 CREATE INDEX access_logs_location_id_ts_idx ON access_logs (location_id, ts DESC);

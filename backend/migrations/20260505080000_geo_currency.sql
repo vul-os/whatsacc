@@ -9,8 +9,8 @@ CREATE TABLE currencies (
     symbol text NOT NULL,
     decimals smallint NOT NULL DEFAULT 2 CHECK (decimals >= 0 AND decimals <= 4),
     is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE currencies IS 'Supported display currencies. Native ledger is ZAR.';
 
@@ -19,8 +19,8 @@ CREATE TABLE fx_rates (
     -- 1 unit of currency = `rate_to_zar` ZAR. Display = zar / rate_to_zar.
     rate_to_zar numeric(18,8) NOT NULL CHECK (rate_to_zar > 0),
     source text NOT NULL DEFAULT 'seed',
-    fetched_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    fetched_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE fx_rates IS 'Latest FX rate per currency relative to ZAR. Refreshed by cron.';
 
@@ -32,8 +32,8 @@ CREATE TABLE countries (
     -- WhatsApp business-initiated conversation cost in ZAR.
     msg_cost_zar numeric(10,4) NOT NULL DEFAULT 0,
     is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE countries IS 'Supported countries with WhatsApp conversation cost in ZAR.';
 CREATE INDEX countries_currency_code_idx ON countries (currency_code);

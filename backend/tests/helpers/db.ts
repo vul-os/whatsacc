@@ -79,7 +79,7 @@ async function applyAllMigrations(sql: postgres.Sql): Promise<void> {
       version    text        PRIMARY KEY,
       name       text        NOT NULL,
       checksum   text        NOT NULL,
-      applied_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+      applied_at timestamptz NOT NULL DEFAULT now()
     );
   `);
 

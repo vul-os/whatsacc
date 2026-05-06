@@ -33,11 +33,11 @@ function analyticsRouter() {
         select
           (select count(*) from access_logs
             where account_id = ${id} and command = 'open' and success = true
-              and ts >= date_trunc('day', timezone('utc', now())))::text as opens_today,
+              and ts >= date_trunc('day', now()))::text as opens_today,
           (select count(*) from access_logs
             where account_id = ${id} and command = 'open' and success = true
-              and ts >= date_trunc('day', timezone('utc', now())) - interval '1 day'
-              and ts <  date_trunc('day', timezone('utc', now())))::text as opens_yesterday,
+              and ts >= date_trunc('day', now()) - interval '1 day'
+              and ts <  date_trunc('day', now()))::text as opens_yesterday,
           (select count(*) from locations where account_id = ${id})::text as location_count,
           (select count(*) from account_members where account_id = ${id})::text as member_count
       `;

@@ -8,8 +8,8 @@ CREATE TABLE users (
     status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled','pending')),
     email_verified_at timestamptz NULL,
     is_platform_admin boolean NOT NULL DEFAULT false,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE users IS 'Authenticated end-users of the platform.';
 
@@ -18,8 +18,8 @@ CREATE TABLE profiles (
     display_name text,
     avatar_url text,
     locale text NOT NULL DEFAULT 'en',
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE profiles IS 'Per-user profile metadata, 1:1 with users.';
 
@@ -29,8 +29,8 @@ CREATE TABLE oauth_identities (
     provider text NOT NULL,
     provider_sub text NOT NULL,
     email citext,
-    linked_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    linked_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (provider, provider_sub)
 );
 COMMENT ON TABLE oauth_identities IS 'Linked external identity-provider identities per user.';
@@ -41,13 +41,13 @@ CREATE TABLE refresh_tokens (
     family_id uuid NOT NULL,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash text NOT NULL,
-    issued_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    issued_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz NOT NULL,
     revoked_at timestamptz NULL,
     replaced_by uuid NULL,
     user_agent text,
     ip inet,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE refresh_tokens IS 'Rotating refresh-token records grouped by family for reuse detection.';
 CREATE INDEX refresh_tokens_user_id_idx ON refresh_tokens (user_id);
@@ -59,7 +59,7 @@ CREATE TABLE password_reset_tokens (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires_at timestamptz NOT NULL,
     used_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE password_reset_tokens IS 'Single-use tokens for password reset flows.';
 CREATE INDEX password_reset_tokens_user_id_idx ON password_reset_tokens (user_id);
@@ -70,7 +70,7 @@ CREATE TABLE email_verification_tokens (
     purpose text NOT NULL DEFAULT 'verify' CHECK (purpose IN ('verify')),
     expires_at timestamptz NOT NULL,
     used_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE email_verification_tokens IS 'Single-use tokens for email-address verification.';
 CREATE INDEX email_verification_tokens_user_id_idx ON email_verification_tokens (user_id);
@@ -81,7 +81,7 @@ CREATE TABLE profile_phone_numbers (
     phone_e164 text NOT NULL,
     verified_at timestamptz NULL,
     is_primary boolean NOT NULL DEFAULT false,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (profile_id, phone_e164)
 );
 COMMENT ON TABLE profile_phone_numbers IS 'Phone numbers attached to a profile, verified or pending.';

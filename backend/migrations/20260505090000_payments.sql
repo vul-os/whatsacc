@@ -29,8 +29,8 @@ CREATE TABLE payment_intents (
     completed_at timestamptz NULL,
     -- Set when this intent was credited to the wallet (idempotency anchor).
     credited_tx_id uuid NULL REFERENCES wallet_transactions(id) ON DELETE SET NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE payment_intents IS 'One row per Paystack transaction attempt; resolves to a wallet credit on success.';
 CREATE UNIQUE INDEX payment_intents_provider_reference_idx
@@ -50,7 +50,7 @@ CREATE TABLE webhook_events (
     payload jsonb NOT NULL,
     processed_at timestamptz NULL,
     error text NULL,
-    received_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    received_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE webhook_events IS 'Append-only inbound webhook log. Used for idempotency and audit.';
 CREATE UNIQUE INDEX webhook_events_provider_event_id_idx

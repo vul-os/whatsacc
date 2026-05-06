@@ -3,4 +3,4 @@
 -- never added. Add it now.
 
 ALTER TABLE payout_requests
-    ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT timezone('utc', now());
+    ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();

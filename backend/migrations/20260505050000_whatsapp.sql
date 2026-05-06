@@ -7,8 +7,8 @@ CREATE TABLE whatsapp_chats (
     profile_id uuid NULL REFERENCES profiles(id) ON DELETE SET NULL,
     last_inbound_at timestamptz,
     last_outbound_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE whatsapp_chats IS 'WhatsApp conversation thread, one per phone number.';
 CREATE INDEX whatsapp_chats_profile_id_idx ON whatsapp_chats (profile_id);
@@ -21,8 +21,8 @@ CREATE TABLE whatsapp_messages (
     body jsonb NOT NULL,
     provider_message_id text,
     status text,
-    ts timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    ts timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE whatsapp_messages IS 'Individual WhatsApp messages exchanged on a chat.';
 CREATE INDEX whatsapp_messages_chat_id_ts_idx ON whatsapp_messages (chat_id, ts DESC);

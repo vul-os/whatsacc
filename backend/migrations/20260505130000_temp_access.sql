@@ -21,8 +21,8 @@ CREATE TABLE temporary_access_grants (
     revoked_by_user_id uuid NULL REFERENCES users(id) ON DELETE SET NULL,
     notes text NULL,
     last_used_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK (ends_at > starts_at)
 );
 COMMENT ON TABLE temporary_access_grants
@@ -51,7 +51,7 @@ CREATE INDEX temporary_access_grant_access_points_ap_idx
 CREATE OR REPLACE FUNCTION app.try_consume_grant(
     in_phone text,
     in_access_point_id uuid,
-    in_ts timestamptz DEFAULT timezone('utc', now())
+    in_ts timestamptz DEFAULT now()
 )
 RETURNS uuid
 LANGUAGE plpgsql

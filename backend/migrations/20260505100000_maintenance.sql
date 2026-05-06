@@ -16,8 +16,8 @@ CREATE TABLE access_point_meters (
     last_service_movement_m numeric(14,2) NULL,
     next_due_movement_m numeric(14,2) NULL,
     next_due_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE access_point_meters IS 'Live cumulative wear meters per access point. Updated by trigger on access_logs.';
 
@@ -25,7 +25,7 @@ CREATE TABLE maintenance_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     access_point_id uuid NOT NULL REFERENCES access_points(id) ON DELETE CASCADE,
     kind text NOT NULL CHECK (kind IN ('inspection','service','repair','replacement')),
-    performed_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    performed_at timestamptz NOT NULL DEFAULT now(),
     performed_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
     technician_name text NULL,
     notes text NULL,
@@ -38,7 +38,7 @@ CREATE TABLE maintenance_events (
     -- and a calendar fallback. The earlier of the two wins.
     next_due_movement_m numeric(14,2) NULL,
     next_due_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE maintenance_events IS 'Append-only log of inspections / services / repairs / replacements per access point.';
 CREATE INDEX maintenance_events_access_point_id_performed_at_idx

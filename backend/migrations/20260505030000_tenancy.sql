@@ -7,8 +7,8 @@ CREATE TABLE accounts (
     billing_type text NOT NULL CHECK (billing_type IN ('personal','business')),
     billing_address jsonb NOT NULL DEFAULT '{}'::jsonb,
     status text NOT NULL DEFAULT 'active',
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE accounts IS 'Top-level billing tenant owning locations and members.';
 
@@ -18,9 +18,9 @@ CREATE TABLE account_members (
     role text NOT NULL CHECK (role IN ('owner','admin','member','viewer')),
     status text NOT NULL DEFAULT 'active',
     invited_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-    joined_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    joined_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (account_id, user_id)
 );
 COMMENT ON TABLE account_members IS 'Membership of users in accounts with account-level role.';
@@ -36,7 +36,7 @@ CREATE TABLE account_invites (
     accepted_at timestamptz NULL,
     accepted_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
     revoked_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    created_at timestamptz NOT NULL DEFAULT now(),
     created_by uuid NULL REFERENCES users(id) ON DELETE SET NULL
 );
 COMMENT ON TABLE account_invites IS 'Pending invitations to join an account.';
@@ -55,8 +55,8 @@ CREATE TABLE locations (
     lat double precision,
     long double precision,
     status text NOT NULL DEFAULT 'active',
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (account_id, slug)
 );
 COMMENT ON TABLE locations IS 'Physical properties (houses, complexes, buildings) under an account.';
@@ -67,8 +67,8 @@ CREATE TABLE location_members (
     location_id uuid NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role text NOT NULL CHECK (role IN ('owner','admin','member','viewer')),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (location_id, user_id)
 );
 COMMENT ON TABLE location_members IS 'Per-location role overrides for users that already belong to the account.';
@@ -81,7 +81,7 @@ CREATE TABLE location_settings (
     max_phones_per_profile int NOT NULL DEFAULT 3,
     allow_command_via_whatsapp boolean NOT NULL DEFAULT true,
     allow_command_via_web boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE location_settings IS 'Per-location operational tunables (geofence, channels, limits).';

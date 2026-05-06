@@ -35,8 +35,8 @@ CREATE TABLE referral_attributions (
     referee_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     via_slug text NOT NULL,
     landed_at timestamptz NULL,
-    attributed_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    attributed_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (referee_user_id),
     CHECK (referrer_user_id <> referee_user_id)
 );
@@ -56,7 +56,7 @@ CREATE TABLE referral_earnings (
     amount_zar_cents bigint NOT NULL CHECK (amount_zar_cents > 0),
     rate_bps int NOT NULL CHECK (rate_bps >= 0 AND rate_bps <= 10000),
     note text NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE referral_earnings IS 'Append-only ledger of referral credits.';
 CREATE INDEX referral_earnings_referrer_created_idx
@@ -83,8 +83,8 @@ CREATE TABLE kyc_profiles (
         bank_account_type IS NULL OR bank_account_type IN ('cheque','savings','transmission')
     ),
     verified_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-    updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE kyc_profiles IS 'KYC details captured before payout. One per user.';
 
@@ -101,10 +101,10 @@ CREATE TABLE payout_requests (
     kyc_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
     paystack_transfer_code text NULL,
     notes text NULL,
-    requested_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
+    requested_at timestamptz NOT NULL DEFAULT now(),
     processed_at timestamptz NULL,
     processed_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-    created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE payout_requests IS 'User-initiated payout against earned referral balance.';
 CREATE INDEX payout_requests_user_status_idx ON payout_requests (user_id, status);
