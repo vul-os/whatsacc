@@ -3,14 +3,13 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from './AppLayout';
 import { Card, StatBlock } from '@/components/ui/Card';
 import { useAuth } from '@/lib/auth';
+import { useFormatZar } from '@/lib/billing/currency';
 import {
   api,
   type AccountBilling,
   type AccountSummary,
   type LocationRow,
 } from '@/lib/api';
-
-const ZAR = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
 
 function relativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -36,6 +35,7 @@ function trendDelta(today: number, yesterday: number): string {
 
 export default function Dashboard() {
   const { user, currentAccount } = useAuth();
+  const formatZar = useFormatZar();
   const [summary, setSummary] = useState<AccountSummary | null>(null);
   const [billing, setBilling] = useState<AccountBilling | null>(null);
   const [locations, setLocations] = useState<LocationRow[]>([]);
@@ -66,6 +66,72 @@ export default function Dashboard() {
 
   const greeting = greetForHour(new Date().getHours());
   const firstName = user?.name?.split(' ')[0] ?? 'there';
+
+  // Brand-new account: no locations yet. Show a focused onboarding panel
+  // instead of empty stats cards. Loading state still falls through to the
+  // normal layout so we don't flash an empty-state on initial render.
+  const isOnboarding = summary !== null && locations.length === 0;
+
+  if (isOnboarding) {
+    return (
+      <>
+        <PageHeader
+          kicker="Welcome"
+          title={`${greeting}, ${firstName}.`}
+          description={`Let's get ${currentAccount?.name ?? 'your account'} set up. Three quick steps and you're opening gates with a text.`}
+        />
+
+        {error && (
+          <Card className="mb-6 border-terracotta/40">
+            <p className="text-sm text-terracotta-deep">{error}</p>
+          </Card>
+        )}
+
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <Card className="lg:col-span-12 p-8">
+            <ol className="space-y-6">
+              <OnboardStep
+                n={1}
+                title="Add your first location"
+                body="A house, a complex, a building — wherever you want gates to open. You can add as many as you like."
+                cta={{ label: 'Create location', to: '/app/locations?new=1' }}
+                primary
+              />
+              <OnboardStep
+                n={2}
+                title="Pair a device & add an access point"
+                body="Each gate / door / barrier is one access point, optionally bound to a paired controller. You can do this without hardware — just create the access point now and pair later."
+                cta={{ label: 'Hardware setup', to: '/app/devices' }}
+              />
+              <OnboardStep
+                n={3}
+                title="Invite your team"
+                body="Send invitations to admins, members, or viewers. Each one gets an email with a join link."
+                cta={{ label: 'Invite members', to: '/app/members' }}
+              />
+            </ol>
+          </Card>
+
+          <Card className="lg:col-span-12 p-6">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-ink/50 mb-2">
+              Need a hand?
+            </p>
+            <p className="text-sm text-ink/70">
+              The{' '}
+              <Link to="/docs" className="underline underline-offset-4 decoration-terracotta">
+                docs
+              </Link>{' '}
+              walk through pairing devices and configuring access. Or jump straight to{' '}
+              <Link to="/app/billing" className="underline underline-offset-4 decoration-terracotta">
+                billing
+              </Link>{' '}
+              if you want to top up your wallet first.
+            </p>
+          </Card>
+        </section>
+      </>
+    );
+  }
 
   return (
     <>
@@ -153,8 +219,8 @@ export default function Dashboard() {
             <p className="text-[11px] uppercase tracking-[0.18em] text-ink/55 mb-3">Wallet</p>
             <p className="font-display text-3xl">
               {billing?.wallet
-                ? ZAR.format(billing.wallet.balance_cents / 100)
-                : 'R 0.00'}
+                ? formatZar(billing.wallet.balance_cents / 100)
+                : formatZar(0)}
             </p>
             <p className="text-sm text-ink/60 mt-1">
               {billing?.subscription
@@ -222,6 +288,46 @@ function greetForHour(h: number): string {
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+function OnboardStep({
+  n,
+  title,
+  body,
+  cta,
+  primary = false,
+}: {
+  n: number;
+  title: string;
+  body: string;
+  cta: { label: string; to: string };
+  primary?: boolean;
+}) {
+  return (
+    <li className="flex items-start gap-5">
+      <span
+        className={`flex-none mt-1 inline-flex items-center justify-center h-9 w-9 rounded-full border text-sm font-medium ${
+          primary ? 'bg-ink text-paper border-ink' : 'bg-paper-cool text-ink/65 border-ink/15'
+        }`}
+      >
+        {n}
+      </span>
+      <div className="flex-1">
+        <p className="font-display text-xl">{title}</p>
+        <p className="text-sm text-ink/65 mt-1.5 max-w-2xl">{body}</p>
+        <Link
+          to={cta.to}
+          className={`mt-3 inline-flex items-center h-10 px-5 rounded-full text-sm font-medium border transition-colors ${
+            primary
+              ? 'bg-terracotta text-paper border-terracotta hover:bg-terracotta-deep'
+              : 'bg-paper-cool text-ink border-ink/15 hover:border-ink'
+          }`}
+        >
+          {cta.label} →
+        </Link>
+      </div>
+    </li>
+  );
 }
 
 function Verdict({ command, success }: { command: string; success: boolean }) {

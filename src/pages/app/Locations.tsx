@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -23,10 +24,22 @@ function relativeTime(iso: string | null): string {
 }
 
 export default function LocationsPage() {
-  const { currentAccount } = useAuth();
+  const { currentAccount, setCurrentAccount, refreshMe } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<LocationRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  // Onboarding from /app sends users here with ?new=1 to auto-open the
+  // create-location modal. Strip the param after we read it so a back-nav
+  // doesn't re-pop the modal.
+  const [creating, setCreating] = useState(searchParams.get('new') === '1');
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!currentAccount) return;
@@ -87,9 +100,9 @@ export default function LocationsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink/10">
-                  {['Name', 'Kind', 'City', 'Members', 'Access points', 'Last opened'].map((c) => (
+                  {['Name', 'Kind', 'City', 'Members', 'Access points', 'Last opened', ''].map((c, i) => (
                     <th
-                      key={c}
+                      key={c || i}
                       className="text-left px-6 py-4 text-[11px] uppercase tracking-[0.18em] text-ink/55 font-normal"
                     >
                       {c}
@@ -119,6 +132,27 @@ export default function LocationsPage() {
                     <td className="px-6 py-5">{l.member_count}</td>
                     <td className="px-6 py-5">{l.access_point_count}</td>
                     <td className="px-6 py-5 text-ink/70">{relativeTime(l.last_opened_at)}</td>
+                    <td className="px-6 py-5 text-right">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = window.confirm(
+                            `Delete "${l.name}"? This removes its members, access points, devices, grants, and wallet. Cannot be undone.`,
+                          );
+                          if (!ok) return;
+                          try {
+                            await api.locationDelete(l.id);
+                            await refreshMe();
+                            await refresh();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Delete failed.');
+                          }
+                        }}
+                        className="text-xs text-terracotta-deep hover:underline underline-offset-4"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -129,11 +163,13 @@ export default function LocationsPage() {
 
       {creating && (
         <CreateLocationModal
-          accountId={currentAccount.id}
           onClose={() => setCreating(false)}
-          onCreated={() => {
+          onCreated={async (newAccountId) => {
             setCreating(false);
-            refresh();
+            // Fresh location lives in a new account — refresh /me so the
+            // switcher picks it up, then jump active scope to it.
+            await refreshMe();
+            setCurrentAccount(newAccountId);
           }}
         />
       )}
@@ -142,13 +178,11 @@ export default function LocationsPage() {
 }
 
 function CreateLocationModal({
-  accountId,
   onClose,
   onCreated,
 }: {
-  accountId: string;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (newAccountId: string) => void;
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<LocationRow['type']>('house');
@@ -165,12 +199,14 @@ function CreateLocationModal({
     }
     setSubmitting(true);
     try {
-      await api.locationCreate(accountId, {
+      // Each location is its own billing tenant — the top-level endpoint
+      // creates a fresh account alongside the location.
+      const r = await api.locationCreateNew({
         type,
         name: name.trim(),
         address: city.trim() ? { city: city.trim() } : undefined,
       });
-      onCreated();
+      onCreated(r.account_id);
     } catch (err) {
       setErrorMsg(err instanceof ApiError ? (err.detail ?? err.code) : err instanceof Error ? err.message : 'Failed.');
       setSubmitting(false);
@@ -180,7 +216,7 @@ function CreateLocationModal({
   return (
     <Modal open onClose={onClose}>
       <h2 className="font-display text-2xl mb-1">New location</h2>
-      <p className="text-sm text-ink/60 mb-5">A house, complex, building, or other site under this account.</p>
+      <p className="text-sm text-ink/60 mb-5">A house, complex, building, or other site. Each location has its own members and billing.</p>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
           <span className="text-sm font-medium text-ink/85">Name</span>

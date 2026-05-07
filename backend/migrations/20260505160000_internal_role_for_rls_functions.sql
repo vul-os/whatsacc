@@ -14,6 +14,22 @@
 -- step (it requires CREATEROLE privilege, which the app role doesn't have).
 -- See README for the bootstrap commands.
 
+-- whatsacc_internal needs CREATE on the app schema to take ownership of
+-- functions defined there (Postgres requires the grantor and target role
+-- both have CREATE on the function's schema). Idempotent.
+GRANT CREATE ON SCHEMA app TO whatsacc_internal;
+
+-- Trigger functions and SECURITY DEFINER helpers need to read+write
+-- application tables under their own role. Idempotent.
+GRANT USAGE ON SCHEMA public TO whatsacc_internal;
+GRANT USAGE ON SCHEMA app TO whatsacc_internal;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO whatsacc_internal;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO whatsacc_internal;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO whatsacc_internal;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO whatsacc_internal;
+
 -- Hand ownership of the privileged helpers to whatsacc_internal.
 ALTER FUNCTION app.is_account_member(uuid)             OWNER TO whatsacc_internal;
 ALTER FUNCTION app.is_account_admin(uuid)              OWNER TO whatsacc_internal;

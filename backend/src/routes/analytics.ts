@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { requireAuth, type AppEnv } from '../middleware/auth.ts';
 import { withUserDb } from '../middleware/rls.ts';
+import { NotFound } from '../lib/errors.ts';
 
 function analyticsRouter() {
   const app = new Hono<AppEnv>();
@@ -9,6 +10,11 @@ function analyticsRouter() {
   app.get('/locations/:id/summary', async (c) => {
     const id = c.req.param('id');
     const data = await withUserDb(c, async (tx) => {
+      // Verify the caller can actually see this location before reporting
+      // any analytics — otherwise non-members get a 200 with zeroed data,
+      // which is mild info-disclosure (proves the location exists).
+      const loc = await tx<{ id: string }[]>`select id from locations where id = ${id}`;
+      if (!loc[0]) throw NotFound('location_not_found');
       const rows = await tx<{ opens: number; closes: number; total: number }[]>`
         select
           count(*) filter (where command = 'open')::int as opens,
@@ -24,6 +30,10 @@ function analyticsRouter() {
   app.get('/accounts/:id/summary', async (c) => {
     const id = c.req.param('id');
     const data = await withUserDb(c, async (tx) => {
+      // Same defence as above — block non-members from probing account
+      // existence via the analytics summary.
+      const acct = await tx<{ id: string }[]>`select id from accounts where id = ${id}`;
+      if (!acct[0]) throw NotFound('account_not_found');
       const counts = await tx<{
         opens_today: string;
         opens_yesterday: string;

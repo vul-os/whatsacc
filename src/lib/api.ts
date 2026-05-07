@@ -159,6 +159,7 @@ export const api = {
     email: string;
     password: string;
     display_name: string;
+    location_name: string;
     country_code: string;
     account_type: 'personal' | 'business';
     referral_slug?: string;
@@ -292,6 +293,20 @@ export const api = {
     },
   ) => apiFetch<{ id: string }>(`/locations/accounts/${accountId}/locations`, { method: 'POST', body }),
 
+  // Top-level: each location is its own account+location (no shared org).
+  locationCreateNew: (body: {
+    name: string;
+    type?: 'house' | 'complex' | 'building' | 'other';
+    country_code?: string;
+    address?: Record<string, unknown>;
+  }) => apiFetch<{ id: string; account_id: string }>('/locations', { method: 'POST', body }),
+
+  locationDelete: (id: string) =>
+    apiFetch<{ deleted: string; account_dropped: boolean }>(
+      `/locations/${id}`,
+      { method: 'DELETE' },
+    ),
+
   // Devices
   devicesList: (locationId?: string) => {
     const qs = locationId ? `?location_id=${encodeURIComponent(locationId)}` : '';
@@ -310,6 +325,12 @@ export const api = {
 
   inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer' }) =>
     apiFetch<{ id: string }>(`/accounts/${accountId}/invites`, { method: 'POST', body }),
+
+  inviteAccept: (token: string) =>
+    apiFetch<{ account_id: string; role: string }>(
+      `/accounts/invites/${encodeURIComponent(token)}/accept`,
+      { method: 'POST', body: {} },
+    ),
 
   // Access ops
   accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'api' } = {}) =>

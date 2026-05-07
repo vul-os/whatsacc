@@ -151,6 +151,12 @@ export async function withRLS<T>(
       await tx`select set_config('app.account_id', '', true)`;
       await tx`select set_config('app.is_platform_admin', 'false', true)`;
     }
+    // Drop privilege from the connection role (which has BYPASSRLS on Neon)
+    // to whatsacc_app (no BYPASSRLS) for the rest of the transaction. RLS
+    // policies finally fire. SET LOCAL reverts on commit/rollback.
+    // Settings made via set_config(..., true) persist across the role switch
+    // because they're transaction-scoped, not role-scoped.
+    await tx.unsafe('SET LOCAL ROLE whatsacc_app');
     return await fn(tx);
   });
 }

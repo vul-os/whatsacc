@@ -4,23 +4,27 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
+import { useFormatZar } from '@/lib/billing/currency';
 import { ApiError, api, type AccountBilling, type WalletVerifyResponse } from '@/lib/api';
-
-const ZAR = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
-
-function formatCents(cents: number, currency: string): string {
-  const amount = cents / 100;
-  if (currency === 'ZAR') return ZAR.format(amount);
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
-}
 
 export default function Billing() {
   const { currentAccount } = useAuth();
   const accountId = currentAccount?.id ?? null;
+  const formatZar = useFormatZar();
+  // Wallet rows on this page are stored in ZAR by the backend (the
+  // wallet_currency column is fixed to 'ZAR' for now). We honour the
+  // visitor's display-currency choice via useFormatZar — the underlying
+  // amount stays ZAR, the formatter converts and labels it.
+  const formatCents = (cents: number, currency: string) => {
+    if (currency === 'ZAR') return formatZar(cents / 100);
+    // Non-ZAR wallet currency (rare, but support it): format directly.
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency })
+        .format(cents / 100);
+    } catch {
+      return `${currency} ${(cents / 100).toFixed(2)}`;
+    }
+  };
   const [billing, setBilling] = useState<AccountBilling | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

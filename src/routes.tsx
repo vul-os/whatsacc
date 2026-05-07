@@ -28,6 +28,7 @@ const routes: RouteObject[] = [
   { path: '/reset-password', element: wrap(() => import('@/pages/ResetPassword')) },
   { path: '/auth/verify-email', element: wrap(() => import('@/pages/VerifyEmail')) },
   { path: '/auth/callback', element: wrap(() => import('@/pages/AuthCallback')) },
+  { path: '/accept-invite', element: wrap(() => import('@/pages/AcceptInvite')) },
   { path: '/r/:slug', element: wrap(() => import('@/pages/ReferralLanding')) },
   {
     path: '/docs',

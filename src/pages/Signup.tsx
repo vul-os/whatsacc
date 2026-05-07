@@ -8,6 +8,8 @@ import { clearReferral, getReferral } from '@/lib/referral';
 
 export default function Signup() {
   const [name, setName] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [locationTouched, setLocationTouched] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [country, setCountry] = useState('ZA');
@@ -50,6 +52,9 @@ export default function Signup() {
         email,
         password,
         display_name: name,
+        // If the user didn't touch the location field, fall back to "Home"
+        // so they don't get stuck on a required-field error.
+        location_name: (locationTouched ? locationName : locationName || 'Home').trim(),
         country_code: country,
         account_type: kind,
         referral_slug: referral?.slug,
@@ -140,6 +145,16 @@ export default function Signup() {
           onChange={setName}
           placeholder="e.g. Yusuf Adams"
           autoComplete="name"
+          required
+        />
+
+        <Field
+          label="Location name"
+          hint="house / complex / building you'll manage"
+          value={locationTouched ? locationName : locationName || 'Home'}
+          onChange={(v) => { setLocationName(v); setLocationTouched(true); }}
+          placeholder="e.g. Home, Sunset Apartments"
+          autoComplete="address-level2"
           required
         />
 

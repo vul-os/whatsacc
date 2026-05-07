@@ -24,9 +24,9 @@ if (!DB_URL) {
   process.exit(2);
 }
 
-const DEMO_EMAIL = 'demo@whatsacc.com';
-const DEMO_PASSWORD = 'DemoSeed_99';
-const DEMO_NAME = 'Andile Demo';
+const DEMO_EMAIL = 'whatsaccsupport@gmail.com';
+const DEMO_PASSWORD = 'happy123';
+const DEMO_NAME = 'Whatsacc Support';
 
 // Force single-IPv4 to dodge Node's multi-IP connect failure mode
 // (broken IPv6 + Neon load-balanced AWS IPs).
@@ -95,6 +95,7 @@ try {
       `--email=${DEMO_EMAIL}`,
       `--password=${DEMO_PASSWORD}`,
       `--name=${DEMO_NAME}`,
+      `--location-name=Home`,
       `--country=ZA`,
     ],
     { stdio: 'pipe' },
@@ -116,57 +117,47 @@ try {
   ok('logged in');
 
   const meRes = await api('GET', '/auth/me', { token });
-  const personalAccountId = meRes.body.accounts[0].account_id;
-  ok(`personal account ${personalAccountId.slice(0, 8)}…`);
+  // The first location ("Home") is auto-created during register and is its
+  // own account. We add two more — "Sunset Apartments" and "Garden Cottage"
+  // — each as a separate top-level location with its own billing.
+  const homeAccountId = meRes.body.accounts[0].account_id;
+  const homeLocations = await api('GET', `/locations/accounts/${homeAccountId}/locations`, { token });
+  const homeId = homeLocations.body.locations[0]?.id;
+  ok(`Home auto-created on signup`, homeId?.slice(0, 8) ?? '?');
 
-  // ─── 2. Business account ───────────────────────────────────────────────
-  step('Create business account');
-  const biz = await api('POST', '/accounts', {
+  // ─── 2. Two more locations, each its own account ──────────────────────
+  step('Add a second location: Sunset Apartments');
+  const sunsetCreate = await api('POST', '/locations', {
     token,
-    json: { name: 'Sunset Apartments', billing_type: 'business', country_code: 'ZA' },
+    json: {
+      name: 'Sunset Apartments', type: 'complex', country_code: 'ZA',
+      address: { city: 'Cape Town', country: 'ZA' },
+    },
   });
-  expect2xx('create business account', biz);
-  const businessAccountId = biz.body.id;
-  ok(`Sunset Apartments ${businessAccountId.slice(0, 8)}…`);
+  expect2xx('POST /locations Sunset Apartments', sunsetCreate);
+  const sunsetId = sunsetCreate.body.id;
+  const sunsetAccountId = sunsetCreate.body.account_id;
 
-  // ─── 3. Locations ──────────────────────────────────────────────────────
-  step('Locations');
-  async function createLocation(spec) {
-    const r = await api('POST', `/locations/accounts/${spec.account_id}/locations`, {
-      token,
-      json: {
-        type: spec.type,
-        name: spec.name,
-        slug: spec.slug,
-        parent_location_id: spec.parent ?? null,
-        address: { street: '12 Camps Bay Drive', city: 'Cape Town', postal_code: '8005', country: 'ZA' },
-      },
-    });
-    expect2xx(`create location "${spec.name}"`, r);
-    return r.body.id;
-  }
-  const homeId = await createLocation({ account_id: personalAccountId, type: 'house', name: 'Home', slug: 'home' });
-  ok('Home (personal)');
-  const cottageId = await createLocation({
-    account_id: personalAccountId, type: 'house', name: 'Garden Cottage', slug: 'cottage', parent: homeId,
+  step('Add a third location: Garden Cottage');
+  const cottageCreate = await api('POST', '/locations', {
+    token,
+    json: {
+      name: 'Garden Cottage', type: 'house', country_code: 'ZA',
+      address: { city: 'Cape Town', country: 'ZA' },
+    },
   });
-  ok('Garden Cottage');
-  const sunsetId = await createLocation({ account_id: businessAccountId, type: 'complex', name: 'Sunset Apartments', slug: 'sunset' });
-  ok('Sunset Apartments (business)');
-  const apt3a = await createLocation({
-    account_id: businessAccountId, type: 'building', name: 'Block A', slug: 'block-a', parent: sunsetId,
-  });
-  ok('Block A');
+  expect2xx('POST /locations Garden Cottage', cottageCreate);
+  const cottageId = cottageCreate.body.id;
+  const cottageAccountId = cottageCreate.body.account_id;
 
-  // ─── 4. Devices ────────────────────────────────────────────────────────
+  // ─── 3. Devices ────────────────────────────────────────────────────────
   step('Devices');
   const deviceSpecs = [
-    { location_id: homeId, label: 'Main Gate Controller' },
-    { location_id: homeId, label: 'Garage Door Opener' },
-    { location_id: cottageId, label: 'Cottage Pedestrian Gate' },
-    { location_id: sunsetId, label: 'Vehicle Boom — North' },
-    { location_id: sunsetId, label: 'Vehicle Boom — South' },
-    { location_id: apt3a, label: 'Block A Lobby Door' },
+    { location_id: homeId, label: 'Home — Main Gate' },
+    { location_id: homeId, label: 'Home — Garage' },
+    { location_id: sunsetId, label: 'Sunset — North Boom' },
+    { location_id: sunsetId, label: 'Sunset — South Boom' },
+    { location_id: cottageId, label: 'Cottage — Pedestrian' },
   ];
   const devices = [];
   for (const d of deviceSpecs) {
@@ -176,15 +167,14 @@ try {
     ok(d.label);
   }
 
-  // ─── 5. Access points (now via API — the route exists since 2026-05-06) ─
+  // ─── 4. Access points ──────────────────────────────────────────────────
   step('Access points');
   const accessPointSpecs = [
     { device_id: devices[0].id, location_id: homeId, name: 'Front Gate', kind: 'gate' },
     { device_id: devices[1].id, location_id: homeId, name: 'Garage', kind: 'door' },
-    { device_id: devices[2].id, location_id: cottageId, name: 'Cottage Pedestrian', kind: 'gate' },
-    { device_id: devices[3].id, location_id: sunsetId, name: 'North Boom', kind: 'barrier' },
-    { device_id: devices[4].id, location_id: sunsetId, name: 'South Boom', kind: 'barrier' },
-    { device_id: devices[5].id, location_id: apt3a, name: 'Lobby Door', kind: 'door' },
+    { device_id: devices[2].id, location_id: sunsetId, name: 'North Boom', kind: 'barrier' },
+    { device_id: devices[3].id, location_id: sunsetId, name: 'South Boom', kind: 'barrier' },
+    { device_id: devices[4].id, location_id: cottageId, name: 'Cottage Pedestrian', kind: 'gate' },
   ];
   for (const ap of accessPointSpecs) {
     const r = await api('POST', '/access/access-points', { token, json: ap });
@@ -242,10 +232,10 @@ try {
   });
   if (expect2xx('set referral KYC', kycRes)) ok('KYC details saved');
 
-  // ─── 9. Pending invites ────────────────────────────────────────────────
-  step('Invites (email send may fail; DB rows still created)');
+  // ─── 7. Pending invites — to the Sunset Apartments location ──────────
+  step('Invites to Sunset Apartments (email send may fail; DB rows still created)');
   for (const email of ['partner@example.com', 'tenant.alex@example.com']) {
-    const r = await api('POST', `/accounts/${businessAccountId}/invites`, {
+    const r = await api('POST', `/accounts/${sunsetAccountId}/invites`, {
       token,
       json: { email, role: 'member' },
     });
@@ -254,18 +244,18 @@ try {
       const rows = await client.query(
         `select id from account_invites where account_id = $1 and email = $2
          order by created_at desc limit 1`,
-        [businessAccountId, email],
+        [sunsetAccountId, email],
       );
       if (rows.rows[0]) ok(`invited ${email} (email send failed but DB row created)`);
       else bad(`invite ${email}`, `${r.status}`);
     }
   }
 
-  // ─── 10. Wallet topup intent ───────────────────────────────────────────
-  step('Billing — wallet topup intent (real Paystack)');
+  // ─── 8. Wallet topup intent — Sunset Apartments wallet ───────────────
+  step('Billing — Sunset Apartments wallet topup (real Paystack)');
   const topup = await api('POST', '/billing/wallet/topup', {
     token,
-    json: { account_id: businessAccountId, amount_cents: 250_00 },
+    json: { account_id: sunsetAccountId, amount_cents: 250_00 },
   });
   if (expect2xx('init wallet topup', topup)) {
     ok('topup intent created');
@@ -275,10 +265,10 @@ try {
   // ─── Summary ───────────────────────────────────────────────────────────
   console.log(`\n\x1b[1m─── Done ───\x1b[0m\n`);
   console.log(`Frontend:  http://localhost:5173`);
+  void cottageAccountId; // (unused; reserved if we want to seed billing here too)
   console.log(`Email:     ${DEMO_EMAIL}`);
   console.log(`Password:  ${DEMO_PASSWORD}\n`);
-  console.log(`Personal account:  ${personalAccountId}`);
-  console.log(`Business account:  ${businessAccountId} ("Sunset Apartments")`);
+  console.log(`Locations seeded: Home (${homeAccountId.slice(0, 8)}…), Sunset Apartments (${sunsetAccountId.slice(0, 8)}…), Garden Cottage (${cottageAccountId.slice(0, 8)}…)`);
 } finally {
   await client.end();
 }

@@ -3,6 +3,7 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { useFormatZar } from '@/lib/billing/currency';
 import {
   ApiError,
   api,
@@ -10,9 +11,6 @@ import {
   type PayoutRow,
   type ReferralMe,
 } from '@/lib/api';
-
-const ZAR = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
-const cents = (n: number) => ZAR.format(n / 100);
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -25,6 +23,8 @@ function formatPayoutDate(d: Date): string {
 }
 
 export default function Referrals() {
+  const formatZar = useFormatZar();
+  const cents = (n: number) => formatZar(n / 100);
   const [data, setData] = useState<ReferralMe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingSlug, setEditingSlug] = useState(false);
@@ -303,6 +303,8 @@ function Stat({ label, value, dark = false }: { label: string; value: string; da
 }
 
 function PayoutRowEl({ row }: { row: PayoutRow }) {
+  const formatZar = useFormatZar();
+  const cents = (n: number) => formatZar(n / 100);
   const tone: Record<typeof row.status, string> = {
     pending: 'text-ink/55 bg-ink/5',
     approved: 'text-gold bg-gold/10',

@@ -143,14 +143,26 @@ function accountsRouter() {
       footnote:
         "If you weren't expecting this, you can safely ignore this email — no account will be created.",
     });
-    await sendEmail({
-      to: email,
-      subject: `You've been invited to ${result.account_name} on whatsacc`,
-      html: inviteMail.html,
-      text: inviteMail.text,
-    });
+    // Best-effort: invite row is already committed; surface the accept URL
+    // in the response so the inviter can copy/paste it manually if Resend
+    // fails (or if they want to share via WhatsApp / Slack instead).
+    let emailSent = true;
+    try {
+      await sendEmail({
+        to: email,
+        subject: `You've been invited to ${result.account_name} on whatsacc`,
+        html: inviteMail.html,
+        text: inviteMail.text,
+      });
+    } catch (err) {
+      emailSent = false;
+      console.warn('[email-send] invite failed:', (err as Error).message);
+    }
 
-    return c.json({ id: result.invite_id }, 201);
+    return c.json(
+      { id: result.invite_id, accept_url: acceptUrl, email_sent: emailSent },
+      201,
+    );
   });
 
   // accepting an invite cannot use the user's account scope (not a member yet)

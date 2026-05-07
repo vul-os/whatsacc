@@ -11,11 +11,17 @@ import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 
 // Args
-const args = parseArgs(process.argv.slice(2), ['email', 'password', 'name', 'country']);
+const args = parseArgs(
+  process.argv.slice(2),
+  ['email', 'password', 'name', 'country', 'location-name'],
+);
 const email = String(args.email ?? '').trim().toLowerCase();
 const password = String(args.password ?? '');
 const name = String(args.name ?? 'Support');
 const country = String(args.country ?? 'ZA').toUpperCase();
+// Account + first-location name. Defaults to "Home" so account naming
+// stays distinct from the human's display_name (which `--name` controls).
+const locationName = String(args['location-name'] ?? 'Home');
 if (!email || !password) {
   console.error('error: --email and --password are required');
   process.exit(1);
@@ -92,7 +98,7 @@ try {
       `insert into accounts (name, billing_type, status, country_code)
        values ($1, 'personal', 'active', $2)
        returning id`,
-      [name, code],
+      [locationName, code],
     );
     const accountId = acct.rows[0].id;
 
@@ -111,7 +117,16 @@ try {
         [accountId, planRows.rows[0].id],
       );
     }
-    console.log(`bootstrapped personal account ${accountId}`);
+    // Each account anchors exactly one location of the same name. Mirrors
+    // what /auth/register does so the seed produces an identical shape.
+    const locSlug = locationName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+      || 'home';
+    await client.query(
+      `insert into locations (account_id, type, name, slug, address, status)
+       values ($1, 'house', $2, $3, '{}'::jsonb, 'active')`,
+      [accountId, locationName, `${locSlug}-${Date.now().toString(36)}`],
+    );
+    console.log(`bootstrapped account "${locationName}" (${accountId}) + matching location`);
   }
 
   // Ensure a referral slug.

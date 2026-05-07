@@ -28,6 +28,10 @@ const registerSchema = z
     email: z.string().email().toLowerCase(),
     password: z.string().min(8).max(256),
     display_name: z.string().min(1).max(120),
+    // The user names their first physical place ("Home", "Sunset Apartments",
+    // etc.). Each location is its own billing tenant — bootstrap creates an
+    // account and a location of the same name, both owned by the new user.
+    location_name: z.string().min(1).max(120),
     country_code: z
       .string()
       .length(2)
@@ -127,6 +131,20 @@ async function attributeReferral(
   `;
 }
 
+// Generate a URL-safe slug for a new location row. Locations are unique
+// per (account_id, slug); we always tack on a short timestamp suffix so two
+// locations called "Home" under the same account never collide.
+export function makeLocationSlug(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+  const suffix = Date.now().toString(36);
+  return `${base || 'loc'}-${suffix}`;
+}
+
 export async function bootstrapPersonalAccount(
   tx: TxSql,
   opts: { userId: string; name: string; countryCode: string; billingType?: 'personal' | 'business' },
@@ -206,8 +224,9 @@ function authRouter() {
   const app = new Hono<AppEnv>();
 
   app.post('/register', zValidator('json', registerSchema), async (c) => {
-    const { email, password, display_name, country_code, account_type, referral_slug } =
-      c.req.valid('json');
+    const {
+      email, password, display_name, location_name, country_code, account_type, referral_slug,
+    } = c.req.valid('json');
     const password_hash = await hashPassword(password);
     const verifyTokenPlain = randomToken(32);
     const verifyTokenHash = await hashToken(verifyTokenPlain);
@@ -216,9 +235,13 @@ function authRouter() {
       const existing = await tx<{ id: string }[]>`select id from users where email = ${email}`;
       if (existing.length > 0) throw Conflict('email_taken');
 
+      // Status starts at 'active' so users can sign in immediately. Email
+      // verification is still emitted (verify-email flow stamps
+      // email_verified_at when clicked) but isn't a login gate. This avoids
+      // a hard dependency on Resend's deliverability.
       const [user] = await tx<{ id: string }[]>`
         insert into users (email, password_hash, status)
-        values (${email}, ${password_hash}, 'pending')
+        values (${email}, ${password_hash}, 'active')
         returning id
       `;
       const userId = user!.id;
@@ -236,10 +259,25 @@ function authRouter() {
 
       const accountId = await bootstrapPersonalAccount(tx, {
         userId,
-        name: display_name,
+        name: location_name,
         countryCode: country_code,
         billingType: account_type,
       });
+
+      // Each account is anchored to exactly one location of the same name —
+      // that's the unit users actually think about. Subsequent locations the
+      // user creates each get their own fresh account (see POST /locations).
+      await tx`
+        insert into locations (account_id, type, name, slug, address, status)
+        values (
+          ${accountId},
+          'house',
+          ${location_name},
+          ${makeLocationSlug(location_name)},
+          '{}'::jsonb,
+          'active'
+        )
+      `;
 
       await assignNewUserSlug(tx, userId);
 
@@ -262,12 +300,19 @@ function authRouter() {
       cta: { label: 'Verify my email', url: verifyUrl },
       footnote: "If you didn't create a whatsacc account, you can safely ignore this email.",
     });
-    await sendEmail({
-      to: email,
-      subject: 'Verify your whatsacc email',
-      html: verifyMail.html,
-      text: verifyMail.text,
-    });
+    // Best-effort — register must succeed even if Resend hiccups. The user's
+    // status is already 'active' so they can sign in without the verify
+    // email; this is just a confirmation nudge.
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Verify your whatsacc email',
+        html: verifyMail.html,
+        text: verifyMail.text,
+      });
+    } catch (err) {
+      console.warn('[email-send] verify-email failed:', (err as Error).message);
+    }
 
     return c.json({ id: result.userId, account_id: result.accountId }, 201);
   });
@@ -429,12 +474,16 @@ function authRouter() {
         footnote:
           "If you didn't request a password reset, you can ignore this email — your password won't change.",
       });
-      await sendEmail({
-        to: email,
-        subject: 'Reset your whatsacc password',
-        html: resetMail.html,
-        text: resetMail.text,
-      });
+      try {
+        await sendEmail({
+          to: email,
+          subject: 'Reset your whatsacc password',
+          html: resetMail.html,
+          text: resetMail.text,
+        });
+      } catch (err) {
+        console.warn('[email-send] reset-password failed:', (err as Error).message);
+      }
     }
 
     return c.body(null, 204);

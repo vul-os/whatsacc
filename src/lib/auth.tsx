@@ -27,6 +27,7 @@ type AuthState = {
   user: SessionUser | null;
   accounts: SessionAccount[];
   currentAccount: SessionAccount | null;
+  setCurrentAccount: (accountId: string) => void;
   signedIn: boolean;
   loading: boolean;
   error: string | null;
@@ -35,6 +36,7 @@ type AuthState = {
     email: string;
     password: string;
     display_name: string;
+    location_name: string;
     country_code: string;
     account_type: 'personal' | 'business';
     referral_slug?: string;
@@ -43,6 +45,8 @@ type AuthState = {
   setTokensFromOAuth: (access_token: string, refresh_token: string) => Promise<void>;
   refreshMe: () => Promise<void>;
 };
+
+const ACTIVE_ACCOUNT_KEY = 'whatsacc.activeAccount';
 
 const Ctx = createContext<AuthState | null>(null);
 
@@ -67,8 +71,17 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [accounts, setAccounts] = useState<SessionAccount[]>([]);
+  const [activeAccountId, setActiveAccountIdState] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try { return window.localStorage.getItem(ACTIVE_ACCOUNT_KEY); } catch { return null; }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const setCurrentAccount = useCallback((accountId: string) => {
+    setActiveAccountIdState(accountId);
+    try { window.localStorage.setItem(ACTIVE_ACCOUNT_KEY, accountId); } catch {/**/}
+  }, []);
 
   const refreshMe = useCallback(async () => {
     if (!tokenStore.access && !tokenStore.refresh) {
@@ -123,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       display_name: string;
+      location_name: string;
       country_code: string;
       account_type: 'personal' | 'business';
       referral_slug?: string;
@@ -155,11 +169,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshMe],
   );
 
+  const currentAccount = useMemo(() => {
+    if (accounts.length === 0) return null;
+    if (activeAccountId) {
+      const match = accounts.find((a) => a.id === activeAccountId);
+      if (match) return match;
+    }
+    // Fallback: first account on the list (preserves existing behaviour for
+    // single-org users and bootstraps a sensible default for new sessions).
+    return accounts[0] ?? null;
+  }, [accounts, activeAccountId]);
+
   const value = useMemo<AuthState>(
     () => ({
       user,
       accounts,
-      currentAccount: accounts[0] ?? null,
+      currentAccount,
+      setCurrentAccount,
       signedIn: user !== null,
       loading,
       error,
@@ -172,6 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       user,
       accounts,
+      currentAccount,
+      setCurrentAccount,
       loading,
       error,
       signInWithPassword,
