@@ -51,14 +51,15 @@ export function Pricing() {
   const formatZar = useFormatZar();
   return (
     <section className="relative">
-      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24 lg:py-32">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24">
         <div className="grid grid-cols-12 gap-x-8 gap-y-6 mb-12 md:mb-14 items-end">
           <div className="col-span-12 lg:col-span-7">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">Pricing</span>
-            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-7xl leading-[0.95]">
-              Pay for messages,
-              <br />
-              not <em className="italic text-terracotta">per seat</em>.
+            <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
+              <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
+              Pricing
+            </span>
+            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-[64px] leading-[0.96] tracking-[-0.02em]">
+              Pay for messages, not <em className="italic text-terracotta">per seat</em>.
             </h2>
           </div>
           <p className="col-span-12 lg:col-span-5 text-ink/70 leading-relaxed">

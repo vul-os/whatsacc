@@ -1,16 +1,15 @@
 export function PeekInside() {
   return (
     <section className="relative bg-paper-warm">
-      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24 lg:py-32">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24">
         <div className="grid grid-cols-12 gap-x-8 gap-y-6 mb-10 md:mb-12">
           <div className="col-span-12 lg:col-span-5">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
+            <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
+              <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
               A peek inside
             </span>
-            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-6xl leading-[0.95]">
-              The control room
-              <br />
-              <em className="italic text-terracotta">behind the gate.</em>
+            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-[56px] leading-[0.96] tracking-[-0.02em]">
+              The control room <em className="italic text-terracotta">behind the gate.</em>
             </h2>
           </div>
           <div className="col-span-12 lg:col-span-6 lg:col-start-7">

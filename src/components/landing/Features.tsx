@@ -46,14 +46,15 @@ const features = [
 export function Features() {
   return (
     <section className="relative">
-      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24 lg:py-32">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24">
         <div className="grid grid-cols-12 gap-x-8 gap-y-8 items-end mb-12 md:mb-14">
           <div className="col-span-12 lg:col-span-6">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">Features</span>
-            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-7xl leading-[0.95]">
-              Quietly serious
-              <br />
-              <em className="italic">about access.</em>
+            <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
+              <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
+              Features
+            </span>
+            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-[64px] leading-[0.96] tracking-[-0.02em]">
+              Quietly serious <em className="italic">about access.</em>
             </h2>
           </div>
           <div className="col-span-12 lg:col-span-6 lg:pl-12">
@@ -64,16 +65,16 @@ export function Features() {
           </div>
         </div>
 
-        <ul className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <ul className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {features.map((f) => (
             <li
               key={f.kicker}
-              className={`${f.span} group/f rounded-3xl bg-paper-cool border border-ink/8 overflow-hidden p-6 sm:p-8 lg:p-10 md:min-h-[300px] flex flex-col gap-6 transition-colors hover:bg-paper-warm`}
+              className={`${f.span} group/f rounded-2xl bg-paper-cool border border-ink/10 overflow-hidden p-6 sm:p-8 md:min-h-[280px] flex flex-col gap-6 transition-colors hover:bg-paper-warm/70`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-3">
-                  <span className="font-display italic text-terracotta text-2xl">{f.kicker}.</span>
-                  <h3 className="font-display text-xl sm:text-2xl lg:text-[26px] leading-tight">
+                  <span className="font-display italic text-terracotta text-xl">{f.kicker}.</span>
+                  <h3 className="font-display text-xl sm:text-[22px] lg:text-2xl leading-tight">
                     {f.title}
                   </h3>
                 </div>

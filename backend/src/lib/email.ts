@@ -83,11 +83,20 @@ const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://
 
 function header(): string {
   return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
-        <td valign="middle" style="padding:0 12px 0 0;line-height:0;">${LOGO_SVG}</td>
-        <td valign="middle" style="font-family:${FONT_DISPLAY};font-size:22px;font-weight:600;color:${INK};letter-spacing:-0.01em;">
-          <a href="https://whatsacc.com" style="text-decoration:none;color:${INK};">whatsacc</a>
+        <td valign="middle" style="padding:0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            <tr>
+              <td valign="middle" style="padding:0 12px 0 0;line-height:0;">${LOGO_SVG}</td>
+              <td valign="middle" style="font-family:${FONT_DISPLAY};font-size:22px;font-weight:600;color:${INK};letter-spacing:-0.01em;">
+                <a href="https://whatsacc.com" style="text-decoration:none;color:${INK};">whatsacc</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td valign="middle" align="right" style="font-family:${FONT_SANS};font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(26,31,54,0.45);">
+          Transactional
         </td>
       </tr>
     </table>`;
@@ -163,15 +172,24 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
               </td>
             </tr>
             <tr>
-              <td bgcolor="${PAPER_COOL}" style="background-color:${PAPER_COOL};border:1px solid ${PAPER_EDGE};border-radius:16px;padding:40px 40px 36px;box-shadow:0 1px 0 rgba(26,31,54,0.04);">
+              <td bgcolor="${PAPER_COOL}" style="background-color:${PAPER_COOL};border:1px solid ${PAPER_EDGE};border-radius:14px;padding:44px 44px 38px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="padding:0 0 14px;">
-                      <span style="display:inline-block;width:28px;height:2px;background-color:${TERRACOTTA};border-radius:2px;line-height:0;font-size:0;">&nbsp;</span>
+                    <td style="padding:0 0 18px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="padding:0 8px 0 0;line-height:0;">
+                            <span style="display:inline-block;width:5px;height:5px;background-color:${TERRACOTTA};border-radius:50%;line-height:0;font-size:0;">&nbsp;</span>
+                          </td>
+                          <td style="font-family:${FONT_SANS};font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(26,31,54,0.55);">
+                            Whatsacc &middot; account
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
                 </table>
-                <h1 style="margin:0 0 22px;font-family:${FONT_DISPLAY};font-size:28px;line-height:1.2;color:${INK};font-weight:600;letter-spacing:-0.015em;">${escapeHtml(input.heading)}</h1>
+                <h1 style="margin:0 0 22px;font-family:${FONT_DISPLAY};font-size:30px;line-height:1.15;color:${INK};font-weight:600;letter-spacing:-0.02em;">${escapeHtml(input.heading)}</h1>
                 ${paragraphs}
                 ${button}
                 ${fallbackLink}
@@ -179,13 +197,22 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
               </td>
             </tr>
             <tr>
-              <td style="padding:24px 8px 0;">
-                <p style="margin:0 0 4px;font-family:${FONT_SANS};font-size:12px;line-height:1.6;color:${INK};font-weight:600;letter-spacing:0.02em;">whatsacc</p>
-                <p style="margin:0 0 8px;font-family:${FONT_DISPLAY};font-size:13px;line-height:1.5;color:${INK_FAINT};font-style:italic;">Texts that open gates.</p>
-                <p style="margin:0;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK_FAINT};">
-                  This is a transactional message about your whatsacc account. You can manage your account at
-                  <a href="https://whatsacc.com" style="color:${INK_FAINT};text-decoration:underline;">whatsacc.com</a>.
-                </p>
+              <td style="padding:28px 4px 0;border-top:1px solid ${INK_HAIR};margin-top:24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:24px 4px 0;">
+                      <p style="margin:0 0 4px;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK};font-weight:600;letter-spacing:0.02em;">whatsacc</p>
+                      <p style="margin:0 0 10px;font-family:${FONT_DISPLAY};font-size:13px;line-height:1.5;color:${INK_FAINT};font-style:italic;">Texts that open gates.</p>
+                      <p style="margin:0;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK_FAINT};">
+                        This is a transactional message about your whatsacc account. Manage settings at
+                        <a href="https://whatsacc.com" style="color:${INK_FAINT};text-decoration:underline;">whatsacc.com</a>.
+                      </p>
+                    </td>
+                    <td valign="top" align="right" style="padding:24px 4px 0;font-family:${FONT_SANS};font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(26,31,54,0.4);white-space:nowrap;">
+                      Made in ZA
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
