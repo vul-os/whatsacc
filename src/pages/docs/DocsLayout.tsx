@@ -61,14 +61,17 @@ export default function DocsLayout() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-6">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-ink/55 mb-4">
+              <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55 mb-5">
+                <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
                 Documentation
               </p>
               <nav className="space-y-7">
                 {groups.map((g) => (
                   <div key={g.head}>
-                    <p className="text-xs font-medium text-ink/85 mb-2">{g.head}</p>
-                    <ul className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-ink/45 mb-2.5">
+                      {g.head}
+                    </p>
+                    <ul className="space-y-0.5">
                       {g.items.map((it) => (
                         <li key={it.to}>
                           <NavLink
@@ -76,7 +79,7 @@ export default function DocsLayout() {
                             end={it.to === '/docs'}
                             className={({ isActive }) =>
                               cn(
-                                'block py-1.5 pl-3 -ml-px border-l text-sm transition-colors',
+                                'block py-1.5 pl-3 -ml-px border-l text-[13.5px] transition-colors',
                                 isActive
                                   ? 'border-terracotta text-ink font-medium'
                                   : 'border-ink/10 text-ink/60 hover:text-ink hover:border-ink/40',
@@ -115,10 +118,17 @@ export function DocLead({
   intro: string;
 }) {
   return (
-    <header className="mb-8 sm:mb-10 border-b border-ink/10 pb-6 sm:pb-8">
-      <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">{kicker}</span>
-      <h1 className="font-display-tight text-4xl sm:text-5xl lg:text-6xl mt-2 sm:mt-3 leading-[1.05]">{title}</h1>
-      <p className="mt-4 sm:mt-5 text-base sm:text-lg text-ink/70 leading-relaxed max-w-prose">{intro}</p>
+    <header className="mb-10 sm:mb-12 border-b border-ink/10 pb-7 sm:pb-9">
+      <span className="inline-flex items-center gap-2 text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">
+        <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
+        {kicker}
+      </span>
+      <h1 className="font-display-tight text-[34px] sm:text-5xl lg:text-[56px] mt-3 leading-[0.98] tracking-[-0.02em]">
+        {title}
+      </h1>
+      <p className="mt-5 sm:mt-6 text-base sm:text-[17px] text-ink/70 leading-relaxed max-w-prose">
+        {intro}
+      </p>
     </header>
   );
 }
@@ -131,16 +141,20 @@ export function DocSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-10 sm:mb-12">
-      <h2 className="font-display text-2xl sm:text-3xl mb-3 sm:mb-4">{heading}</h2>
-      <div className="prose-content space-y-4 text-ink/80 leading-relaxed">{children}</div>
+    <section className="mb-10 sm:mb-14">
+      <h2 className="font-display text-2xl sm:text-[28px] mb-4 sm:mb-5 tracking-[-0.005em]">
+        {heading}
+      </h2>
+      <div className="prose-content space-y-4 text-ink/80 leading-relaxed text-[15px]">
+        {children}
+      </div>
     </section>
   );
 }
 
 export function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="rounded-2xl bg-ink text-paper p-5 overflow-x-auto text-[13px] font-mono leading-relaxed">
+    <pre className="rounded-2xl bg-ink text-paper p-5 sm:p-6 overflow-x-auto text-[12.5px] font-mono leading-relaxed border border-ink/0">
       <code>{children}</code>
     </pre>
   );

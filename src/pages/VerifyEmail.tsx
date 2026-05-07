@@ -49,15 +49,20 @@ export default function VerifyEmail() {
         </p>
       }
     >
-      <h1 className="font-display-tight text-3xl sm:text-4xl">Email verification</h1>
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+        Email verification
+      </h1>
 
       {status === 'verifying' && (
-        <p className="mt-3 text-sm text-ink/65">Verifying your email…</p>
+        <p className="mt-4 inline-flex items-center gap-2 text-[13px] uppercase tracking-[0.18em] text-ink/55">
+          <span className="h-1 w-1 rounded-full bg-terracotta animate-pulse" aria-hidden />
+          Verifying&hellip;
+        </p>
       )}
 
       {status === 'missing' && (
         <>
-          <p className="mt-3 text-sm text-ink/65">
+          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
             This link is missing its token. Open the verification link from your email, or sign in
             to request a new one.
           </p>

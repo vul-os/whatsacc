@@ -32,23 +32,25 @@ export default function Login() {
       asideKicker="Welcome back"
       asideTitle="The gate is just inside."
     >
-      <h1 className="font-display-tight text-3xl sm:text-4xl">Sign in</h1>
-      <p className="mt-2 text-sm text-ink/60">
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+        Sign in
+      </h1>
+      <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
         Use your email and password, or continue with Google.
       </p>
 
       <a
         href={api.googleStartUrl()}
-        className="mt-6 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+        className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
       >
         <GoogleMark />
         <span className="text-sm font-medium">Continue with Google</span>
       </a>
 
-      <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
-        <span className="flex-1 h-px bg-ink/15" />
+      <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
+        <span className="flex-1 h-px bg-ink/12" />
         or
-        <span className="flex-1 h-px bg-ink/15" />
+        <span className="flex-1 h-px bg-ink/12" />
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">

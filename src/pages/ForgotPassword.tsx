@@ -35,9 +35,11 @@ export default function ForgotPassword() {
         </p>
       }
     >
-      <h1 className="font-display-tight text-3xl sm:text-4xl">Reset your password</h1>
-      <p className="mt-2 text-sm text-ink/60">
-        Enter the email you signed up with — we’ll email you a reset link.
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+        Reset your password
+      </h1>
+      <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
+        Enter the email you signed up with — we&rsquo;ll email you a reset link.
       </p>
 
       {sent ? (

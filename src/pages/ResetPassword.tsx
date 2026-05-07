@@ -63,11 +63,13 @@ export default function ResetPassword() {
         </p>
       }
     >
-      <h1 className="font-display-tight text-3xl sm:text-4xl">Set a new password</h1>
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+        Set a new password
+      </h1>
 
       {missing ? (
         <>
-          <p className="mt-3 text-sm text-ink/65">
+          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
             This link is missing its token. Request a new reset link to continue.
           </p>
           <Button
@@ -90,7 +92,9 @@ export default function ResetPassword() {
         </>
       ) : (
         <>
-          <p className="mt-2 text-sm text-ink/60">Choose something at least 8 characters long.</p>
+          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
+            Choose something at least 8 characters long.
+          </p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <label className="block">
               <span className="text-sm font-medium text-ink/85 block mb-1.5">New password</span>
