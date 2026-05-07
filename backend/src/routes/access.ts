@@ -271,6 +271,12 @@ function accessRouter() {
   app.use('*', requireAuth());
 
   app.get('/access-points', async (c) => {
+    // Optional ?account_id= scopes the listing to one tenant. Without it RLS
+    // would still filter to "any account the user is a member of", which
+    // collapses every location's APs into one view when the user owns
+    // multiple locations. Frontend passes the active account id so the page
+    // shows only the current location's APs.
+    const accountId = c.req.query('account_id') ?? null;
     const rows = await withUserDb(c, async (tx) => {
       return await tx<AccessPointWithMeter[]>`
         select
@@ -279,7 +285,9 @@ function accessRouter() {
           m.last_serviced_at, m.last_service_movement_m,
           m.next_due_movement_m, m.next_due_at
         from access_points ap
+        join locations l on l.id = ap.location_id
         left join access_point_meters m on m.access_point_id = ap.id
+        where ${accountId}::uuid is null or l.account_id = ${accountId}::uuid
         order by ap.created_at asc
       `;
     });

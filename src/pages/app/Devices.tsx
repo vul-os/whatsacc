@@ -54,7 +54,7 @@ export default function DevicesPage() {
     if (!currentAccount) return;
     try {
       const [d, l] = await Promise.all([
-        api.devicesList(),
+        api.devicesList({ account_id: currentAccount.id }),
         api.locationsList(currentAccount.id),
       ]);
       setDevices(d.devices);

@@ -378,7 +378,7 @@ export function PricingEstimator() {
                     <dt className="text-ink/65">
                       Extra access points
                       <span className="ml-2 text-ink/40">
-                        {Math.max(0, accessPoints - 5)} &times; R 49
+                        {Math.max(0, accessPoints - 5)} &times; {fmt(49, currency)}
                       </span>
                     </dt>
                     <dd className="tabular-nums text-ink/90">

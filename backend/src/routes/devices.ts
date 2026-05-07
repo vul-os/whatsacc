@@ -40,20 +40,22 @@ function devicesRouter() {
   app.use('*', requireAuth());
 
   app.get('/', async (c) => {
-    const locationId = c.req.query('location_id');
+    // ?location_id= or ?account_id= scopes the listing. Without either RLS
+    // still filters to accounts the user is a member of — but that collapses
+    // every location's devices into one view when the user owns several.
+    // The frontend passes the active account id so the page only shows the
+    // current location's devices.
+    const locationId = c.req.query('location_id') ?? null;
+    const accountId = c.req.query('account_id') ?? null;
     const rows = await withUserDb(c, async (tx) => {
-      if (locationId) {
-        return await tx<DeviceRow[]>`
-          select id, location_id, label, status, paired_at, last_seen_at,
-                 claim_expires_at, created_at
-          from devices where location_id = ${locationId}
-          order by created_at desc
-        `;
-      }
       return await tx<DeviceRow[]>`
-        select id, location_id, label, status, paired_at, last_seen_at,
-               claim_expires_at, created_at
-        from devices order by created_at desc
+        select d.id, d.location_id, d.label, d.status, d.paired_at, d.last_seen_at,
+               d.claim_expires_at, d.created_at
+        from devices d
+        join locations l on l.id = d.location_id
+        where (${locationId}::uuid is null or d.location_id = ${locationId}::uuid)
+          and (${accountId}::uuid is null or l.account_id = ${accountId}::uuid)
+        order by d.created_at desc
       `;
     });
     return c.json({ devices: rows });

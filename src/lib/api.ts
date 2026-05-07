@@ -209,7 +209,10 @@ export const api = {
       `/billing/wallet/verify?reference=${encodeURIComponent(reference)}`,
     ),
 
-  accessPoints: () => apiFetch<{ access_points: AccessPointDetail[] }>('/access/access-points'),
+  accessPoints: (accountId?: string) => {
+    const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
+    return apiFetch<{ access_points: AccessPointDetail[] }>(`/access/access-points${qs}`);
+  },
 
   accessPoint: (id: string) =>
     apiFetch<AccessPointDetail>(`/access/access-points/${id}`),
@@ -308,9 +311,12 @@ export const api = {
     ),
 
   // Devices
-  devicesList: (locationId?: string) => {
-    const qs = locationId ? `?location_id=${encodeURIComponent(locationId)}` : '';
-    return apiFetch<{ devices: DeviceRow[] }>(`/devices${qs}`);
+  devicesList: (filter?: { location_id?: string; account_id?: string }) => {
+    const params = new URLSearchParams();
+    if (filter?.location_id) params.set('location_id', filter.location_id);
+    if (filter?.account_id) params.set('account_id', filter.account_id);
+    const qs = params.toString();
+    return apiFetch<{ devices: DeviceRow[] }>(`/devices${qs ? `?${qs}` : ''}`);
   },
 
   deviceCreate: (body: { location_id: string; label?: string; claim_ttl_seconds?: number }) =>

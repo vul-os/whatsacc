@@ -1,9 +1,12 @@
 import { LinkButton } from '@/components/ui/Button';
+import { useFormatZar } from '@/lib/billing/currency';
 
+// Prices canonical in ZAR — the formatter converts to whatever currency the
+// visitor selected in the top-bar selector.
 const plans = [
   {
     name: 'Free',
-    price: '$0',
+    priceZar: 0,
     cadence: '/ month',
     msgs: '100 messages',
     blurb: 'For a single house. Try it on your own gate first — most people do.',
@@ -14,7 +17,7 @@ const plans = [
   },
   {
     name: 'Starter',
-    price: '$9',
+    priceZar: 165,
     cadence: '/ month',
     msgs: '2,000 messages',
     blurb: 'Right-sized for a townhouse cluster, a small office, or a busy household.',
@@ -25,7 +28,7 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '$49',
+    priceZar: 900,
     cadence: '/ month',
     msgs: '20,000 messages',
     blurb:
@@ -42,7 +45,10 @@ const plans = [
   },
 ];
 
+const PER_MESSAGE_ZAR = 0.033;
+
 export function Pricing() {
+  const formatZar = useFormatZar();
   return (
     <section className="relative">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24 lg:py-32">
@@ -89,7 +95,9 @@ export function Pricing() {
               </div>
 
               <div className="mt-5 sm:mt-6 flex items-baseline gap-2">
-                <span className="font-display text-5xl sm:text-6xl leading-none">{p.price}</span>
+                <span className="font-display text-5xl sm:text-6xl leading-none">
+                  {formatZar(p.priceZar)}
+                </span>
                 <span className={p.accent ? 'text-paper/60' : 'text-ink/55'}>{p.cadence}</span>
               </div>
 
@@ -134,7 +142,7 @@ export function Pricing() {
           <a href="/signup" className="underline underline-offset-4 decoration-terracotta">
             Talk to us
           </a>{' '}
-          &mdash; we have a per-message rate from $0.0018.
+          &mdash; we have a per-message rate from {formatZar(PER_MESSAGE_ZAR)}.
         </p>
       </div>
     </section>

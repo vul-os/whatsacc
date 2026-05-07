@@ -138,7 +138,7 @@ export default function Billing() {
               ? formatCents(billing.wallet.balance_cents, billing.wallet.currency)
               : loading
                 ? '—'
-                : 'R 0.00'}
+                : formatZar(0)}
           </p>
           <p className="text-paper/60 mt-1">prepaid · spent per message</p>
           {billing?.subscription && (

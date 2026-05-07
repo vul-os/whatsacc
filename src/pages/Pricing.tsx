@@ -2,16 +2,19 @@ import { TopNav } from '@/components/nav/TopNav';
 import { Footer } from '@/components/landing/Footer';
 import { Pricing as PricingBlock } from '@/components/landing/Pricing';
 import { PricingEstimator } from '@/components/landing/PricingEstimator';
+import { useFormatZar } from '@/lib/billing/currency';
 
-const tiers = [
-  ['Free', '$0', '100', '1', '1', '30 days', 'Email'],
-  ['Starter', '$9', '2,000', '5', '10', '12 months', 'Email + chat'],
-  ['Pro', '$49', '20,000', 'Unlimited', 'Unlimited', 'Forever', 'Priority + phone'],
+// Same canonical-ZAR base as the landing tier card so both stay in sync.
+const tiers: Array<[string, number, string, string, string, string, string]> = [
+  ['Free',    0,   '100',    '1',         '1',         '30 days',  'Email'],
+  ['Starter', 165, '2,000',  '5',         '10',        '12 months','Email + chat'],
+  ['Pro',     900, '20,000', 'Unlimited', 'Unlimited', 'Forever',  'Priority + phone'],
 ];
 
 const cols = ['Plan', 'Monthly', 'Messages', 'Locations', 'Devices', 'Audit retention', 'Support'];
 
 export default function PricingPage() {
+  const formatZar = useFormatZar();
   return (
     <div className="bg-paper">
       <TopNav />
@@ -42,7 +45,7 @@ export default function PricingPage() {
                       key={j}
                       className={`px-5 py-5 ${j === 0 ? 'font-display text-lg' : 'text-ink/80'}`}
                     >
-                      {cell}
+                      {j === 1 ? formatZar(cell as number) : cell}
                     </td>
                   ))}
                 </tr>

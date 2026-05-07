@@ -3,11 +3,13 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArchMark } from '@/components/illustrations/ArchMark';
+import { useAuth } from '@/lib/auth';
 import { ApiError, api, type AccessPointDetail } from '@/lib/api';
 
 type Stage = 'pick' | 'confirm' | 'locating' | 'sent' | 'denied';
 
 export default function OpenGate() {
+  const { currentAccount } = useAuth();
   const [accessPoints, setAccessPoints] = useState<AccessPointDetail[] | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [stage, setStage] = useState<Stage>('pick');
@@ -15,14 +17,15 @@ export default function OpenGate() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!currentAccount) return;
     try {
-      const r = await api.accessPoints();
+      const r = await api.accessPoints(currentAccount.id);
       setAccessPoints(r.access_points);
       if (!selected && r.access_points[0]) setSelected(r.access_points[0].id);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to load access points.');
     }
-  }, [selected]);
+  }, [selected, currentAccount]);
 
   useEffect(() => {
     refresh();

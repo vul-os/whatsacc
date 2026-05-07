@@ -42,20 +42,22 @@ function relTime(ts: string | null): string {
 }
 
 export default function AccessPointsPage() {
+  const { currentAccount } = useAuth();
   const [points, setPoints] = useState<AccessPointDetail[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openMaintenanceFor, setOpenMaintenanceFor] = useState<AccessPointDetail | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const refresh = useCallback(async () => {
+    if (!currentAccount) return;
     try {
-      const r = await api.accessPoints();
+      const r = await api.accessPoints(currentAccount.id);
       setPoints(r.access_points);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load access points.');
     }
-  }, []);
+  }, [currentAccount]);
 
   useEffect(() => {
     refresh();
@@ -171,7 +173,7 @@ function CreateAccessPointModal({
     }
     let cancelled = false;
     api
-      .devicesList(locationId)
+      .devicesList({ location_id: locationId })
       .then((r) => {
         if (!cancelled) setDevices(r.devices);
       })

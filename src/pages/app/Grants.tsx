@@ -3,6 +3,7 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { useAuth } from '@/lib/auth';
 import {
   ApiError,
   api,
@@ -43,16 +44,21 @@ export default function Grants() {
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'past'>('all');
 
+  const { currentAccount } = useAuth();
   const refresh = useCallback(async () => {
+    if (!currentAccount) return;
     try {
-      const [g, ap] = await Promise.all([api.grants(), api.accessPoints()]);
+      const [g, ap] = await Promise.all([
+        api.grants({ account_id: currentAccount.id }),
+        api.accessPoints(currentAccount.id),
+      ]);
       setGrants(g.grants);
       setAccessPoints(ap.access_points);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load grants.');
     }
-  }, []);
+  }, [currentAccount]);
 
   useEffect(() => {
     refresh();
