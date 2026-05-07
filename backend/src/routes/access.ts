@@ -17,6 +17,17 @@ const opSchema = z
 
 const PHONE_E164 = /^\+[1-9][0-9]{6,14}$/;
 
+const createAccessPointSchema = z
+  .object({
+    location_id: z.string().uuid(),
+    name: z.string().min(1).max(120),
+    kind: z.enum(['gate', 'door', 'barrier', 'other']),
+    device_id: z.string().uuid().nullable().optional(),
+    lat: z.number().optional(),
+    long: z.number().optional(),
+  })
+  .strict();
+
 const grantCreateSchema = z
   .object({
     phone_e164: z.string().regex(PHONE_E164, 'phone must be E.164 (+27821234567)'),
@@ -292,6 +303,44 @@ function accessRouter() {
     });
     if (!row) throw NotFound('access_point_not_found');
     return c.json(shapeAccessPoint(row));
+  });
+
+  app.post('/access-points', zValidator('json', createAccessPointSchema), async (c) => {
+    const body = c.req.valid('json');
+    // RLS enforces admin-of-account-owning-location via the WITH CHECK on
+    // access_points (see migrations/20260505070000_rls.sql). If the user
+    // doesn't own the location's account, the insert raises and Hono converts
+    // it to a 500 — we'd rather give a 403, so we pre-check.
+    const created = await withUserDb(c, async (tx) => {
+      const loc = await tx<{ id: string }[]>`
+        select id from locations where id = ${body.location_id}
+      `;
+      if (!loc[0]) throw NotFound('location_not_found');
+
+      if (body.device_id) {
+        const dev = await tx<{ id: string }[]>`
+          select id from devices where id = ${body.device_id} and location_id = ${body.location_id}
+        `;
+        if (!dev[0]) throw BadRequest('device_not_at_location');
+      }
+
+      const rows = await tx<AccessPointWithMeter[]>`
+        with inserted as (
+          insert into access_points (location_id, name, kind, device_id, lat, long, status)
+          values (${body.location_id}, ${body.name}, ${body.kind},
+                  ${body.device_id ?? null}, ${body.lat ?? null}, ${body.long ?? null}, 'active')
+          returning id, location_id, name, kind, device_id, status
+        )
+        select i.id, i.location_id, i.name, i.kind, i.device_id, i.status,
+               m.movement_m, m.total_opens, m.total_closes, m.last_op_at,
+               m.last_serviced_at, m.last_service_movement_m,
+               m.next_due_movement_m, m.next_due_at
+        from inserted i
+        left join access_point_meters m on m.access_point_id = i.id
+      `;
+      return rows[0]!;
+    });
+    return c.json(shapeAccessPoint(created), 201);
   });
 
   app.get('/access-points/:id/maintenance', async (c) => {

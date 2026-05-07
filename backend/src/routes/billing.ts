@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import postgres from 'postgres';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireAuth, getUser, type AppEnv } from '../middleware/auth.ts';
@@ -13,7 +12,7 @@ import {
   verifyWebhookSignature,
   type PaystackVerifyData,
 } from '../lib/paystack.ts';
-import type { TxSql } from '../lib/db.ts';
+import type { JSONValue, TxSql } from '../lib/db.ts';
 
 const topupSchema = z
   .object({
@@ -59,7 +58,7 @@ async function creditWalletForIntent(
     update payment_intents
     set status = 'succeeded',
         completed_at = now(),
-        raw_verify = ${tx.json(verifyData as unknown as postgres.JSONValue)},
+        raw_verify = ${tx.json(verifyData as unknown as JSONValue)},
         credited_tx_id = ${walletTxId},
         updated_at = now()
     where id = ${intent.id}
@@ -188,7 +187,7 @@ function billingRouter() {
         update payment_intents
         set authorization_url = ${init.authorization_url},
             access_code = ${init.access_code},
-            raw_init = ${tx.json({ ...init } as unknown as postgres.JSONValue)},
+            raw_init = ${tx.json({ ...init } as unknown as JSONValue)},
             updated_at = now()
         where id = ${intent.id}
       `;
@@ -237,7 +236,7 @@ function billingRouter() {
       await tx`
         update payment_intents
         set status = ${next},
-            raw_verify = ${tx.json(verifyData as unknown as postgres.JSONValue)},
+            raw_verify = ${tx.json(verifyData as unknown as JSONValue)},
             updated_at = now()
         where id = ${intent.id} and status = 'pending'
       `;
@@ -292,7 +291,7 @@ function webhookRouter() {
       // 1. Insert dedupe row. If we've seen this event id, do nothing.
       const inserted = await tx<{ id: string }[]>`
         insert into webhook_events (provider, event_id, event_type, signature, payload)
-        values ('paystack', ${eventId}, ${event}, ${signature}, ${tx.json(body as unknown as postgres.JSONValue)})
+        values ('paystack', ${eventId}, ${event}, ${signature}, ${tx.json(body as unknown as JSONValue)})
         on conflict (provider, event_id) do nothing
         returning id
       `;
@@ -323,7 +322,7 @@ function webhookRouter() {
           await tx`
             update payment_intents
             set status = 'failed',
-                raw_verify = ${tx.json(body as unknown as postgres.JSONValue)},
+                raw_verify = ${tx.json(body as unknown as JSONValue)},
                 updated_at = now()
             where provider = 'paystack' and provider_reference = ${data.reference}
               and status = 'pending'

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import type postgres from 'postgres';
+import type { JSONValue } from '../lib/db.ts';
 import { requireAuth, type AppEnv } from '../middleware/auth.ts';
 import { withUserDb } from '../middleware/rls.ts';
 import { NotFound } from '../lib/errors.ts';
@@ -86,7 +86,7 @@ function locationsRouter() {
             (account_id, parent_location_id, type, name, slug, address, lat, long, status)
           values
             (${accountId}, ${body.parent_location_id ?? null}, ${body.type},
-             ${body.name}, ${body.slug ?? null}, ${tx.json((body.address ?? {}) as postgres.JSONValue)},
+             ${body.name}, ${body.slug ?? null}, ${tx.json((body.address ?? {}) as JSONValue)},
              ${body.lat ?? null}, ${body.long ?? null}, 'active')
           returning id
         `;
@@ -128,7 +128,7 @@ function locationsRouter() {
       await tx`
         update locations set
           name = coalesce(${body.name ?? null}, name),
-          address = coalesce(${tx.json((body.address ?? null) as postgres.JSONValue)}, address),
+          address = coalesce(${tx.json((body.address ?? null) as JSONValue)}, address),
           lat = coalesce(${body.lat ?? null}, lat),
           long = coalesce(${body.long ?? null}, long),
           status = coalesce(${body.status ?? null}, status),

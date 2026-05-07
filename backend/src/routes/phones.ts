@@ -60,11 +60,12 @@ function phonesRouter() {
     const { code } = c.req.valid('json');
     if (!/^\d{6}$/.test(code)) throw BadRequest('invalid_code');
     await withUserDb(c, async (tx) => {
-      const r = await tx`
+      const r = await tx<{ id: string }[]>`
         update profile_phone_numbers set verified_at = now()
         where id = ${id} and profile_id = ${user.sub}
+        returning id
       `;
-      if (r.count === 0) throw NotFound('phone_not_found');
+      if (r.length === 0) throw NotFound('phone_not_found');
     });
     return c.body(null, 204);
   });
@@ -73,11 +74,12 @@ function phonesRouter() {
     const user = getUser(c);
     const id = c.req.param('id');
     await withUserDb(c, async (tx) => {
-      const r = await tx`
+      const r = await tx<{ id: string }[]>`
         delete from profile_phone_numbers
         where id = ${id} and profile_id = ${user.sub}
+        returning id
       `;
-      if (r.count === 0) throw NotFound('phone_not_found');
+      if (r.length === 0) throw NotFound('phone_not_found');
     });
     return c.body(null, 204);
   });

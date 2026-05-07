@@ -28,6 +28,13 @@ export function createApp() {
         if (!origin) return origin;
         if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
         if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+        // Firebase Hosting — deployed sites + preview channels
+        if (origin === 'https://whats-acc.web.app') return origin;
+        if (origin === 'https://whats-acc-dev.web.app') return origin;
+        if (/^https:\/\/whats-acc(-dev)?--[a-z0-9-]+\.web\.app$/.test(origin)) return origin;
+        // Custom domains
+        if (origin === 'https://whatsacc.com') return origin;
+        if (origin === 'https://www.whatsacc.com') return origin;
         return null;
       },
       credentials: true,

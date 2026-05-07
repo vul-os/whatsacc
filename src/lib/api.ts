@@ -213,6 +213,16 @@ export const api = {
   accessPoint: (id: string) =>
     apiFetch<AccessPointDetail>(`/access/access-points/${id}`),
 
+  accessPointCreate: (body: {
+    location_id: string;
+    name: string;
+    kind: 'gate' | 'door' | 'barrier' | 'other';
+    device_id?: string | null;
+    lat?: number;
+    long?: number;
+  }) =>
+    apiFetch<AccessPointDetail>('/access/access-points', { method: 'POST', body }),
+
   maintenanceList: (id: string) =>
     apiFetch<{ events: MaintenanceEvent[] }>(`/access/access-points/${id}/maintenance`),
 

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type postgres from 'postgres';
+import type { JSONValue } from '../lib/db.ts';
 import type { AppEnv } from '../middleware/auth.ts';
 import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
@@ -102,7 +102,7 @@ function whatsappRouter() {
               insert into whatsapp_messages
                 (chat_id, direction, kind, body, provider_message_id, status, ts)
               values
-                (${chat.id}, 'in', ${msg.type}, ${tx.json(msg as unknown as postgres.JSONValue)},
+                (${chat.id}, 'in', ${msg.type}, ${tx.json(msg as unknown as JSONValue)},
                  ${msg.id}, 'received', to_timestamp(${Number(msg.timestamp)}))
               on conflict do nothing
             `;
