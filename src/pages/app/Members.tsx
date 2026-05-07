@@ -83,7 +83,33 @@ export default function MembersPage() {
         </Card>
       ) : (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile: card list. Tables don't fit comfortably on phones, and the
+              email column was the main offender. */}
+          <ul className="md:hidden divide-y divide-ink/10">
+            {members.map((m) => (
+              <li key={m.user_id} className="p-4 flex items-start gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-ink/10 text-ink text-xs font-medium shrink-0">
+                  {initials(m.display_name, m.email)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">
+                    {m.display_name ?? m.email.split('@')[0]}
+                  </p>
+                  <p className="text-xs text-ink/60 truncate mt-0.5">{m.email}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${roleStyles[m.role]}`}
+                    >
+                      {m.role}
+                    </span>
+                    <span className="text-[11px] text-ink/60 capitalize">{m.status}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {/* md+: full table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ink/10">

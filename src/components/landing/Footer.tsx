@@ -70,7 +70,7 @@ export function Footer() {
             </div>
           ))}
 
-          <div className="col-span-12 sm:col-span-12 lg:col-span-1">
+          <div className="col-span-12 sm:col-span-12 lg:col-span-3">
             <p className="text-[11px] uppercase tracking-[0.22em] text-paper/45 mb-4">Reach</p>
             <a
               href="mailto:hello@whatsacc.io"

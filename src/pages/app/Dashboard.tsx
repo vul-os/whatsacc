@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from './AppLayout';
 import { Card, StatBlock } from '@/components/ui/Card';
@@ -71,6 +71,22 @@ export default function Dashboard() {
   // instead of empty stats cards. Loading state still falls through to the
   // normal layout so we don't flash an empty-state on initial render.
   const isOnboarding = summary !== null && locations.length === 0;
+
+  // Progressive setup signal — derived from data we already fetched, so no
+  // extra round-trips. Hidden once all four steps are done.
+  const setup = useMemo(() => {
+    if (!summary) return null;
+    const accessPointTotal = locations.reduce((sum, l) => sum + l.access_point_count, 0);
+    const hasOpens =
+      summary.opens_today + summary.opens_yesterday > 0 || summary.recent_activity.length > 0;
+    const steps: SetupStep[] = [
+      { key: 'location', label: 'Add a location', done: locations.length > 0, to: '/app/locations?new=1' },
+      { key: 'access-point', label: 'Create an access point', done: accessPointTotal > 0, to: '/app/access-points' },
+      { key: 'member', label: 'Invite a teammate', done: summary.member_count > 1, to: '/app/members' },
+      { key: 'first-open', label: 'First gate open', done: hasOpens, to: '/app/open' },
+    ];
+    return { steps, completed: steps.filter((s) => s.done).length, total: steps.length };
+  }, [summary, locations]);
 
   if (isOnboarding) {
     return (
@@ -153,6 +169,10 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {setup && setup.completed < setup.total && (
+        <SetupProgress steps={setup.steps} completed={setup.completed} total={setup.total} />
+      )}
+
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <Card className="lg:col-span-8 p-0 overflow-hidden">
           <div className="px-6 lg:px-8 pt-7 pb-2 flex items-center justify-between">
@@ -164,7 +184,18 @@ export default function Dashboard() {
           {summary === null ? (
             <p className="px-6 lg:px-8 py-6 text-ink/55 text-sm">Loading…</p>
           ) : summary.recent_activity.length === 0 ? (
-            <p className="px-6 lg:px-8 py-6 text-ink/65 text-sm">No activity yet.</p>
+            <div className="px-6 lg:px-8 py-10 text-center">
+              <p className="text-ink/70 text-sm">No activity yet.</p>
+              <p className="text-ink/45 text-xs mt-1.5">
+                Once a gate opens, the latest events land here.
+              </p>
+              <Link
+                to="/app/open"
+                className="inline-flex items-center h-9 px-4 mt-4 rounded-full text-xs border border-ink/15 hover:border-ink transition-colors"
+              >
+                Open a gate →
+              </Link>
+            </div>
           ) : (
             <ul className="divide-y divide-ink/10">
               {summary.recent_activity.map((a) => (
@@ -281,6 +312,60 @@ export default function Dashboard() {
         </Card>
       </section>
     </>
+  );
+}
+
+type SetupStep = { key: string; label: string; done: boolean; to: string };
+
+function SetupProgress({
+  steps,
+  completed,
+  total,
+}: {
+  steps: SetupStep[];
+  completed: number;
+  total: number;
+}) {
+  const next = steps.find((s) => !s.done);
+  return (
+    <Card className="mb-6 p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-ink/50">Setup</p>
+          <p className="font-display text-xl mt-1">
+            {completed} of {total} complete
+          </p>
+        </div>
+        {next && (
+          <Link
+            to={next.to}
+            className="inline-flex items-center h-10 px-5 rounded-full bg-ink text-paper text-sm font-medium hover:bg-ink/90 transition-colors"
+          >
+            Next: {next.label} →
+          </Link>
+        )}
+      </div>
+      <div className="mt-5 flex gap-2">
+        {steps.map((s) => (
+          <span
+            key={s.key}
+            className={`flex-1 h-1.5 rounded-full ${s.done ? 'bg-terracotta' : 'bg-ink/10'}`}
+          />
+        ))}
+      </div>
+      <ul className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        {steps.map((s) => (
+          <li key={s.key} className="flex items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${s.done ? 'bg-moss' : 'bg-ink/20'}`}
+            />
+            <span className={s.done ? 'line-through text-ink/40' : 'text-ink/70'}>
+              {s.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

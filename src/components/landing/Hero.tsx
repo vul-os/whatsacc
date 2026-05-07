@@ -20,9 +20,9 @@ export function Hero() {
     // hero + trust band are visible without scrolling on a typical laptop.
     // Uses 100svh on mobile to avoid the address-bar resize jank.
     <section className="relative overflow-hidden flex flex-col min-h-[calc(100svh-64px)]">
-      <div className="flex-1 mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-6 pb-8 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-8 lg:gap-y-0 lg:items-center">
+      <div className="flex-1 mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-4 pb-6 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-6 lg:gap-y-0 lg:items-center">
         {/* ── left: copy + ctas + capabilities ───────────────────────── */}
-        <div className="col-span-12 lg:col-span-7 relative z-10 order-2 lg:order-1">
+        <div className="col-span-12 lg:col-span-7 relative z-10 order-1 lg:order-1">
           {/* eyebrow — small, calm, capability-first */}
           <div className="inline-flex items-center gap-2.5 rounded-full bg-paper-cool border border-ink/10 pl-2.5 pr-4 py-1.5">
             <span className="grid place-items-center h-5 w-5 rounded-full bg-ink text-paper text-[10px] leading-none">
@@ -35,8 +35,8 @@ export function Hero() {
 
           {/* headline — capped smaller so the section fits in one viewport */}
           <h1
-            className="font-display-tight mt-5 sm:mt-6 leading-[0.94] tracking-[-0.02em] text-ink"
-            style={{ fontSize: 'clamp(2.25rem, 7vw, 5rem)' }}
+            className="font-display-tight mt-3 sm:mt-6 leading-[0.94] tracking-[-0.02em] text-ink"
+            style={{ fontSize: 'clamp(1.875rem, 7vw, 5rem)' }}
           >
             Texts
             <br />
@@ -68,13 +68,13 @@ export function Hero() {
           </h1>
 
           {/* dek — kept brief so we don't blow the fold */}
-          <p className="mt-5 sm:mt-6 max-w-xl text-base sm:text-[17px] leading-relaxed text-ink/70">
+          <p className="mt-3 sm:mt-6 max-w-xl text-[15px] sm:text-[17px] leading-snug sm:leading-relaxed text-ink/70">
             Residents, staff and visitors open a gate, door or barrier with one WhatsApp
             message. Phone-verified, geofence-aware, audited end-to-end.
           </p>
 
-          {/* capability chips */}
-          <ul className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/65">
+          {/* capability chips — hidden on phones to keep the fold tight */}
+          <ul className="mt-5 hidden sm:flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/65">
             {capabilities.map((c, i) => (
               <li key={c} className="flex items-center gap-2.5">
                 {i > 0 && <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-ink/20" aria-hidden />}
@@ -84,7 +84,7 @@ export function Hero() {
           </ul>
 
           {/* ctas */}
-          <div className="mt-6 sm:mt-7 flex flex-wrap items-center gap-3">
+          <div className="mt-4 sm:mt-7 flex flex-wrap items-center gap-3">
             <LinkButton to="/signup" variant="ink" size="lg">
               Start free
             </LinkButton>
@@ -105,11 +105,14 @@ export function Hero() {
               No credit card. Free up to 100 msgs / month.
             </span>
           </div>
+          <p className="md:hidden mt-3 text-xs text-ink/45">
+            No credit card. Free up to 100 msgs / month.
+          </p>
         </div>
 
         {/* ── right: portal illustration ─────────────────────────── */}
-        <div className="col-span-12 lg:col-span-5 order-1 lg:order-2 relative">
-          <div className="relative mx-auto max-w-[280px] sm:max-w-[340px] lg:max-w-[440px]">
+        <div className="col-span-12 lg:col-span-5 order-2 lg:order-2 relative">
+          <div className="relative mx-auto max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[440px]">
             <span className="hidden lg:block absolute -left-4 -top-4 h-5 w-5 border-l border-t border-ink/30" aria-hidden />
             <span className="hidden lg:block absolute -right-4 -top-4 h-5 w-5 border-r border-t border-ink/30" aria-hidden />
             <span className="hidden lg:block absolute -left-4 -bottom-4 h-5 w-5 border-l border-b border-ink/30" aria-hidden />

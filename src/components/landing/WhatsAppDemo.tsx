@@ -106,9 +106,9 @@ function Doodle() {
 
 export function WhatsAppDemo() {
   return (
-    <section className="relative bg-paper-warm">
-      <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-20 md:py-28 lg:py-32">
-        <div className="grid grid-cols-12 gap-y-14 gap-x-10 items-center">
+    <section className="relative bg-paper-warm overflow-hidden">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-16 sm:py-20 md:py-28 lg:py-32">
+        <div className="grid grid-cols-12 gap-y-12 sm:gap-y-14 gap-x-6 sm:gap-x-10 items-center">
           {/* Left: copy */}
           <div className="col-span-12 lg:col-span-5 lg:order-1 order-2">
             <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
@@ -143,7 +143,7 @@ export function WhatsAppDemo() {
           {/* Right: phone */}
           <div className="col-span-12 lg:col-span-7 lg:order-2 order-1 flex justify-center lg:justify-end">
             <div
-              className="relative w-full max-w-[380px] aspect-[9/18.5] rounded-[42px] bg-ink p-[5px] shadow-[0_28px_60px_-20px_rgba(26,31,54,0.45)]"
+              className="relative w-full max-w-[300px] sm:max-w-[340px] lg:max-w-[380px] aspect-[9/18.5] rounded-[42px] bg-ink p-[5px] shadow-[0_28px_60px_-20px_rgba(26,31,54,0.45)]"
               style={{ transform: 'rotate(-1.5deg)' }}
             >
               {/* Inner screen */}

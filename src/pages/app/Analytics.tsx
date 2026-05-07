@@ -30,7 +30,7 @@ export default function Analytics() {
         description="The shape of your week. Use this when you're sizing up a plan or chasing down anomalies."
       />
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card><StatBlock label="Opens · 7d" value="788" hint="+11% week-over-week" /></Card>
         <Card><StatBlock label="Denied · 7d" value="15" hint="2% of attempts" /></Card>
         <Card><StatBlock label="Avg open" value="1.8s" hint="signed → opened" /></Card>
@@ -53,7 +53,7 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="flex items-end gap-3 h-72 px-2">
+          <div className="flex items-end gap-1.5 sm:gap-3 h-60 sm:h-72 px-1 sm:px-2 overflow-hidden">
             {days.map(([d, opens, denied]) => (
               <div key={d} className="flex-1 flex flex-col items-center gap-2">
                 <div className="w-full flex-1 flex items-end gap-1">
