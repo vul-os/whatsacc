@@ -402,33 +402,71 @@ function CreateGrantModal({
         </label>
 
         <fieldset>
-          <legend className="text-sm font-medium text-ink/85 mb-2">Access points</legend>
-          {accessPoints.length === 0 ? (
-            <p className="text-sm text-ink/55">No access points yet.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-auto pr-1">
-              {accessPoints.map((ap) => (
-                <label
-                  key={ap.id}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
-                    selectedAps.has(ap.id)
-                      ? 'bg-ink/5 border-ink'
-                      : 'bg-paper-cool border-ink/15 hover:border-ink/35'
-                  }`}
+          <legend className="text-sm font-medium text-ink/85">
+            Which gates can this visitor open?
+          </legend>
+          <p className="text-xs text-ink/55 mt-0.5 mb-2">
+            {accessPoints.length === 0
+              ? "No access points at this location yet — add one first."
+              : `${accessPoints.length} available · ${selectedAps.size} selected`}
+          </p>
+          {accessPoints.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 mb-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAps(new Set(accessPoints.map((a) => a.id)))}
+                  className="underline underline-offset-4 decoration-terracotta text-ink/65 hover:text-ink"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedAps.has(ap.id)}
-                    onChange={() => toggleAp(ap.id)}
-                    className="accent-ink"
-                  />
-                  <span className="flex-1 text-sm">{ap.name}</span>
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50">
-                    {ap.kind}
-                  </span>
-                </label>
-              ))}
-            </div>
+                  Select all
+                </button>
+                <span className="text-ink/25">·</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAps(new Set())}
+                  className="underline underline-offset-4 decoration-ink/30 text-ink/65 hover:text-ink"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-auto pr-1">
+                {accessPoints.map((ap) => (
+                  <label
+                    key={ap.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
+                      selectedAps.has(ap.id)
+                        ? 'bg-ink/5 border-ink'
+                        : 'bg-paper-cool border-ink/15 hover:border-ink/35'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAps.has(ap.id)}
+                      onChange={() => toggleAp(ap.id)}
+                      className="accent-ink"
+                    />
+                    <span
+                      className={`flex-none h-6 w-6 rounded-md grid place-items-center text-[10px] font-medium ${
+                        ap.kind === 'gate'
+                          ? 'bg-terracotta/15 text-terracotta-deep'
+                          : ap.kind === 'door'
+                            ? 'bg-moss/15 text-moss'
+                            : ap.kind === 'barrier'
+                              ? 'bg-gold/20 text-ink/80'
+                              : 'bg-ink/10 text-ink/65'
+                      }`}
+                      aria-hidden
+                    >
+                      {ap.kind === 'gate' ? '⌐' : ap.kind === 'door' ? '▤' : ap.kind === 'barrier' ? '═' : '○'}
+                    </span>
+                    <span className="flex-1 text-sm">{ap.name}</span>
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50">
+                      {ap.kind}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </>
           )}
         </fieldset>
 
