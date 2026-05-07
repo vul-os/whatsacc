@@ -1,21 +1,42 @@
 import { LinkButton } from '@/components/ui/Button';
 import { HeroPortal } from '@/components/illustrations/HeroPortal';
 
+// Hardware brands that the controllers integrate with — used as a quiet
+// trust band below the fold. Stays restrained: small caps, ink/45 colour,
+// no logo files (just wordmarks) so the page feels owned-and-considered
+// rather than like a partnerships salad.
+const integrations = ['Centurion', 'BFT', 'Came', 'Nice', 'Et Blue'];
+
+const capabilities = [
+  'WhatsApp-native',
+  'End-to-end encrypted',
+  'Geofence-aware',
+  'Audit log per open',
+];
+
 export function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-6 pb-16 sm:pt-10 sm:pb-20 lg:pt-14 lg:pb-28 grid grid-cols-12 gap-x-8 gap-y-12 lg:items-end">
+    // Sized to fill the first viewport (minus the ~64px sticky nav) so the
+    // hero + trust band are visible without scrolling on a typical laptop.
+    // Uses 100svh on mobile to avoid the address-bar resize jank.
+    <section className="relative overflow-hidden flex flex-col min-h-[calc(100svh-64px)]">
+      <div className="flex-1 mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-6 pb-8 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-8 lg:gap-y-0 lg:items-center">
+        {/* ── left: copy + ctas + capabilities ───────────────────────── */}
         <div className="col-span-12 lg:col-span-7 relative z-10 order-2 lg:order-1">
-          <div className="flex items-center gap-3 mb-6 sm:mb-8">
-            <span className="h-px w-8 sm:w-10 bg-ink/40" />
-            <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">
-              what&rsquo;s access &middot; est. 2026
+          {/* eyebrow — small, calm, capability-first */}
+          <div className="inline-flex items-center gap-2.5 rounded-full bg-paper-cool border border-ink/10 pl-2.5 pr-4 py-1.5">
+            <span className="grid place-items-center h-5 w-5 rounded-full bg-ink text-paper text-[10px] leading-none">
+              w
+            </span>
+            <span className="text-[11px] tracking-[0.18em] uppercase text-ink/65">
+              Access, by message
             </span>
           </div>
 
+          {/* headline — capped smaller so the section fits in one viewport */}
           <h1
-            className="font-display-tight leading-[0.92] text-ink"
-            style={{ fontSize: 'clamp(2.75rem, 11.5vw, 8rem)' }}
+            className="font-display-tight mt-5 sm:mt-6 leading-[0.94] tracking-[-0.02em] text-ink"
+            style={{ fontSize: 'clamp(2.25rem, 7vw, 5rem)' }}
           >
             Texts
             <br />
@@ -30,13 +51,13 @@ export function Hero() {
             <span className="relative inline-block">
               gates.
               <svg
-                className="pointer-events-none absolute left-0 right-0 -bottom-2 sm:-bottom-3 w-full h-2.5 sm:h-3"
+                className="pointer-events-none absolute left-0 right-0 -bottom-1.5 sm:-bottom-2 w-full h-2 text-terracotta"
                 viewBox="0 0 360 12"
                 preserveAspectRatio="none"
                 aria-hidden
               >
                 <path
-                  d="M4 8 Q 92 -2 180 6 T 356 4"
+                  d="M4 7 Q 92 -1 180 5 T 356 4"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -46,12 +67,24 @@ export function Hero() {
             </span>
           </h1>
 
-          <p className="mt-8 sm:mt-10 max-w-md text-base sm:text-lg text-ink/70 leading-relaxed">
-            whatsacc lets residents, staff and visitors open a gate, door or barrier with a
-            single WhatsApp message. No app, no remote, no fob to lose.
+          {/* dek — kept brief so we don't blow the fold */}
+          <p className="mt-5 sm:mt-6 max-w-xl text-base sm:text-[17px] leading-relaxed text-ink/70">
+            Residents, staff and visitors open a gate, door or barrier with one WhatsApp
+            message. Phone-verified, geofence-aware, audited end-to-end.
           </p>
 
-          <div className="mt-7 sm:mt-8 flex flex-wrap items-center gap-3">
+          {/* capability chips */}
+          <ul className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/65">
+            {capabilities.map((c, i) => (
+              <li key={c} className="flex items-center gap-2.5">
+                {i > 0 && <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-ink/20" aria-hidden />}
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+
+          {/* ctas */}
+          <div className="mt-6 sm:mt-7 flex flex-wrap items-center gap-3">
             <LinkButton to="/signup" variant="ink" size="lg">
               Start free
             </LinkButton>
@@ -68,42 +101,63 @@ export function Hero() {
                 />
               </svg>
             </LinkButton>
+            <span className="hidden md:inline text-xs text-ink/45 ml-1">
+              No credit card. Free up to 100 msgs / month.
+            </span>
           </div>
-
-          <dl className="mt-12 sm:mt-14 grid grid-cols-3 gap-4 sm:gap-6 max-w-md border-t border-ink/15 pt-5 sm:pt-6">
-            <div>
-              <dt className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/45">Avg open</dt>
-              <dd className="font-display text-xl sm:text-2xl mt-1">1.8s</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/45">Locations</dt>
-              <dd className="font-display text-xl sm:text-2xl mt-1">412</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/45">Uptime</dt>
-              <dd className="font-display text-xl sm:text-2xl mt-1">99.98%</dd>
-            </div>
-          </dl>
         </div>
 
+        {/* ── right: portal illustration ─────────────────────────── */}
         <div className="col-span-12 lg:col-span-5 order-1 lg:order-2 relative">
-          <div className="relative drift mx-auto max-w-[360px] sm:max-w-[420px] lg:max-w-[480px]">
+          <div className="relative mx-auto max-w-[280px] sm:max-w-[340px] lg:max-w-[440px]">
+            <span className="hidden lg:block absolute -left-4 -top-4 h-5 w-5 border-l border-t border-ink/30" aria-hidden />
+            <span className="hidden lg:block absolute -right-4 -top-4 h-5 w-5 border-r border-t border-ink/30" aria-hidden />
+            <span className="hidden lg:block absolute -left-4 -bottom-4 h-5 w-5 border-l border-b border-ink/30" aria-hidden />
+            <span className="hidden lg:block absolute -right-4 -bottom-4 h-5 w-5 border-r border-b border-ink/30" aria-hidden />
             <HeroPortal className="block w-full h-auto" />
-            {/* corner ticks anchor the portal on desktop */}
-            <span className="hidden lg:block absolute -left-3 -top-3 h-4 w-4 border-l-2 border-t-2 border-ink/40" />
-            <span className="hidden lg:block absolute -right-3 -bottom-3 h-4 w-4 border-r-2 border-b-2 border-ink/40" />
           </div>
         </div>
       </div>
 
-      {/* editorial date strip */}
-      <div className="border-y border-ink/10 bg-paper-warm/50">
-        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-3 flex items-center justify-between gap-4 text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-ink/55">
-          <span className="shrink-0">Vol. 01 &mdash; Issue 04</span>
-          <span className="hidden md:inline">&mdash; a quiet revolution at the threshold &mdash;</span>
-          <span className="shrink-0 text-right">Durban &middot; Lagos &middot; Lisbon</span>
+      {/* ── trust band: hardware integrations + 3 hard metrics ─────── */}
+      <div className="border-y border-ink/10 bg-paper-warm/40">
+        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 grid grid-cols-12 gap-y-4 gap-x-8 items-center">
+          <div className="col-span-12 md:col-span-5">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-ink/55">
+              Talks to your hardware
+            </span>
+            <ul className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 font-display text-sm sm:text-base text-ink/85">
+              {integrations.map((brand, i) => (
+                <li key={brand} className="flex items-center gap-5">
+                  <span>{brand}</span>
+                  {i < integrations.length - 1 && (
+                    <span className="hidden sm:inline-block h-3 w-px bg-ink/20" aria-hidden />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <span className="hidden md:block md:col-span-1 h-10 w-px bg-ink/15 mx-auto" aria-hidden />
+
+          <dl className="col-span-12 md:col-span-6 grid grid-cols-3 gap-4 sm:gap-8">
+            <Stat label="Avg open" value="1.8 s" />
+            <Stat label="Locations live" value="412" />
+            <Stat label="Uptime" value="99.98%" />
+          </dl>
         </div>
       </div>
     </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/45">
+        {label}
+      </dt>
+      <dd className="font-display text-lg sm:text-xl mt-0.5 tabular-nums">{value}</dd>
+    </div>
   );
 }
