@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -317,31 +318,35 @@ function AccessPointCard({
   const due = ap.maintenance.due_now;
   const pct = ap.maintenance.pct_used ?? 0;
   return (
-    <Card className="p-6">
-      <div className="flex items-start justify-between mb-3">
-        <span
-          className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] ${
-            statusStyles[ap.status] ?? 'bg-ink/5 text-ink/60'
-          }`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {ap.status}
-        </span>
-        <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">{ap.kind}</span>
-      </div>
-      <p className="font-display text-2xl">{ap.name}</p>
-      <p className="text-sm text-ink/60 mt-1">
-        {ap.device_id ? `device ${ap.device_id.slice(0, 8)}…` : 'unpaired'}
-      </p>
+    <Card className="p-0 overflow-hidden hover:border-ink/30 transition-colors">
+      {/* Card body is one big link to the detail page; the maintenance row
+          below sits outside the link so its own button doesn't steal the click. */}
+      <Link to={`/app/access-points/${ap.id}`} className="block p-6">
+        <div className="flex items-start justify-between mb-3">
+          <span
+            className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] ${
+              statusStyles[ap.status] ?? 'bg-ink/5 text-ink/60'
+            }`}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            {ap.status}
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-ink/50">{ap.kind}</span>
+        </div>
+        <p className="font-display text-2xl">{ap.name}</p>
+        <p className="text-sm text-ink/60 mt-1">
+          {ap.device_id ? `device ${ap.device_id.slice(0, 8)}…` : 'unpaired'}
+        </p>
 
-      <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-        <Stat label="opens" value={ap.meter.total_opens.toLocaleString()} />
-        <Stat label="movement" value={formatMeters(ap.meter.movement_m)} />
-        <Stat label="last op" value={relTime(ap.meter.last_op_at)} />
-      </div>
+        <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+          <Stat label="opens" value={ap.meter.total_opens.toLocaleString()} />
+          <Stat label="movement" value={formatMeters(ap.meter.movement_m)} />
+          <Stat label="last op" value={relTime(ap.meter.last_op_at)} />
+        </div>
+      </Link>
 
-      <div className="mt-5 pt-4 border-t border-ink/10">
-        <div className="flex items-center justify-between mb-2">
+      <div className="px-6 pb-6 pt-1 border-t border-ink/10 -mt-1">
+        <div className="flex items-center justify-between mb-2 pt-4">
           <span className="text-[11px] uppercase tracking-[0.18em] text-ink/55">Maintenance</span>
           {due ? (
             <span className="text-[10px] uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-terracotta/15 text-terracotta-deep">

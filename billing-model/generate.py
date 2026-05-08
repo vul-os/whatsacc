@@ -20,8 +20,14 @@ from pathlib import Path
 from typing import List, Tuple
 import json
 
-import matplotlib.pyplot as plt
-import numpy as np
+try:
+    import matplotlib.pyplot as plt
+    import numpy as np
+    HAVE_PLOT = True
+except ImportError:
+    plt = None
+    np = None
+    HAVE_PLOT = False
 
 # ── Brand palette ────────────────────────────────────────────────────────────
 INK = '#1A1F36'
@@ -40,8 +46,13 @@ CLAY = '#CAB39A'
 class Assumptions:
     # User behaviour ──────────────────────────────────────────────────────────
     # ~1.3 opens/day on avg blends heavy users (4-5/day) with light users (~3/wk).
-    conversations_per_user_month: float = 40.0
+    opens_per_user_month: float = 40.0      # all gate opens (WhatsApp + portal)
     msgs_per_conversation: float = 4.0      # greet, location, list, pick, confirm
+
+    # Web portal substitution ────────────────────────────────────────────────
+    # "Infinite access via web portal" is the headline. A material fraction of
+    # opens happen through the portal (no Meta cost). Conservative default 30%.
+    portal_substitution: float = 0.30
 
     # Topology
     users_per_device: float = 50.0          # residents per gate
@@ -51,40 +62,46 @@ class Assumptions:
     # Service conversations are user-initiated; for whatsacc that's nearly all of them.
     # Meta's blended service rate runs ~$0.005 (ZA, IN) → ~$0.025 (US, EU).
     whatsapp_cost_per_conversation: float = 0.006
-    free_conversations_per_business_month: int = 1000  # Meta's free tier per business account
+    # Meta's free tier is per WABA, not per customer. We assume one WABA per
+    # region, so the free pool is amortised across that region's customers and
+    # is effectively zero at any non-trivial scale. Set to 0 to avoid distorting
+    # small-account economics.
+    free_conversations_per_business_month: int = 0
 
     # Server / DB ─────────────────────────────────────────────────────────────
-    server_cost_per_msg: float = 0.0003     # Deno Deploy req-cost amortised
-    db_cost_per_user_month: float = 0.005   # Neon Postgres at scale
+    server_cost_per_msg: float = 0.00015    # Cloudflare Workers req cost amortised
+    db_cost_per_user_month: float = 0.004   # Neon Postgres at scale
 
     # GSM data per controller device ──────────────────────────────────────────
     device_gsm_cost_per_month: float = 4.0  # IoT SIM, low-volume
     device_other_cost_per_month: float = 0.5  # hardware amort, ops overhead
 
     # Fixed monthly (independent of scale) ───────────────────────────────────
-    fixed_hosting: float = 50.0             # Deno Deploy + Neon base
+    fixed_hosting: float = 35.0             # Workers + Neon base
     fixed_monitoring: float = 30.0          # Sentry / logs / uptime
     fixed_misc: float = 20.0                # domain, mail, etc
 
     # Revenue ─────────────────────────────────────────────────────────────────
-    arpu: float = 1.50                      # $/active resident/month, standard
+    arpu: float = 1.50                      # currency-units / active resident / month
     enterprise_user_threshold: int = 5000   # at >= this, ARPU drops
     enterprise_arpu: float = 1.00           # negotiated rate
     base_subscription_per_location: float = 19.0  # min floor per paying account
 
-    # Stripe ─────────────────────────────────────────────────────────────────
-    stripe_pct: float = 0.029
-    stripe_fixed_per_charge: float = 0.30
+    # Paystack (replaces Stripe) ──────────────────────────────────────────────
+    # Per-region: ZA local 2.9% + R1; international cards 3.5%; NG 1.5% capped.
+    # Defaults below are blended international, in USD; per-region values
+    # override these via Region.fee_pct / Region.fee_fixed.
+    fee_pct: float = 0.035
+    fee_fixed_per_charge: float = 0.20
 
     # Resend (transactional email) ────────────────────────────────────────────
     # Pro plan starts at $20/mo for 50k emails; per-email amortised ~ $0.0004.
-    # Volume drivers: invite emails, password reset, email verification,
-    # payout success/failure notices.
     resend_fixed_monthly: float = 20.0       # base plan
     resend_per_email: float = 0.0004
     resend_included_per_month: int = 50_000
     # Heuristic: ~3 transactional emails per active user per month.
     emails_per_user_per_month: float = 3.0
+
 
 
 # ── Regions ──────────────────────────────────────────────────────────────────
@@ -106,6 +123,11 @@ class Region:
     enterprise_arpu: float
     base_subscription_per_location: float
     fx_to_usd: float                  # multiplier to convert region currency → USD for charts
+    # Paystack fees (in local currency)
+    fee_pct: float                    # 0.029 = 2.9%
+    fee_fixed_per_charge: float       # local currency
+    # Wallet / PAYG per-open price (local currency).  Drives top-up overage.
+    payg_open_price: float
     color: str
 
 
@@ -119,6 +141,9 @@ REGIONS: Tuple[Region, ...] = (
         arpu=2.50, enterprise_arpu=1.80,
         base_subscription_per_location=39.0,
         fx_to_usd=1.0,
+        # Paystack international: 3.9%, no fixed fee.
+        fee_pct=0.039, fee_fixed_per_charge=0.0,
+        payg_open_price=0.10,           # $0.10/open → ~75% margin over Meta cost
         color=INK,
     ),
     Region(
@@ -129,7 +154,9 @@ REGIONS: Tuple[Region, ...] = (
         whatsapp_cost_per_conversation=0.0200,
         arpu=2.20, enterprise_arpu=1.60,
         base_subscription_per_location=32.0,
-        fx_to_usd=1.08,                # EUR → USD
+        fx_to_usd=1.08,
+        fee_pct=0.039, fee_fixed_per_charge=0.0,
+        payg_open_price=0.08,
         color=SLATE,
     ),
     Region(
@@ -137,32 +164,39 @@ REGIONS: Tuple[Region, ...] = (
         name='South Africa',
         countries=('ZA',),
         currency='ZAR',
-        whatsapp_cost_per_conversation=0.0080,
+        whatsapp_cost_per_conversation=0.0080,   # Meta cost is in USD
         arpu=22.0, enterprise_arpu=15.0,
         base_subscription_per_location=349.0,
-        fx_to_usd=0.054,               # ZAR → USD
+        fx_to_usd=0.054,
+        # Paystack ZA local: 2.9% + R1.
+        fee_pct=0.029, fee_fixed_per_charge=1.0,
+        payg_open_price=1.50,            # R1.50/open ≈ $0.081 → ~90% margin
         color=TERRACOTTA,
     ),
     Region(
         code='latam',
         name='Brazil / LATAM',
         countries=('BR', 'MX', 'AR', 'CO', 'CL'),
-        currency='USD',                # blended; we'd offer USD billing
+        currency='USD',
         whatsapp_cost_per_conversation=0.0050,
         arpu=1.20, enterprise_arpu=0.80,
         base_subscription_per_location=15.0,
         fx_to_usd=1.0,
+        fee_pct=0.039, fee_fixed_per_charge=0.0,
+        payg_open_price=0.04,
         color=GOLD,
     ),
     Region(
         code='in-sea',
         name='India / SE Asia',
         countries=('IN', 'ID', 'PH', 'VN', 'MY', 'TH'),
-        currency='USD',                # blended; offered in USD
+        currency='USD',
         whatsapp_cost_per_conversation=0.0035,
-        arpu=0.60, enterprise_arpu=0.40,
-        base_subscription_per_location=9.0,
+        arpu=0.80, enterprise_arpu=0.55,           # raised from 0.6/0.4 — model was loss-making at 100 users
+        base_subscription_per_location=12.0,        # raised from 9.0 to cover 1-location fixed cost share
         fx_to_usd=1.0,
+        fee_pct=0.039, fee_fixed_per_charge=0.0,
+        payg_open_price=0.03,
         color=MOSS,
     ),
 )
@@ -171,13 +205,20 @@ DEFAULT_REGION = REGIONS[0]  # US/CA used as the baseline for the existing chart
 
 
 def region_assumptions(a: Assumptions, r: Region) -> Assumptions:
-    """Return an Assumptions copy with WhatsApp + revenue fields swapped to the region."""
+    """Return an Assumptions copy with all USD-equivalent fields for the region.
+
+    Charts/JSON are denominated in USD so currency-native Region values
+    (arpu, base sub, fees) are converted via fx_to_usd. WhatsApp cost is
+    already USD upstream and is NOT scaled by fx.
+    """
     return replace(
         a,
-        whatsapp_cost_per_conversation=r.whatsapp_cost_per_conversation * r.fx_to_usd,
+        whatsapp_cost_per_conversation=r.whatsapp_cost_per_conversation,
         arpu=r.arpu * r.fx_to_usd,
         enterprise_arpu=r.enterprise_arpu * r.fx_to_usd,
         base_subscription_per_location=r.base_subscription_per_location * r.fx_to_usd,
+        fee_pct=r.fee_pct,
+        fee_fixed_per_charge=r.fee_fixed_per_charge * r.fx_to_usd,
     )
 
 
@@ -188,8 +229,11 @@ def model(users: int, a: Assumptions) -> dict:
     devices = max(1.0, users / a.users_per_device)
     locations = max(1.0, devices / a.devices_per_location)
 
-    conversations = users * a.conversations_per_user_month
-    msgs = conversations * a.msgs_per_conversation
+    opens = users * a.opens_per_user_month
+    # Web portal absorbs `portal_substitution` of opens with zero Meta cost.
+    whatsapp_opens = opens * (1.0 - a.portal_substitution)
+    portal_opens = opens * a.portal_substitution
+    msgs = whatsapp_opens * a.msgs_per_conversation
 
     # Revenue: take the higher of per-user or per-location floor
     arpu = a.enterprise_arpu if users >= a.enterprise_user_threshold else a.arpu
@@ -197,25 +241,25 @@ def model(users: int, a: Assumptions) -> dict:
     revenue_floor = locations * a.base_subscription_per_location
     revenue = max(revenue_per_user, revenue_floor)
 
-    # WhatsApp: subtract Meta's free conversation tier
-    billable_conversations = max(0.0, conversations - a.free_conversations_per_business_month)
+    # WhatsApp: subtract Meta's free conversation tier (per WABA, regional)
+    billable_conversations = max(0.0, whatsapp_opens - a.free_conversations_per_business_month)
     whatsapp_cost = billable_conversations * a.whatsapp_cost_per_conversation
 
     # Other costs
-    server_cost = msgs * a.server_cost_per_msg
+    server_cost = msgs * a.server_cost_per_msg + portal_opens * a.server_cost_per_msg * 1.5
     db_cost = users * a.db_cost_per_user_month
     devices_cost = devices * (a.device_gsm_cost_per_month + a.device_other_cost_per_month)
     fixed = a.fixed_hosting + a.fixed_monitoring + a.fixed_misc
 
-    # Stripe: % of revenue + fixed per location/charge
-    stripe_cost = revenue * a.stripe_pct + locations * a.stripe_fixed_per_charge
+    # Paystack: % of revenue + fixed fee per renewal (one charge per location)
+    paystack_cost = revenue * a.fee_pct + locations * a.fee_fixed_per_charge
 
     # Resend: fixed plan + overage above the included pool
     emails = users * a.emails_per_user_per_month
     resend_overage = max(0.0, emails - a.resend_included_per_month) * a.resend_per_email
     resend_cost = a.resend_fixed_monthly + resend_overage
 
-    total_cost = whatsapp_cost + server_cost + db_cost + devices_cost + fixed + stripe_cost + resend_cost
+    total_cost = whatsapp_cost + server_cost + db_cost + devices_cost + fixed + paystack_cost + resend_cost
     profit = revenue - total_cost
     margin = (profit / revenue * 100) if revenue > 0 else 0.0
 
@@ -223,7 +267,9 @@ def model(users: int, a: Assumptions) -> dict:
         'users': users,
         'devices': round(devices, 1),
         'locations': round(locations, 1),
-        'conversations': conversations,
+        'opens': opens,
+        'whatsapp_opens': whatsapp_opens,
+        'portal_opens': portal_opens,
         'billable_conversations': billable_conversations,
         'msgs': msgs,
         'arpu_used': arpu,
@@ -233,7 +279,7 @@ def model(users: int, a: Assumptions) -> dict:
         'db': db_cost,
         'devices_cost': devices_cost,
         'fixed': fixed,
-        'stripe': stripe_cost,
+        'paystack': paystack_cost,
         'resend': resend_cost,
         'emails': emails,
         'total_cost': total_cost,
@@ -332,11 +378,11 @@ def chart_revenue_vs_cost(rows, out: Path):
 
 def chart_cost_breakdown(rows, out: Path):
     user_labels = [fmt_users(r['users']) for r in rows]
-    categories = ['WhatsApp', 'Devices (GSM)', 'Hosting + DB', 'Stripe', 'Resend', 'Server', 'Fixed misc']
+    categories = ['WhatsApp', 'Devices (GSM)', 'Hosting + DB', 'Paystack', 'Resend', 'Server', 'Fixed misc']
     colors = [TERRACOTTA, GOLD, INK, SLATE, '#A56F8E', CLAY, MOSS]
 
     data = np.array([
-        [r['whatsapp'], r['devices_cost'], r['db'], r['stripe'], r['resend'], r['server'], r['fixed']]
+        [r['whatsapp'], r['devices_cost'], r['db'], r['paystack'], r['resend'], r['server'], r['fixed']]
         for r in rows
     ]).T
 
@@ -554,8 +600,153 @@ def chart_whatsapp_sensitivity(rows, out: Path, a: Assumptions):
 # ── Run ──────────────────────────────────────────────────────────────────────
 
 
+# ── Tiers ────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class TierShape:
+    """Tier shape, expressed as multipliers of the regional base subscription.
+
+    For each tier we set a *price multiplier* over the region's base
+    subscription, and quotas (residents, devices, locations, opens/mo). The
+    `simulate` step then runs the model at the tier's expected operating point
+    and verifies margin.
+    """
+    code: str
+    name: str
+    price_mult: float           # × region.base_subscription_per_location
+    residents: int              # included
+    devices: int                # included
+    locations: int              # included
+    opens_per_month: int        # WhatsApp+portal combined included
+    blurb: str
+
+
+TIERS: Tuple[TierShape, ...] = (
+    TierShape('free',     'Free',       0.0,    5,   1,  1,    100,  'Try it. Includes web portal access.'),
+    TierShape('starter',  'Starter',    1.0,    30,  3,  1,    900,  'For a single estate or building.'),
+    TierShape('growth',   'Growth',     2.6,    100, 8,  2,    3000, 'Most popular — small estate.'),
+    TierShape('business', 'Business',   6.5,    300, 20, 5,    9000, 'Multi-site or large estate.'),
+    TierShape('scale',    'Scale',      18.0,   1000,60, 15,   30000,'Enterprise estates / property mgmt.'),
+)
+
+
+def _format_currency(amount: float, currency: str) -> str:
+    if currency in ('USD', 'EUR'):
+        return f'{currency} {amount:,.2f}'
+    return f'{currency} {amount:,.0f}'
+
+
+def _account_marginal_cost(a: Assumptions, users: int, opens: float) -> dict:
+    """Marginal cost to serve a single customer account.
+
+    Excludes platform-wide fixed overhead (hosting/monitoring/misc + Resend
+    base plan) — those are amortised across all paying accounts and would
+    distort per-tier margin if charged to every individual account.
+    """
+    # Devices/locations sized to actual residents, not the tier ceiling.
+    devices = max(1.0, users / a.users_per_device)
+    locations = max(1.0, devices / a.devices_per_location)
+
+    whatsapp_opens = opens * (1.0 - a.portal_substitution)
+    portal_opens = opens * a.portal_substitution
+    msgs = whatsapp_opens * a.msgs_per_conversation
+
+    whatsapp = whatsapp_opens * a.whatsapp_cost_per_conversation
+    server = msgs * a.server_cost_per_msg + portal_opens * a.server_cost_per_msg * 1.5
+    db = users * a.db_cost_per_user_month
+    devices_cost = devices * (a.device_gsm_cost_per_month + a.device_other_cost_per_month)
+    # Resend is metered on overage above 50k/mo platform-wide; per-account
+    # marginal is essentially the per-email cost on this account's emails.
+    resend = users * a.emails_per_user_per_month * a.resend_per_email
+    return {
+        'devices': devices,
+        'locations': locations,
+        'whatsapp_opens': whatsapp_opens,
+        'portal_opens': portal_opens,
+        'whatsapp': whatsapp,
+        'server': server,
+        'db': db,
+        'devices_cost': devices_cost,
+        'resend': resend,
+        'subtotal': whatsapp + server + db + devices_cost + resend,
+    }
+
+
+def derive_tiers(a: Assumptions, r: Region) -> List[dict]:
+    """For each tier, compute regional price + simulated unit economics.
+
+    Returns one row per tier, denominated in the region's local currency
+    (so the frontend can render directly), with USD-equivalents alongside.
+    """
+    a_r = region_assumptions(a, r)
+    out = []
+    for t in TIERS:
+        # Price in local currency (rounded to a clean number per region).
+        if t.code == 'free':
+            local_price = 0.0
+        else:
+            raw = r.base_subscription_per_location * t.price_mult
+            local_price = _round_price(raw, r.currency)
+
+        # Operating point: tier filled to 90% residents, 80% of opens cap.
+        users = max(int(t.residents * 0.9), 1)
+        opens = t.opens_per_month * 0.8
+        mc = _account_marginal_cost(a_r, users, opens)
+
+        sim_revenue_usd = local_price * r.fx_to_usd
+        paystack = sim_revenue_usd * a_r.fee_pct + mc['locations'] * a_r.fee_fixed_per_charge
+        sim_total_cost = mc['subtotal'] + paystack
+        sim_profit = sim_revenue_usd - sim_total_cost
+        sim_margin = (sim_profit / sim_revenue_usd * 100) if sim_revenue_usd > 0 else 0.0
+
+        out.append({
+            'code': t.code,
+            'name': t.name,
+            'currency': r.currency,
+            'price_local': local_price,
+            'price_usd': sim_revenue_usd,
+            'residents': t.residents,
+            'devices': t.devices,
+            'locations': t.locations,
+            'opens_per_month': t.opens_per_month,
+            'web_portal': True,
+            'blurb': t.blurb,
+            'payg_open_price_local': r.payg_open_price,
+            'payg_open_price_usd': r.payg_open_price * r.fx_to_usd,
+            'sim': {
+                'expected_users': users,
+                'expected_opens': opens,
+                'whatsapp_cost_usd': mc['whatsapp'],
+                'devices_cost_usd': mc['devices_cost'],
+                'paystack_cost_usd': paystack,
+                'cost_usd': sim_total_cost,
+                'profit_usd': sim_profit,
+                'margin_pct': sim_margin,
+            },
+        })
+    return out
+
+
+def _round_price(amount: float, currency: str) -> float:
+    """Round prices to clean retail values per currency convention."""
+    if currency == 'ZAR':
+        # R49, R149, R349, R899, R2499 — clean retail tiers
+        if amount < 100:   return round(amount / 5) * 5 - 1
+        if amount < 1000:  return round(amount / 50) * 50 - 1
+        return round(amount / 100) * 100 - 1
+    if currency == 'USD' or currency == 'EUR':
+        if amount < 10:   return round(amount * 2) / 2 - 0.01    # $4.99
+        if amount < 100:  return round(amount) - 0.01             # $19, $49, $99
+        return round(amount / 10) * 10 - 1                        # $129, $349
+    return round(amount, 2)
+
+
 def main():
-    setup_style()
+    if HAVE_PLOT:
+        setup_style()
+    else:
+        print('(matplotlib unavailable — skipping chart rendering, JSON only)')
 
     a = Assumptions()
     user_counts = [10, 100, 1_000, 10_000, 100_000]
@@ -580,7 +771,8 @@ def main():
     print('Regions:')
     for r in REGIONS:
         print(f'  · {r.name:<18} {r.currency}  whatsapp ${r.whatsapp_cost_per_conversation:.4f}/conv  '
-              f'arpu {r.currency} {r.arpu:>5.2f}  base {r.currency} {r.base_subscription_per_location:>5.0f}')
+              f'arpu {r.currency} {r.arpu:>5.2f}  base {r.currency} {r.base_subscription_per_location:>5.0f}  '
+              f'payg {r.currency} {r.payg_open_price:>5.2f}/open')
 
     print()
     print('Per-region snapshot at each user scale (USD-equivalent):')
@@ -600,28 +792,68 @@ def main():
             )
         print()
 
-    # ── Charts ───────────────────────────────────────────────────────────────
-    # Existing per-region charts (default = US/CA)
-    chart_revenue_vs_cost(rows, out_dir)
-    chart_cost_breakdown(rows, out_dir)
-    chart_margin(rows, out_dir)
-    chart_per_user(rows, out_dir)
-    chart_whatsapp_sensitivity(rows, out_dir, a_default)
+    # ── Tier table ───────────────────────────────────────────────────────────
+    print('Per-region tier pricing & simulated margin:')
+    print(f'  {"region":<14} {"tier":<10} {"price":>14} {"opens/mo":>9} {"residents":>10} {"sim margin":>11}')
+    print('  ' + '─' * 76)
+    region_tiers = {}
+    for r in REGIONS:
+        tiers = derive_tiers(a, r)
+        region_tiers[r.code] = tiers
+        for t in tiers:
+            price = _format_currency(t['price_local'], t['currency'])
+            margin = f'{t["sim"]["margin_pct"]:.0f}%' if t['code'] != 'free' else '   —'
+            print(
+                f'  {r.code:<14} {t["code"]:<10} {price:>14} '
+                f'{t["opens_per_month"]:>9,} {t["residents"]:>10} {margin:>11}'
+            )
+        print()
 
-    # New region-comparison charts
-    chart_region_profit(user_counts, out_dir, a)
-    chart_region_revenue(user_counts, out_dir, a)
-    chart_region_snapshot(1_000, out_dir, a)
-    chart_region_snapshot(10_000, out_dir, a)
+    # ── Charts ───────────────────────────────────────────────────────────────
+    if HAVE_PLOT:
+        chart_revenue_vs_cost(rows, out_dir)
+        chart_cost_breakdown(rows, out_dir)
+        chart_margin(rows, out_dir)
+        chart_per_user(rows, out_dir)
+        chart_whatsapp_sensitivity(rows, out_dir, a_default)
+        chart_region_profit(user_counts, out_dir, a)
+        chart_region_revenue(user_counts, out_dir, a)
+        chart_region_snapshot(1_000, out_dir, a)
+        chart_region_snapshot(10_000, out_dir, a)
 
     # ── Raw data ─────────────────────────────────────────────────────────────
     raw = {
         'assumptions': asdict(a),
-        'regions': [{**asdict(r), 'rows': [model(u, region_assumptions(a, r)) for u in user_counts]} for r in REGIONS],
+        'regions': [
+            {
+                **asdict(r),
+                'rows': [model(u, region_assumptions(a, r)) for u in user_counts],
+                'tiers': region_tiers[r.code],
+            }
+            for r in REGIONS
+        ],
     }
     (out_dir / 'data.json').write_text(json.dumps(raw, indent=2))
 
-    print(f'✓ {len(list(out_dir.glob("*.png")))} charts + data.json written to {out_dir}/')
+    # Compact tiers-only file for the backend/frontend to consume directly.
+    tiers_only = {
+        'generated_from': 'billing-model/generate.py',
+        'regions': {
+            r.code: {
+                'name': r.name,
+                'currency': r.currency,
+                'countries': list(r.countries),
+                'fx_to_usd': r.fx_to_usd,
+                'payg_open_price_local': r.payg_open_price,
+                'tiers': region_tiers[r.code],
+            }
+            for r in REGIONS
+        },
+    }
+    (out_dir / 'tiers.json').write_text(json.dumps(tiers_only, indent=2))
+
+    chart_count = len(list(out_dir.glob("*.png")))
+    print(f'✓ {chart_count} charts + data.json + tiers.json written to {out_dir}/')
 
 
 if __name__ == '__main__':

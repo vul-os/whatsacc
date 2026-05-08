@@ -8,7 +8,7 @@ we need invoices, backend must make pdf, our company details must be in .env als
 use logo make it look amazing, it must be available on frontend
 
 
-we need paystack, test payouts, referrals, normal billing
+we need paystack, test payouts, referrals, normal billingcl
 have tests so that we cant get caught with referals, like if you cancel and come back etc
 
 buy domain on namecheap, whatsacc.com

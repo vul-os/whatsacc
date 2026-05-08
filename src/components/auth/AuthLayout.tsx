@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
-import { AuthAside } from '@/components/illustrations/AuthAside';
+import { AuthScene } from '@/components/illustrations/AuthScene';
 
 // Shared two-column shell for /login, /signup, /forgot-password,
 // /reset-password and similar. Aside on the left (top on mobile).
@@ -22,22 +22,30 @@ export function AuthLayout({
     <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-paper grid grid-cols-1 lg:grid-cols-12">
       <aside
         className={[
-          'lg:col-span-5 bg-ink text-paper relative overflow-hidden',
+          'lg:col-span-5 bg-ink text-paper relative overflow-hidden isolate',
           asideOrder === 'last' ? 'lg:order-last' : '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        <div className="absolute inset-0 grain pointer-events-none" />
-        <AuthAside className="absolute inset-0 h-full w-full opacity-80" />
+        {/* Animated brand illustration — replaces the previous static photo. */}
+        <AuthScene className="absolute inset-0 h-full w-full" />
+        {/* Bottom gradient ensures the headline + body copy stays legible
+            over the illustration without crushing its detail. */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink via-ink/85 to-transparent pointer-events-none"
+          aria-hidden
+        />
+        {/* subtle film grain — keeps the panel feeling premium, not pristine */}
+        <div className="absolute inset-0 grain pointer-events-none opacity-40" aria-hidden />
 
         {/* corner architectural ticks — quiet structural detail */}
-        <span className="hidden lg:block absolute top-6 left-6 h-3 w-3 border-l border-t border-paper/30" aria-hidden />
-        <span className="hidden lg:block absolute top-6 right-6 h-3 w-3 border-r border-t border-paper/30" aria-hidden />
-        <span className="hidden lg:block absolute bottom-6 left-6 h-3 w-3 border-l border-b border-paper/30" aria-hidden />
-        <span className="hidden lg:block absolute bottom-6 right-6 h-3 w-3 border-r border-b border-paper/30" aria-hidden />
+        <span className="hidden lg:block absolute top-6 left-6 h-3 w-3 border-l border-t border-paper/40 z-10" aria-hidden />
+        <span className="hidden lg:block absolute top-6 right-6 h-3 w-3 border-r border-t border-paper/40 z-10" aria-hidden />
+        <span className="hidden lg:block absolute bottom-6 left-6 h-3 w-3 border-l border-b border-paper/40 z-10" aria-hidden />
+        <span className="hidden lg:block absolute bottom-6 right-6 h-3 w-3 border-r border-b border-paper/40 z-10" aria-hidden />
 
-        <div className="relative h-full min-h-[260px] lg:min-h-0 flex flex-col p-6 sm:p-10 lg:p-12">
+        <div className="relative z-10 h-full min-h-[320px] lg:min-h-0 flex flex-col p-6 sm:p-10 lg:p-12">
           <Link to="/" className="inline-flex items-center gap-2.5 group">
             <ArchMark className="h-7 w-7 sm:h-8 sm:w-8 text-paper transition-transform group-hover:-translate-y-0.5" />
             <span className="font-display italic text-lg sm:text-xl">whatsacc</span>

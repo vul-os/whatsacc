@@ -310,6 +310,17 @@ export const api = {
       { method: 'DELETE' },
     ),
 
+  locationUpdate: (
+    id: string,
+    body: {
+      name?: string;
+      address?: Record<string, unknown>;
+      lat?: number;
+      long?: number;
+      status?: string;
+    },
+  ) => apiFetch<void>(`/locations/${id}`, { method: 'PATCH', body }),
+
   // Devices
   devicesList: (filter?: { location_id?: string; account_id?: string }) => {
     const params = new URLSearchParams();

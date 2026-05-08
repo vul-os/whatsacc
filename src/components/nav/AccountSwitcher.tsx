@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { CreateLocationModal } from '@/components/locations/CreateLocationModal';
 
 // User-facing pill in the top bar. Drops down to a list of accounts the user
-// belongs to so they can switch tenants. If they only belong to one account,
-// renders as a non-interactive pill (no dropdown affordance).
+// belongs to so they can switch tenants and a "+ New location" entry that
+// creates a fresh account/location pair. Always interactive — even with a
+// single location the user needs the create affordance here.
 export function AccountSwitcher() {
-  const { user, accounts, currentAccount, setCurrentAccount } = useAuth();
+  const { user, accounts, currentAccount, setCurrentAccount, refreshMe } = useAuth();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click + Escape
@@ -26,19 +29,15 @@ export function AccountSwitcher() {
 
   if (!user) return null;
   const initials = user.name.split(' ').map((s) => s[0] ?? '').join('').slice(0, 2).toUpperCase();
-  const onlyOne = accounts.length <= 1;
 
   return (
     <div className="relative" ref={wrapRef}>
       <button
         type="button"
-        onClick={() => !onlyOne && setOpen((v) => !v)}
-        disabled={onlyOne}
-        className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/10 transition-colors ${
-          onlyOne ? 'cursor-default' : 'hover:border-ink/30 hover:bg-paper-cool'
-        }`}
-        aria-haspopup={!onlyOne ? 'menu' : undefined}
-        aria-expanded={!onlyOne ? open : undefined}
+        onClick={() => setOpen((v) => !v)}
+        className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/10 transition-colors hover:border-ink/30 hover:bg-paper-cool"
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-paper text-[11px] font-medium">
           {initials || '·'}
@@ -51,14 +50,12 @@ export function AccountSwitcher() {
             {currentAccount?.name ?? user.name.split(' ')[0]}
           </span>
         </span>
-        {!onlyOne && (
-          <svg viewBox="0 0 12 8" className="h-2.5 w-2.5 text-ink/55 ml-0.5" aria-hidden>
-            <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" />
-          </svg>
-        )}
+        <svg viewBox="0 0 12 8" className="h-2.5 w-2.5 text-ink/55 ml-0.5" aria-hidden>
+          <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        </svg>
       </button>
 
-      {open && !onlyOne && (
+      {open && (
         <div
           role="menu"
           className="absolute right-0 mt-2 w-72 rounded-2xl border border-ink/10 bg-paper shadow-[0_24px_48px_-24px_rgba(26,31,54,0.25)] py-2 z-30"
@@ -109,12 +106,36 @@ export function AccountSwitcher() {
               );
             })}
           </ul>
-          <div className="border-t border-ink/8 mt-1 pt-2 px-2">
-            <p className="px-2 py-1 text-xs text-ink/55">
+          <div className="border-t border-ink/8 mt-1 pt-1 px-1">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setCreating(true);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-ink hover:bg-paper-cool transition-colors flex items-center gap-2.5"
+            >
+              <span className="grid h-7 w-7 place-items-center rounded-full border border-dashed border-ink/30 text-ink/55 text-base leading-none">
+                +
+              </span>
+              <span>New location</span>
+            </button>
+            <p className="px-3 py-1.5 text-xs text-ink/55">
               Signed in as <span className="text-ink">{user.email}</span>
             </p>
           </div>
         </div>
+      )}
+
+      {creating && (
+        <CreateLocationModal
+          onClose={() => setCreating(false)}
+          onCreated={async (newAccountId) => {
+            setCreating(false);
+            await refreshMe();
+            setCurrentAccount(newAccountId);
+          }}
+        />
       )}
     </div>
   );

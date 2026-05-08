@@ -26,15 +26,19 @@ export function createApp() {
     cors({
       origin: (origin) => {
         if (!origin) return origin;
-        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-        if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+        // Browsers will sometimes send an FQDN-form Origin (`example.com.`)
+        // when the user navigated with a trailing dot. Strip it before
+        // matching so we don't blackhole otherwise-valid requests.
+        const o = origin.replace(/\.$/, '');
+        if (/^http:\/\/localhost(:\d+)?$/.test(o)) return origin;
+        if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(o)) return origin;
         // Firebase Hosting — deployed sites + preview channels
-        if (origin === 'https://whats-acc.web.app') return origin;
-        if (origin === 'https://whats-acc-dev.web.app') return origin;
-        if (/^https:\/\/whats-acc(-dev)?--[a-z0-9-]+\.web\.app$/.test(origin)) return origin;
+        if (o === 'https://whats-acc.web.app') return origin;
+        if (o === 'https://whats-acc-dev.web.app') return origin;
+        if (/^https:\/\/whats-acc(-dev)?--[a-z0-9-]+\.web\.app$/.test(o)) return origin;
         // Custom domains
-        if (origin === 'https://whatsacc.com') return origin;
-        if (origin === 'https://www.whatsacc.com') return origin;
+        if (o === 'https://whatsacc.com') return origin;
+        if (o === 'https://www.whatsacc.com') return origin;
         return null;
       },
       credentials: true,

@@ -7,13 +7,19 @@
 -- non-BYPASSRLS role re-arms the policies without burning a separate
 -- connection pool. Idempotent.
 
-DO $$ BEGIN
-    CREATE ROLE whatsacc_app NOLOGIN;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- Allow the connecting role to SET ROLE to whatsacc_app. Postgres requires
--- membership in the target role for SET ROLE to be allowed.
-GRANT whatsacc_app TO CURRENT_USER;
+-- Idempotent + permission-tolerant: if the role already exists (typical when
+-- the connecting user IS whatsacc_app), skip CREATE entirely so we don't trip
+-- on missing CREATEROLE privilege. If we're already connected as the target
+-- role, skip the GRANT-to-self that would otherwise be a no-op or error.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'whatsacc_app') THEN
+        CREATE ROLE whatsacc_app NOLOGIN;
+    END IF;
+    IF current_user <> 'whatsacc_app' THEN
+        EXECUTE format('GRANT whatsacc_app TO %I', current_user);
+    END IF;
+END $$;
 
 -- Schema + table privileges. RLS will still filter rows; these grants only
 -- decide whether the role can see/touch the relations at all.

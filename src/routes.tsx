@@ -57,15 +57,15 @@ const routes: RouteObject[] = [
     children: [
       { index: true, element: wrap(() => import('@/pages/app/Dashboard')), errorElement },
       { path: 'open', element: wrap(() => import('@/pages/app/OpenGate')), errorElement },
-      { path: 'locations', element: wrap(() => import('@/pages/app/Locations')), errorElement },
       { path: 'access-points', element: wrap(() => import('@/pages/app/AccessPoints')), errorElement },
+      { path: 'access-points/:id', element: wrap(() => import('@/pages/app/AccessPoint')), errorElement },
       { path: 'devices', element: wrap(() => import('@/pages/app/Devices')), errorElement },
       { path: 'members', element: wrap(() => import('@/pages/app/Members')), errorElement },
       { path: 'billing', element: wrap(() => import('@/pages/app/Billing')), errorElement },
       { path: 'analytics', element: wrap(() => import('@/pages/app/Analytics')), errorElement },
       { path: 'referrals', element: wrap(() => import('@/pages/app/Referrals')), errorElement },
       { path: 'grants', element: wrap(() => import('@/pages/app/Grants')), errorElement },
-      { path: 'security', element: wrap(() => import('@/pages/app/SecuritySettings')), errorElement },
+      { path: 'settings', element: wrap(() => import('@/pages/app/Settings')), errorElement },
     ],
   },
 ];

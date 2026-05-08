@@ -13,6 +13,7 @@ import {
   type PaystackVerifyData,
 } from '../lib/paystack.ts';
 import type { JSONValue, TxSql } from '../lib/db.ts';
+import { regionForCountry, REGIONS, type RegionCode } from '../lib/billing/tiers.ts';
 
 const topupSchema = z
   .object({
@@ -75,6 +76,40 @@ async function creditWalletForIntent(
 
 function billingRouter() {
   const app = new Hono<AppEnv>();
+
+  // Public: list pricing tiers for a region (resolved from country code or
+  // explicit region). Used by the marketing pricing page and the in-app upgrade
+  // modal. No auth — pricing should be discoverable.
+  const tiersQuerySchema = z.object({
+    country: z.string().length(2).optional(),
+    region: z.enum(['us-ca', 'eu-west', 'za', 'latam', 'in-sea']).optional(),
+  });
+  app.get('/tiers', zValidator('query', tiersQuerySchema), async (c) => {
+    const { country, region: explicit } = c.req.valid('query');
+    const region: RegionCode = explicit ?? regionForCountry(country ?? null);
+    const r = REGIONS[region];
+    return c.json({
+      region: r.code,
+      region_name: r.name,
+      currency: r.currency,
+      countries: r.countries,
+      payg_open_price: r.paygOpenPriceLocal,
+      tiers: r.tiers.map((t) => ({
+        code: t.code,
+        name: t.name,
+        price: t.priceLocal,
+        currency: r.currency,
+        included_opens: t.opensPerMonth,
+        included_residents: t.residents,
+        included_devices: t.devices,
+        included_locations: t.locations,
+        web_portal: t.webPortal,
+        blurb: t.blurb,
+      })),
+    });
+  });
+
+  // All other routes below require auth.
   app.use('*', requireAuth());
 
   app.get('/accounts/:id/billing', async (c) => {
@@ -142,11 +177,19 @@ function billingRouter() {
       `${env.APP_PUBLIC_URL}${callback_path ?? '/app/billing'}`;
 
     // 1. Authorize + reserve an intent row under the user's RLS context.
+    //    Currency follows the account's region (us-ca → USD, za → ZAR, etc.).
     const intent = await withUserDb(c, async (tx) => {
       const ok = await tx<{ ok: boolean }[]>`
         select app.is_account_admin(${account_id}) as ok
       `;
       if (!ok[0]?.ok) throw Forbidden('not_account_admin');
+
+      const acctRows = await tx<{ country_code: string }[]>`
+        select country_code from accounts where id = ${account_id}
+      `;
+      const country = acctRows[0]?.country_code ?? 'ZA';
+      const region = regionForCountry(country);
+      const currency = REGIONS[region].currency;
 
       const emailRows = await tx<{ email: string }[]>`
         select email from users where id = ${user.sub}
@@ -160,10 +203,10 @@ function billingRouter() {
            purpose, amount_cents, currency, status)
         values
           (${account_id}, ${user.sub}, 'paystack', ${reference},
-           'wallet_topup', ${amount_cents}, 'ZAR', 'pending')
+           'wallet_topup', ${amount_cents}, ${currency}, 'pending')
         returning id
       `;
-      return { id: row!.id, email };
+      return { id: row!.id, email, currency };
     });
 
     // 2. Init the transaction with Paystack (network call after DB row exists,
@@ -172,7 +215,7 @@ function billingRouter() {
       email: intent.email,
       amountCents: amount_cents,
       reference,
-      currency: 'ZAR',
+      currency: intent.currency,
       callbackUrl,
       metadata: {
         account_id,
