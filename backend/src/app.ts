@@ -12,6 +12,8 @@ import { accessRoutes } from './routes/access.ts';
 import { devicesRoutes } from './routes/devices.ts';
 import { phonesRoutes } from './routes/phones.ts';
 import { whatsappRoutes } from './routes/whatsapp.ts';
+import { telegramRoutes } from './routes/telegram.ts';
+import { slackRoutes } from './routes/slack.ts';
 import { billingRoutes, paystackWebhookRoutes } from './routes/billing.ts';
 import { analyticsRoutes } from './routes/analytics.ts';
 import { referralsRoutes } from './routes/referrals.ts';
@@ -71,6 +73,8 @@ export function createApp() {
   app.route('/analytics', analyticsRoutes);
   app.route('/referrals', referralsRoutes);
   app.route('/', whatsappRoutes); // mounts /webhooks/whatsapp at root
+  app.route('/', telegramRoutes); // mounts /webhooks/telegram at root
+  app.route('/', slackRoutes); // mounts /webhooks/slack at root
   app.route('/', paystackWebhookRoutes); // mounts /webhooks/paystack at root
 
   return app;

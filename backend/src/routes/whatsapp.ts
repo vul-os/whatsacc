@@ -4,6 +4,7 @@ import type { AppEnv } from '../middleware/auth.ts';
 import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
+import { sendWhatsAppText } from '../lib/whatsapp.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -85,10 +86,20 @@ function whatsappRouter() {
       throw BadRequest('bad_json');
     }
 
+    type PendingReply = { to: string; chatId: string; body: string };
+    const replies: PendingReply[] = [];
+
+    // Meta delivers webhooks for every phone number on the WABA, not just
+    // ours. Drop changes targeted at any other phone_number_id so we don't
+    // process / reply to messages meant for a sibling project's bot.
+    const ourPhoneId = getEnv().WHATSAPP_PHONE_NUMBER_ID;
+
     await withAnonDb(async (tx) => {
       for (const entry of payload.entry ?? []) {
         for (const change of entry.changes ?? []) {
           const value = change.value;
+          const incomingPhoneId = value.metadata?.phone_number_id;
+          if (ourPhoneId && incomingPhoneId && incomingPhoneId !== ourPhoneId) continue;
           for (const msg of value.messages ?? []) {
             const from = `+${msg.from}`;
             const chatRows = await tx<{ id: string; profile_id: string | null }[]>`
@@ -106,12 +117,40 @@ function whatsappRouter() {
                  ${msg.id}, 'received', to_timestamp(${Number(msg.timestamp)}))
               on conflict do nothing
             `;
+
+            if (msg.type === 'text') {
+              const text = (msg.text?.body ?? '').trim().toLowerCase();
+              const reply = text === 'open' ? 'success' : 'failed';
+              replies.push({ to: msg.from, chatId: chat.id, body: reply });
+            }
           }
           // TODO: handle status updates (delivered/read) by upserting whatsapp_messages.status
-          // TODO: dispatch intent/conversation engine for inbound messages
         }
       }
     });
+
+    // Send replies outside the DB tx so a slow Meta API call doesn't hold a
+    // connection. Persist outbound rows after each send completes.
+    for (const r of replies) {
+      const sent = await sendWhatsAppText(r.to, r.body);
+      await withAnonDb(async (tx) => {
+        await tx`
+          insert into whatsapp_messages
+            (chat_id, direction, kind, body, provider_message_id, status, ts)
+          values
+            (${r.chatId}, 'out', 'text',
+             ${tx.json({ text: { body: r.body } } as unknown as JSONValue)},
+             ${sent.providerMessageId ?? null},
+             ${sent.ok ? 'sent' : `failed:${sent.error ?? 'unknown'}`},
+             now())
+        `;
+        await tx`
+          update whatsapp_chats
+          set last_outbound_at = now()
+          where id = ${r.chatId}
+        `;
+      });
+    }
 
     return c.json({ ok: true });
   });

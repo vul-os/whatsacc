@@ -350,13 +350,13 @@ export const api = {
     ),
 
   // Access ops
-  accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'api' } = {}) =>
+  accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
     apiFetch<{ ok: boolean; command: 'open' }>(`/access/access-points/${id}/open`, {
       method: 'POST',
       body: { source: 'web', ...body },
     }),
 
-  accessClose: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'api' } = {}) =>
+  accessClose: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
     apiFetch<{ ok: boolean; command: 'close' }>(`/access/access-points/${id}/close`, {
       method: 'POST',
       body: { source: 'web', ...body },
