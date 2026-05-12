@@ -233,7 +233,7 @@ try {
   if (businessAcctId) {
     const invite = await api('POST', `/accounts/${businessAcctId}/invites`, {
       token: aliceTok,
-      json: { email: bobEmail, role: 'member' },
+      json: { email: bobEmail, role: 'member', phone_e164: '+27821234567' },
     });
     if (invite.status >= 200 && invite.status < 300) ok('send invite', `${invite.status}`);
     else {

@@ -36,6 +36,7 @@ type AuthState = {
     email: string;
     password: string;
     display_name: string;
+    phone_e164?: string;
     location_name: string;
     country_code: string;
     account_type: 'personal' | 'business';
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       display_name: string;
+      phone_e164?: string;
       location_name: string;
       country_code: string;
       account_type: 'personal' | 'business';

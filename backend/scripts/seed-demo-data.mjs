@@ -237,7 +237,7 @@ try {
   for (const email of ['partner@example.com', 'tenant.alex@example.com']) {
     const r = await api('POST', `/accounts/${sunsetAccountId}/invites`, {
       token,
-      json: { email, role: 'member' },
+      json: { email, role: 'member', phone_e164: '+27000000000' },
     });
     if (r.status >= 200 && r.status < 300) ok(`invited ${email}`);
     else {

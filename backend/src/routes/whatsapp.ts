@@ -4,7 +4,12 @@ import type { AppEnv } from '../middleware/auth.ts';
 import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
-import { sendWhatsAppText } from '../lib/whatsapp.ts';
+import {
+  sendWhatsAppText,
+  sendWhatsAppInteractive,
+  type WhatsAppInteractive,
+} from '../lib/whatsapp.ts';
+import { tryConsumeGrant, logAccess } from './access.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -40,6 +45,11 @@ type WhatsAppValue = {
     timestamp: string;
     type: string;
     text?: { body: string };
+    interactive?: {
+      type: 'list_reply' | 'button_reply';
+      list_reply?: { id: string; title: string; description?: string };
+      button_reply?: { id: string; title: string };
+    };
     [k: string]: unknown;
   }>;
   statuses?: Array<{ id: string; status: string; timestamp: string }>;
@@ -86,7 +96,9 @@ function whatsappRouter() {
       throw BadRequest('bad_json');
     }
 
-    type PendingReply = { to: string; chatId: string; body: string };
+    type PendingReply =
+      | { type: 'text'; to: string; chatId: string; body: string }
+      | { type: 'interactive'; to: string; chatId: string; interactive: WhatsAppInteractive };
     const replies: PendingReply[] = [];
 
     // Meta delivers webhooks for every phone number on the WABA, not just
@@ -119,9 +131,165 @@ function whatsappRouter() {
             `;
 
             if (msg.type === 'text') {
-              const text = (msg.text?.body ?? '').trim().toLowerCase();
-              const reply = text === 'open' ? 'success' : 'failed';
-              replies.push({ to: msg.from, chatId: chat.id, body: reply });
+              // 1. Lookup temporary grants (visitors)
+              const visitorGrants = await tx<
+                {
+                  id: string;
+                  max_uses: number | null;
+                  uses_count: number;
+                  ap_id: string;
+                  ap_name: string;
+                  loc_name: string;
+                }[]
+              >`
+                select g.id, g.max_uses, g.uses_count,
+                       ap.id as ap_id, ap.name as ap_name,
+                       l.name as loc_name
+                from temporary_access_grants g
+                join temporary_access_grant_access_points t on t.grant_id = g.id
+                join access_points ap on ap.id = t.access_point_id
+                join locations l on l.id = ap.location_id
+                where g.phone_e164 = ${from}
+                  and g.status = 'active'
+                  and g.starts_at <= now()
+                  and g.ends_at > now()
+                  and (g.max_uses is null or g.uses_count < g.max_uses)
+                order by g.ends_at asc
+              `;
+
+              // 2. Lookup member access (registered users)
+              const memberGrants = await tx<
+                {
+                  ap_id: string;
+                  ap_name: string;
+                  loc_name: string;
+                }[]
+              >`
+                select ap.id as ap_id, ap.name as ap_name, l.name as loc_name
+                from profile_phone_numbers ppn
+                join profiles p on p.id = ppn.profile_id
+                join account_members am on am.user_id = p.id
+                join locations l on l.account_id = am.account_id
+                join access_points ap on ap.location_id = l.id
+                where ppn.phone_e164 = ${from}
+                  and ppn.verified_at is not null
+                  and am.status = 'active'
+                  and ap.status = 'active'
+              `;
+
+              // Combine them
+              const allGrants = [
+                ...visitorGrants.map(g => ({ ...g, type: 'visitor' as const })),
+                ...memberGrants.map(g => ({ ...g, id: null, max_uses: null, uses_count: 0, type: 'member' as const })),
+              ];
+
+              if (allGrants.length === 0) {
+                replies.push({
+                  type: 'text',
+                  to: msg.from,
+                  chatId: chat.id,
+                  body: "Hello! You don't have any active gate access linked to this number. Please contact the administrator if you believe this is an error.",
+                });
+              } else if (allGrants.length === 1) {
+                const g = allGrants[0]!;
+                const footer = g.type === 'visitor' 
+                  ? { text: `You have ${g.max_uses === null ? 'unlimited' : g.max_uses - g.uses_count} uses remaining.` }
+                  : undefined;
+
+                replies.push({
+                  type: 'interactive',
+                  to: msg.from,
+                  chatId: chat.id,
+                  interactive: {
+                    type: 'button',
+                    body: { text: `Welcome! Would you like to open the ${g.ap_name}?` },
+                    footer,
+                    action: {
+                      buttons: [
+                        {
+                          type: 'reply',
+                          reply: { id: g.ap_id, title: `Open ${g.ap_name}` },
+                        },
+                      ],
+                    },
+                  },
+                });
+              } else {
+                // Multiple gates: use a List Message.
+                replies.push({
+                  type: 'interactive',
+                  to: msg.from,
+                  chatId: chat.id,
+                  interactive: {
+                    type: 'list',
+                    header: { type: 'text', text: 'Gate Access' },
+                    body: { text: 'Welcome! Please select the gate you would like to open.' },
+                    action: {
+                      button: 'Select Gate',
+                      sections: [
+                        {
+                          title: 'Available Gates',
+                          rows: allGrants.slice(0, 10).map((g) => ({
+                            id: g.ap_id,
+                            title: g.ap_name,
+                            description: g.loc_name,
+                          })),
+                        },
+                      ],
+                    },
+                  },
+                });
+              }
+            } else if (msg.type === 'interactive') {
+              const reply = msg.interactive?.list_reply || msg.interactive?.button_reply;
+              if (reply) {
+                const apId = reply.id;
+                
+                // Try consuming as visitor first
+                let grantId = await tryConsumeGrant(from, apId);
+                let isMember = false;
+
+                if (!grantId) {
+                  // If not visitor, check if they are a member
+                  const memberCheck = await tx`
+                    select am.user_id
+                    from profile_phone_numbers ppn
+                    join account_members am on am.user_id = ppn.profile_id
+                    join locations l on l.account_id = am.account_id
+                    join access_points ap on ap.location_id = l.id
+                    where ppn.phone_e164 = ${from}
+                      and ppn.verified_at is not null
+                      and ap.id = ${apId}::uuid
+                      and am.status = 'active'
+                    limit 1
+                  `;
+                  if (memberCheck.length > 0) {
+                    isMember = true;
+                  }
+                }
+
+                if (grantId || isMember) {
+                  await logAccess(tx, {
+                    user_id: null, // TODO: resolve user_id for members?
+                    access_point_id: apId,
+                    command: 'open',
+                    source: 'whatsapp',
+                  });
+                  replies.push({
+                    type: 'text',
+                    to: msg.from,
+                    chatId: chat.id,
+                    body: `✅ Opening ${reply.title}...`,
+                  });
+                } else {
+                  replies.push({
+                    type: 'text',
+                    to: msg.from,
+                    chatId: chat.id,
+                    body: `❌ Sorry, you no longer have access to this gate.`,
+                  });
+                }
+              }
             }
           }
           // TODO: handle status updates (delivered/read) by upserting whatsapp_messages.status
@@ -132,14 +300,21 @@ function whatsappRouter() {
     // Send replies outside the DB tx so a slow Meta API call doesn't hold a
     // connection. Persist outbound rows after each send completes.
     for (const r of replies) {
-      const sent = await sendWhatsAppText(r.to, r.body);
+      const sent =
+        r.type === 'text'
+          ? await sendWhatsAppText(r.to, r.body)
+          : await sendWhatsAppInteractive(r.to, r.interactive);
+
       await withAnonDb(async (tx) => {
+        const kind = r.type === 'text' ? 'text' : 'interactive';
+        const body = r.type === 'text' ? { text: { body: r.body } } : r.interactive;
+
         await tx`
           insert into whatsapp_messages
             (chat_id, direction, kind, body, provider_message_id, status, ts)
           values
-            (${r.chatId}, 'out', 'text',
-             ${tx.json({ text: { body: r.body } } as unknown as JSONValue)},
+            (${r.chatId}, 'out', ${kind},
+             ${tx.json(body as unknown as JSONValue)},
              ${sent.providerMessageId ?? null},
              ${sent.ok ? 'sent' : `failed:${sent.error ?? 'unknown'}`},
              now())

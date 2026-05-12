@@ -178,20 +178,32 @@ function InviteModal({
   onInvited: () => void;
 }) {
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('+');
   const [role, setRole] = useState<AccountMemberRow['role']>('member');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [delivery, setDelivery] = useState<{ email: boolean; whatsapp: boolean } | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErrorMsg(null);
     setSubmitting(true);
     try {
-      await api.inviteCreate(accountId, { email: email.trim().toLowerCase(), role });
+      const result = await api.inviteCreate(accountId, {
+        email: email.trim().toLowerCase(),
+        phone_e164: phone.replace(/\s+/g, ''),
+        role,
+      });
+      setDelivery({ email: result.email_sent, whatsapp: result.whatsapp_sent });
       setSent(true);
     } catch (err) {
-      setErrorMsg(err instanceof ApiError ? (err.detail ?? err.code) : err instanceof Error ? err.message : 'Failed.');
+      const msg = err instanceof ApiError 
+        ? (err.detail ?? err.code) 
+        : err instanceof Error 
+          ? err.message 
+          : 'Failed.';
+      setErrorMsg(typeof msg === 'string' ? msg : 'An unexpected error occurred.');
       setSubmitting(false);
     }
   }
@@ -202,8 +214,16 @@ function InviteModal({
       {sent ? (
         <>
           <p className="text-sm text-ink/65 mt-2">
-            We've emailed <span className="font-medium">{email}</span> with the accept link. It expires in 7 days.
+            We've sent the invite to <span className="font-medium">{email}</span> and{' '}
+            <span className="font-medium">{phone}</span>. It expires in 7 days.
           </p>
+          {delivery && (!delivery.email || !delivery.whatsapp) && (
+            <p className="text-xs text-terracotta-deep mt-3">
+              {delivery.email ? '' : 'Email delivery failed. '}
+              {delivery.whatsapp ? '' : 'WhatsApp delivery failed. '}
+              The invite was still created.
+            </p>
+          )}
           <div className="flex justify-end mt-6">
             <Button variant="ink" onClick={onInvited}>
               Done
@@ -213,7 +233,7 @@ function InviteModal({
       ) : (
         <>
           <p className="text-sm text-ink/60 mb-5">
-            They'll get an email with a link to accept. They need to sign up first.
+            They'll get an email and WhatsApp with a link to accept.
           </p>
           <form onSubmit={onSubmit} className="space-y-4">
             <label className="block">
@@ -227,6 +247,18 @@ function InviteModal({
                 placeholder="member@example.com"
                 className="mt-1.5 w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
               />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-ink/85">Phone Number (E.164)</span>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+27..."
+                className="mt-1.5 w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
+              />
+              <p className="text-[11px] text-ink/50 mt-1">Must include country code, e.g. +27821234567</p>
             </label>
             <fieldset>
               <legend className="text-sm font-medium text-ink/85 mb-2">Role</legend>

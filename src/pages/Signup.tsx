@@ -20,6 +20,7 @@ export default function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Step 2 — account kind
   const [kind, setKind] = useState<'personal' | 'business'>('personal');
@@ -93,6 +94,7 @@ export default function Signup() {
         email,
         password,
         display_name: name,
+        phone_e164: phone.trim() || undefined,
         location_name: (locationName.trim() || placeholderForKind).trim(),
         country_code: country,
         account_type: kind,
@@ -193,6 +195,15 @@ export default function Signup() {
                   placeholder="••••••••"
                   autoComplete="new-password"
                   required
+                />
+                <Field
+                  label="Phone number"
+                  type="tel"
+                  hint="E.164 (+27821234567)"
+                  value={phone}
+                  onChange={setPhone}
+                  placeholder="+27..."
+                  autoComplete="tel"
                 />
               </div>
 

@@ -28,6 +28,7 @@ const registerSchema = z
     email: z.string().email().toLowerCase(),
     password: z.string().min(8).max(256),
     display_name: z.string().min(1).max(120),
+    phone_e164: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
     // The user names their first physical place ("Home", "Sunset Apartments",
     // etc.). Each location is its own billing tenant — bootstrap creates an
     // account and a location of the same name, both owned by the new user.
@@ -225,7 +226,7 @@ function authRouter() {
 
   app.post('/register', zValidator('json', registerSchema), async (c) => {
     const {
-      email, password, display_name, location_name, country_code, account_type, referral_slug,
+      email, password, display_name, phone_e164, location_name, country_code, account_type, referral_slug,
     } = c.req.valid('json');
     const password_hash = await hashPassword(password);
     const verifyTokenPlain = randomToken(32);
@@ -250,6 +251,13 @@ function authRouter() {
         insert into profiles (id, display_name, country_code)
         values (${userId}, ${display_name}, ${country_code})
       `;
+
+      if (phone_e164) {
+        await tx`
+          insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
+          values (${userId}, ${phone_e164}, true, now())
+        `;
+      }
 
       const expires = new Date(Date.now() + 60 * 60 * 24 * 1000); // 24h
       await tx`

@@ -6,6 +6,7 @@ import { withUserDb } from '../middleware/rls.ts';
 import { withRLS } from '../lib/db.ts';
 import { BadRequest, Forbidden, NotFound } from '../lib/errors.ts';
 import type { TxSql } from '../lib/db.ts';
+import { sendWhatsAppText, sendWhatsAppInteractive } from '../lib/whatsapp.ts';
 
 const opSchema = z
   .object({
@@ -71,10 +72,10 @@ const maintenanceSchema = z
   })
   .strict();
 
-async function logAccess(
+export async function logAccess(
   tx: TxSql,
   args: {
-    user_id: string;
+    user_id: string | null;
     access_point_id: string;
     command: 'open' | 'close';
     source: string;
@@ -504,8 +505,8 @@ function accessRouter() {
 
     const grant = await withUserDb(c, async (tx) => {
       // 1. All access points must belong to ONE account that the user admins.
-      const apRows = await tx<{ id: string; account_id: string; admin: boolean }[]>`
-        select ap.id, l.account_id, app.is_account_admin(l.account_id) as admin
+      const apRows = await tx<{ id: string; account_id: string; admin: boolean; name: string }[]>`
+        select ap.id, l.account_id, app.is_account_admin(l.account_id) as admin, ap.name
         from access_points ap
         join locations l on l.id = ap.location_id
         where ap.id = any(${body.access_point_ids}::uuid[])
@@ -550,7 +551,47 @@ function accessRouter() {
                ) as access_point_ids
         from temporary_access_grants g where g.id = ${grantId}
       `;
-      return fullRows[0]!;
+      const grant = fullRows[0]!;
+
+      // 3. Notify the visitor via WhatsApp.
+      const to = grant.phone_e164.startsWith('+') ? grant.phone_e164.slice(1) : grant.phone_e164;
+      const names = apRows.map((r) => r.name).join(', ');
+      const message = `Hello ${grant.visitor_name ?? 'there'}! You've been granted access to: ${names}. This access is valid until ${grant.ends_at.toLocaleString()}. You can open the gate by replying to this message.`;
+
+      if (apRows.length === 1) {
+        await sendWhatsAppInteractive(to, {
+          type: 'button',
+          body: { text: message },
+          action: {
+            buttons: [
+              {
+                type: 'reply',
+                reply: { id: apRows[0]!.id, title: `Open ${apRows[0]!.name}` },
+              },
+            ],
+          },
+        });
+      } else {
+        await sendWhatsAppInteractive(to, {
+          type: 'list',
+          header: { type: 'text', text: 'Access Granted' },
+          body: { text: message },
+          action: {
+            button: 'View Gates',
+            sections: [
+              {
+                title: 'Available Gates',
+                rows: apRows.slice(0, 10).map((r) => ({
+                  id: r.id,
+                  title: r.name,
+                })),
+              },
+            ],
+          },
+        });
+      }
+
+      return grant;
     });
 
     return c.json(shapeGrant(grant), 201);
@@ -577,7 +618,17 @@ function accessRouter() {
                     where t.grant_id = temporary_access_grants.id
                   ) as access_point_ids
       `;
-      return rows[0] ?? null;
+      const grant = rows[0] ?? null;
+
+      if (grant) {
+        const to = grant.phone_e164.startsWith('+') ? grant.phone_e164.slice(1) : grant.phone_e164;
+        await sendWhatsAppText(
+          to,
+          `Your access has been revoked. If you believe this is an error, please contact the administrator.`,
+        );
+      }
+
+      return grant;
     });
     if (!row) throw NotFound('grant_not_revocable');
     return c.json(shapeGrant(row));

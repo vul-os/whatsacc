@@ -16,9 +16,30 @@ export class ApiError extends Error {
   status: number;
   code: string;
   detail?: string;
-  constructor(status: number, body: ApiErrorBody | string) {
-    const code = typeof body === 'string' ? body : body.error;
-    const detail = typeof body === 'string' ? undefined : body.detail;
+  constructor(status: number, body: ApiErrorBody | any) {
+    let code: string = 'error';
+    let detail: string | undefined = undefined;
+
+    if (typeof body === 'string') {
+      code = body;
+    } else if (body && typeof body === 'object') {
+      // 1. Handle standard { error, detail } shape
+      if (typeof body.error === 'string') {
+        code = body.error;
+        detail = typeof body.detail === 'string' ? body.detail : undefined;
+      } 
+      // 2. Handle Hono/Zod error shape: { success: false, error: { issues: [...], name: 'ZodError' } }
+      else if (body.error && typeof body.error === 'object' && Array.isArray(body.error.issues)) {
+        code = 'validation_error';
+        detail = body.error.issues[0]?.message;
+      }
+      // 3. Fallback for other objects
+      else {
+        code = body.error ? String(body.error) : 'error';
+        detail = body.detail ? String(body.detail) : undefined;
+      }
+    }
+
     super(detail ? `${code}: ${detail}` : code);
     this.status = status;
     this.code = code;
@@ -159,6 +180,7 @@ export const api = {
     email: string;
     password: string;
     display_name: string;
+    phone_e164?: string;
     location_name: string;
     country_code: string;
     account_type: 'personal' | 'business';
@@ -340,13 +362,16 @@ export const api = {
   accountMembers: (accountId: string) =>
     apiFetch<{ members: AccountMemberRow[] }>(`/accounts/${accountId}/members`),
 
-  inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer' }) =>
-    apiFetch<{ id: string }>(`/accounts/${accountId}/invites`, { method: 'POST', body }),
+  inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer'; phone_e164: string }) =>
+    apiFetch<{ id: string; accept_url: string; email_sent: boolean; whatsapp_sent: boolean }>(
+      `/accounts/${accountId}/invites`,
+      { method: 'POST', body },
+    ),
 
-  inviteAccept: (token: string) =>
+  inviteAccept: (token: string, phone_e164?: string) =>
     apiFetch<{ account_id: string; role: string }>(
       `/accounts/invites/${encodeURIComponent(token)}/accept`,
-      { method: 'POST', body: {} },
+      { method: 'POST', body: { phone_e164 } },
     ),
 
   // Access ops

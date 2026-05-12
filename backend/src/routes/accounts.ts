@@ -9,6 +9,7 @@ import { hashToken } from '../lib/refresh.ts';
 import { escapeHtml, renderEmail, sendEmail } from '../lib/email.ts';
 import { getEnv } from '../lib/env.ts';
 import { bootstrapPersonalAccount } from './auth.ts';
+import { sendWhatsAppText } from '../lib/whatsapp.ts';
 
 const createAccountSchema = z
   .object({
@@ -22,10 +23,15 @@ const inviteSchema = z
   .object({
     email: z.string().email().toLowerCase(),
     role: z.enum(['owner', 'admin', 'member', 'viewer']).default('member'),
+    phone_e164: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Invalid phone number format (must start with + and include country code)'),
   })
   .strict();
 
-const acceptInviteSchema = z.object({}).strict();
+const acceptInviteSchema = z
+  .object({
+    phone_e164: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Invalid phone number format').optional(),
+  })
+  .strict();
 
 function accountsRouter() {
   const app = new Hono<AppEnv>();
@@ -111,15 +117,15 @@ function accountsRouter() {
 
   app.post('/:id/invites', zValidator('json', inviteSchema), async (c) => {
     const id = c.req.param('id');
-    const { email, role } = c.req.valid('json');
+    const { email, role, phone_e164 } = c.req.valid('json');
     const tokenPlain = randomToken(32);
     const tokenHash = await hashToken(tokenPlain);
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const result = await withUserDb(c, async (tx) => {
       const [invite] = await tx<{ id: string }[]>`
-        insert into account_invites (account_id, email, role, token_hash, expires_at)
-        values (${id}, ${email}, ${role}, ${tokenHash}, ${expires})
+        insert into account_invites (account_id, email, role, token_hash, expires_at, phone_e164)
+        values (${id}, ${email}, ${role}, ${tokenHash}, ${expires}, ${phone_e164 ?? null})
         returning id
       `;
       const accountRows = await tx<{ name: string }[]>`
@@ -131,6 +137,22 @@ function accountsRouter() {
     const env = getEnv();
     const acceptUrl =
       `${env.APP_PUBLIC_URL}/accept-invite?token=${encodeURIComponent(tokenPlain)}`;
+    
+    let whatsappSent = false;
+    try {
+      const waTo = phone_e164.startsWith('+') ? phone_e164.slice(1) : phone_e164;
+      const waResult = await sendWhatsAppText(
+        waTo,
+        `Hi! You've been invited to join ${result.account_name} on whatsacc. Accept your invitation here: ${acceptUrl}`,
+      );
+      whatsappSent = waResult.ok;
+      if (!waResult.ok) {
+        console.warn('[whatsapp-send] invite failed:', waResult.error ?? 'unknown_error');
+      }
+    } catch (err) {
+      console.warn('[whatsapp-send] invite failed:', (err as Error).message);
+    }
+
     const inviteMail = renderEmail({
       preheader: `You've been invited to join ${result.account_name} on whatsacc.`,
       heading: `Join ${escapeHtml(result.account_name)} on whatsacc`,
@@ -143,9 +165,7 @@ function accountsRouter() {
       footnote:
         "If you weren't expecting this, you can safely ignore this email — no account will be created.",
     });
-    // Best-effort: invite row is already committed; surface the accept URL
-    // in the response so the inviter can copy/paste it manually if Resend
-    // fails (or if they want to share via WhatsApp / Slack instead).
+
     let emailSent = true;
     try {
       await sendEmail({
@@ -160,7 +180,7 @@ function accountsRouter() {
     }
 
     return c.json(
-      { id: result.invite_id, accept_url: acceptUrl, email_sent: emailSent },
+      { id: result.invite_id, accept_url: acceptUrl, email_sent: emailSent, whatsapp_sent: whatsappSent },
       201,
     );
   });
@@ -170,6 +190,7 @@ function accountsRouter() {
     const user = getUser(c);
     const token = c.req.param('token');
     const tokenHash = await hashToken(token);
+    const { phone_e164 } = c.req.valid('json');
 
     const result = await withAnonDb(async (tx) => {
       const rows = await tx<{
@@ -180,8 +201,9 @@ function accountsRouter() {
         expires_at: Date;
         accepted_at: Date | null;
         revoked_at: Date | null;
+        phone_e164: string | null;
       }[]>`
-        select id, account_id, email, role, expires_at, accepted_at, revoked_at
+        select id, account_id, email, role, expires_at, accepted_at, revoked_at, phone_e164
         from account_invites where token_hash = ${tokenHash}
         for update
       `;
@@ -207,6 +229,17 @@ function accountsRouter() {
         update account_invites set accepted_at = now(), accepted_by = ${user.sub}
         where id = ${inv.id}
       `;
+
+      // Sync phone number if provided or if it was in the invite
+      const effectivePhone = phone_e164 || inv.phone_e164;
+      if (effectivePhone) {
+        await tx`
+          insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
+          values (${user.sub}, ${effectivePhone}, true, now())
+          on conflict (profile_id, phone_e164) do update set verified_at = now()
+        `;
+      }
+
       return { account_id: inv.account_id, role: inv.role };
     });
 
