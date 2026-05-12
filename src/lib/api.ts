@@ -155,6 +155,12 @@ export type MeResponse = {
     avatar_url: string | null;
     locale: string | null;
   } | null;
+  phones: Array<{
+    id: string;
+    phone_e164: string;
+    verified_at: string | null;
+    is_primary: boolean;
+  }>;
   accounts: Array<{
     account_id: string;
     name: string;
@@ -181,11 +187,12 @@ export const api = {
     password: string;
     display_name: string;
     phone_e164?: string;
-    location_name: string;
+    location_name?: string;
     country_code: string;
     account_type: 'personal' | 'business';
     referral_slug?: string;
-  }) => apiFetch<{ id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
+    invite_token?: string;
+  }) => apiFetch<AuthTokens & { id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
 
   refresh: (refresh_token: string) =>
     apiFetch<AuthTokens>('/auth/refresh', { method: 'POST', body: { refresh_token } }),
@@ -194,6 +201,11 @@ export const api = {
     apiFetch<void>('/auth/logout', { method: 'POST', body: { refresh_token } }),
 
   me: () => apiFetch<MeResponse>('/auth/me'),
+
+  phones: () => apiFetch<{ phones: MeResponse['phones'] }>('/phones/me/phones'),
+
+  phoneAdd: (body: { phone_e164: string; is_primary?: boolean }) =>
+    apiFetch<{ id: string }>('/phones/me/phones', { method: 'POST', body }),
 
   forgotPassword: (email: string) =>
     apiFetch<void>('/auth/forgot-password', { method: 'POST', body: { email } }),

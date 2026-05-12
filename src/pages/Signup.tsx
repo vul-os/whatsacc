@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth';
 import { ApiError, api, type CountryRef } from '@/lib/api';
 import { clearReferral, getReferral } from '@/lib/referral';
 
+const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
+const PHONE_E164_RE = /^\+[1-9]\d{6,14}$/;
+
 type Step = 'auth' | 'kind' | 'location';
 const STEPS: Array<{ key: Step; label: string }> = [
   { key: 'auth', label: 'Account' },
@@ -37,11 +40,13 @@ export default function Signup() {
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const { registerWithPassword } = useAuth();
   const navigate = useNavigate();
+  const pendingInviteToken = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try { return sessionStorage.getItem(PENDING_INVITE_KEY); } catch { return null; }
+  }, []);
+  const isInviteSignup = Boolean(pendingInviteToken);
 
   const referral = useMemo(() => getReferral(), []);
-  const googleUrl = referral
-    ? `${api.googleStartUrl()}?ref=${encodeURIComponent(referral.slug)}`
-    : api.googleStartUrl();
 
   useEffect(() => {
     let cancelled = false;
@@ -65,13 +70,49 @@ export default function Signup() {
     kind === 'business' ? (name ? `${name} HQ` : 'Sunset Apartments') : 'Home';
 
   const canAdvanceFromAuth =
-    name.trim().length > 0 && /.+@.+\..+/.test(email) && password.length >= 8;
+    name.trim().length > 0 &&
+    /.+@.+\..+/.test(email) &&
+    password.length >= 8 &&
+    (phone.trim().length === 0 || PHONE_E164_RE.test(phone.trim()));
+
+  async function submitSignup() {
+    setErrorMsg(null);
+    setSubmitting(true);
+    try {
+      await registerWithPassword({
+        email,
+        password,
+        display_name: name,
+        phone_e164: phone.trim() || undefined,
+        location_name: isInviteSignup ? undefined : (locationName.trim() || placeholderForKind).trim(),
+        country_code: country,
+        account_type: kind,
+        referral_slug: referral?.slug,
+        invite_token: pendingInviteToken ?? undefined,
+      });
+      clearReferral();
+      if (pendingInviteToken) {
+        try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch {/**/}
+        navigate('/app', { replace: true });
+      } else {
+        setSubmittedEmail(email);
+      }
+    } catch (err) {
+      setErrorMsg(toMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   function gotoNext() {
     setErrorMsg(null);
     if (step === 'auth') {
       if (!canAdvanceFromAuth) {
-        setErrorMsg('Fill in your name, a valid email, and a password (8+ chars).');
+        setErrorMsg('Fill in your name, email, password (8+ chars), and use +27821234567 if you add a phone number.');
+        return;
+      }
+      if (isInviteSignup) {
+        void submitSignup();
         return;
       }
       setStep('kind');
@@ -87,26 +128,7 @@ export default function Signup() {
 
   async function onFinalSubmit(e: FormEvent) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSubmitting(true);
-    try {
-      await registerWithPassword({
-        email,
-        password,
-        display_name: name,
-        phone_e164: phone.trim() || undefined,
-        location_name: (locationName.trim() || placeholderForKind).trim(),
-        country_code: country,
-        account_type: kind,
-        referral_slug: referral?.slug,
-      });
-      clearReferral();
-      setSubmittedEmail(email);
-    } catch (err) {
-      setErrorMsg(toMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
+    await submitSignup();
   }
 
   return (
@@ -134,7 +156,7 @@ export default function Signup() {
       {submittedEmail ? (
         <SuccessPanel
           email={submittedEmail}
-          onSignIn={() => navigate('/login')}
+          onContinue={() => navigate('/app', { replace: true })}
           onRedo={() => setSubmittedEmail(null)}
         />
       ) : (
@@ -145,7 +167,9 @@ export default function Signup() {
           {step === 'auth' && (
             <>
               <h1 className="font-display-tight text-3xl sm:text-4xl">Create your account</h1>
-              <p className="mt-2 text-sm text-ink/60">Two minutes. No credit card.</p>
+              <p className="mt-2 text-sm text-ink/60">
+                {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. No credit card.'}
+              </p>
 
               {referral && (
                 <p className="mt-4 px-3 py-2 rounded-xl bg-moss/10 border border-moss/30 text-sm text-ink/80">
@@ -154,21 +178,7 @@ export default function Signup() {
                 </p>
               )}
 
-              <a
-                href={googleUrl}
-                className="mt-6 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
-              >
-                <GoogleMark />
-                <span className="text-sm font-medium">Continue with Google</span>
-              </a>
-
-              <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
-                <span className="flex-1 h-px bg-ink/15" />
-                or sign up with email
-                <span className="flex-1 h-px bg-ink/15" />
-              </div>
-
-              <div className="space-y-3">
+              <div className="mt-6 space-y-3">
                 <Field
                   label="Your name"
                   value={name}
@@ -199,7 +209,7 @@ export default function Signup() {
                 <Field
                   label="Phone number"
                   type="tel"
-                  hint="E.164 (+27821234567)"
+                  hint="Optional · E.164 (+27821234567)"
                   value={phone}
                   onChange={setPhone}
                   placeholder="+27..."
@@ -219,9 +229,9 @@ export default function Signup() {
                 size="lg"
                 className="w-full mt-6"
                 onClick={gotoNext}
-                disabled={!canAdvanceFromAuth}
+                disabled={!canAdvanceFromAuth || submitting}
               >
-                Continue →
+                {submitting ? 'Creating account…' : isInviteSignup ? 'Create account and accept invite' : 'Continue →'}
               </Button>
 
               <p className="mt-5 text-sm text-ink/60">
@@ -482,26 +492,26 @@ function KindCard({
 
 function SuccessPanel({
   email,
-  onSignIn,
+  onContinue,
   onRedo,
 }: {
   email: string;
-  onSignIn: () => void;
+  onContinue: () => void;
   onRedo: () => void;
 }) {
   return (
     <>
       <h1 className="font-display-tight text-3xl sm:text-4xl">You're in.</h1>
       <p className="mt-3 text-sm text-ink/70">
-        Signed up as <span className="font-medium text-ink">{email}</span>. Hit sign-in below to
-        jump into your dashboard.
+        Signed up as <span className="font-medium text-ink">{email}</span>. Continue to your
+        dashboard to add access points and invite members.
       </p>
       <div className="mt-6 rounded-xl bg-paper-cool border border-ink/10 px-4 py-3 text-sm text-ink/70">
         We sent a verification link too — clicking it confirms your email but isn't required to
         sign in.
       </div>
-      <Button variant="ink" size="lg" className="mt-6 w-full" onClick={onSignIn}>
-        Go to sign in
+      <Button variant="ink" size="lg" className="mt-6 w-full" onClick={onContinue}>
+        Go to dashboard
       </Button>
       <p className="mt-5 text-sm text-ink/60">
         Wrong email?{' '}
@@ -522,6 +532,12 @@ function toMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === 'email_taken') return 'That email is already in use. Try signing in.';
     if (err.code === 'invalid_credentials') return 'Could not sign in after registration.';
+    if (err.code === 'invite_email_mismatch') return 'Use the same email address this invitation was sent to.';
+    if (err.code === 'invite_phone_mismatch') return 'Use the same WhatsApp number this invitation was sent to.';
+    if (err.code === 'invite_used') return 'This invitation has already been accepted.';
+    if (err.code === 'invite_expired') return 'This invitation has expired. Ask the sender to send a new one.';
+    if (err.code === 'invite_revoked') return 'This invitation was revoked by the sender.';
+    if (err.code === 'invite_not_found') return 'We could not find this invitation. The link may be wrong.';
     return err.detail ?? err.code;
   }
   if (err instanceof Error) return err.message;

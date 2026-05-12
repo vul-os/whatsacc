@@ -67,6 +67,10 @@ export default function AcceptInvite() {
                 ? 'This invitation has expired. Ask the sender to send a new one.'
                 : err.code === 'invite_not_found'
                   ? 'We couldn\'t find this invitation. The link may be wrong.'
+                  : err.code === 'invite_phone_required'
+                    ? 'Add your WhatsApp number to accept this invitation.'
+                    : err.code === 'invite_phone_mismatch'
+                      ? 'Use the same WhatsApp number this invitation was sent to.'
                   : (err.detail ?? err.code)
         : err instanceof Error ? err.message : 'Failed to accept invitation.';
       setErrorMsg(msg);

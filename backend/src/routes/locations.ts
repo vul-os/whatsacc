@@ -95,6 +95,7 @@ function locationsRouter() {
     '/accounts/:accountId/locations',
     zValidator('json', createLocationSchema),
     async (c) => {
+      const user = getUser(c);
       const accountId = c.req.param('accountId');
       const body = c.req.valid('json');
       const result = await withUserDb(c, async (tx) => {
@@ -106,6 +107,11 @@ function locationsRouter() {
              ${body.name}, ${body.slug ?? null}, ${tx.json((body.address ?? {}) as JSONValue)},
              ${body.lat ?? null}, ${body.long ?? null}, 'active')
           returning id
+        `;
+        await tx`
+          insert into location_members (location_id, user_id, role)
+          values (${rows[0]!.id}, ${user.sub}, 'owner')
+          on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
         `;
         return rows[0]!;
       });
@@ -163,6 +169,11 @@ function locationsRouter() {
           'active'
         )
         returning id
+      `;
+      await tx`
+        insert into location_members (location_id, user_id, role)
+        values (${rows[0]!.id}, ${user.sub}, 'owner')
+        on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
       `;
       return { id: rows[0]!.id, account_id: accountId };
     });

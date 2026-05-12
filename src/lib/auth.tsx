@@ -14,6 +14,7 @@ export type SessionUser = {
   email: string;
   name: string;
   avatar_url: string | null;
+  has_verified_phone: boolean;
 };
 
 export type SessionAccount = {
@@ -37,10 +38,11 @@ type AuthState = {
     password: string;
     display_name: string;
     phone_e164?: string;
-    location_name: string;
+    location_name?: string;
     country_code: string;
     account_type: 'personal' | 'business';
     referral_slug?: string;
+    invite_token?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
   setTokensFromOAuth: (access_token: string, refresh_token: string) => Promise<void>;
@@ -59,6 +61,7 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
       email: me.user.email,
       name: fallbackName,
       avatar_url: me.profile?.avatar_url ?? null,
+      has_verified_phone: me.phones.some((p) => p.verified_at !== null),
     },
     accounts: me.accounts.map((a) => ({
       id: a.account_id,
@@ -138,15 +141,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: string;
       display_name: string;
       phone_e164?: string;
-      location_name: string;
+      location_name?: string;
       country_code: string;
       account_type: 'personal' | 'business';
       referral_slug?: string;
+      invite_token?: string;
     }) => {
       setError(null);
-      await api.register(input);
+      const tokens = await api.register(input);
+      tokenStore.set(tokens.access_token, tokens.refresh_token);
+      await refreshMe();
     },
-    [],
+    [refreshMe],
   );
 
   const signOut = useCallback(async () => {

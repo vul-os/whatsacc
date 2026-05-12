@@ -220,23 +220,40 @@ function accountsRouter() {
         throw BadRequest('invite_email_mismatch');
       }
 
+      const profilePhoneRows = await tx<{ phone_e164: string; verified_at: Date | null }[]>`
+        select phone_e164, verified_at
+        from profile_phone_numbers
+        where profile_id = ${user.sub}
+      `;
+
+      const effectivePhone = phone_e164 ?? inv.phone_e164 ?? profilePhoneRows.find((p) => p.verified_at)?.phone_e164;
+      if (phone_e164 && inv.phone_e164 && phone_e164 !== inv.phone_e164) {
+        throw BadRequest('invite_phone_mismatch', 'Phone number must match the number this invitation was sent to');
+      }
+
       await tx`
         insert into account_members (account_id, user_id, role, status)
         values (${inv.account_id}, ${user.sub}, ${inv.role}, 'active')
         on conflict (account_id, user_id) do update set role = excluded.role, status = 'active'
       `;
       await tx`
+        insert into location_members (location_id, user_id, role)
+        select id, ${user.sub}, ${inv.role}
+        from locations
+        where account_id = ${inv.account_id}
+        on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
+      `;
+      await tx`
         update account_invites set accepted_at = now(), accepted_by = ${user.sub}
         where id = ${inv.id}
       `;
 
-      // Sync phone number if provided or if it was in the invite
-      const effectivePhone = phone_e164 || inv.phone_e164;
       if (effectivePhone) {
         await tx`
           insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
           values (${user.sub}, ${effectivePhone}, true, now())
-          on conflict (profile_id, phone_e164) do update set verified_at = now()
+          on conflict (profile_id, phone_e164)
+          do update set is_primary = true, verified_at = coalesce(profile_phone_numbers.verified_at, now())
         `;
       }
 

@@ -32,13 +32,14 @@ const registerSchema = z
     // The user names their first physical place ("Home", "Sunset Apartments",
     // etc.). Each location is its own billing tenant — bootstrap creates an
     // account and a location of the same name, both owned by the new user.
-    location_name: z.string().min(1).max(120),
+    location_name: z.string().min(1).max(120).optional(),
     country_code: z
       .string()
       .length(2)
       .transform((v) => v.toUpperCase())
       .default('ZA'),
     account_type: z.enum(['personal', 'business']).default('personal'),
+    invite_token: z.string().min(1).optional(),
     referral_slug: z
       .string()
       .min(3)
@@ -226,11 +227,15 @@ function authRouter() {
 
   app.post('/register', zValidator('json', registerSchema), async (c) => {
     const {
-      email, password, display_name, phone_e164, location_name, country_code, account_type, referral_slug,
+      email, password, display_name, phone_e164, location_name, country_code, account_type, referral_slug, invite_token,
     } = c.req.valid('json');
+    if (!invite_token && !location_name) {
+      throw BadRequest('location_required', 'Location name is required');
+    }
     const password_hash = await hashPassword(password);
     const verifyTokenPlain = randomToken(32);
     const verifyTokenHash = await hashToken(verifyTokenPlain);
+    const inviteTokenHash = invite_token ? await hashToken(invite_token) : null;
 
     const result = await withAnonDb(async (tx) => {
       const existing = await tx<{ id: string }[]>`select id from users where email = ${email}`;
@@ -265,27 +270,88 @@ function authRouter() {
         values (${verifyTokenHash}, ${userId}, ${expires})
       `;
 
-      const accountId = await bootstrapPersonalAccount(tx, {
-        userId,
-        name: location_name,
-        countryCode: country_code,
-        billingType: account_type,
-      });
+      let accountId: string;
+      if (inviteTokenHash) {
+        const inviteRows = await tx<{
+          id: string;
+          account_id: string;
+          email: string;
+          role: 'owner' | 'admin' | 'member' | 'viewer';
+          expires_at: Date;
+          accepted_at: Date | null;
+          revoked_at: Date | null;
+          phone_e164: string | null;
+        }[]>`
+          select id, account_id, email, role, expires_at, accepted_at, revoked_at, phone_e164
+          from account_invites where token_hash = ${inviteTokenHash}
+          for update
+        `;
+        const inv = inviteRows[0];
+        if (!inv) throw BadRequest('invite_not_found');
+        if (inv.accepted_at) throw BadRequest('invite_used');
+        if (inv.revoked_at) throw BadRequest('invite_revoked');
+        if (inv.expires_at.getTime() <= Date.now()) throw BadRequest('invite_expired');
+        if (inv.email !== email) throw BadRequest('invite_email_mismatch');
+        if (phone_e164 && inv.phone_e164 && inv.phone_e164 !== phone_e164) {
+          throw BadRequest('invite_phone_mismatch', 'Phone number must match the number this invitation was sent to');
+        }
 
-      // Each account is anchored to exactly one location of the same name —
-      // that's the unit users actually think about. Subsequent locations the
-      // user creates each get their own fresh account (see POST /locations).
-      await tx`
-        insert into locations (account_id, type, name, slug, address, status)
-        values (
-          ${accountId},
-          'house',
-          ${location_name},
-          ${makeLocationSlug(location_name)},
-          '{}'::jsonb,
-          'active'
-        )
-      `;
+        accountId = inv.account_id;
+        await tx`
+          insert into account_members (account_id, user_id, role, status)
+          values (${accountId}, ${userId}, ${inv.role}, 'active')
+          on conflict (account_id, user_id) do update set role = excluded.role, status = 'active'
+        `;
+        await tx`
+          insert into location_members (location_id, user_id, role)
+          select id, ${userId}, ${inv.role}
+          from locations
+          where account_id = ${accountId}
+          on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
+        `;
+        await tx`
+          update account_invites set accepted_at = now(), accepted_by = ${userId}
+          where id = ${inv.id}
+        `;
+        const linkedPhone = phone_e164 ?? inv.phone_e164;
+        if (linkedPhone) {
+          await tx`
+            insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
+            values (${userId}, ${linkedPhone}, true, now())
+            on conflict (profile_id, phone_e164)
+            do update set is_primary = true, verified_at = coalesce(profile_phone_numbers.verified_at, now())
+          `;
+        }
+      } else {
+        accountId = await bootstrapPersonalAccount(tx, {
+          userId,
+          name: location_name!,
+          countryCode: country_code,
+          billingType: account_type,
+        });
+
+        // Each account is anchored to exactly one location of the same name —
+        // that's the unit users actually think about. Subsequent locations the
+        // user creates each get their own fresh account (see POST /locations).
+        const [location] = await tx<{ id: string }[]>`
+          insert into locations (account_id, type, name, slug, address, status)
+          values (
+            ${accountId},
+            'house',
+            ${location_name!},
+            ${makeLocationSlug(location_name!)},
+            '{}'::jsonb,
+            'active'
+          )
+          returning id
+        `;
+
+        await tx`
+          insert into location_members (location_id, user_id, role)
+          values (${location!.id}, ${userId}, 'owner')
+          on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
+        `;
+      }
 
       await assignNewUserSlug(tx, userId);
 
@@ -293,7 +359,16 @@ function authRouter() {
         await attributeReferral(tx, userId, referral_slug);
       }
 
-      return { userId, accountId };
+      const userRows = await tx<UserRow[]>`
+        select id, email, password_hash, status, email_verified_at, is_platform_admin
+        from users where id = ${userId}
+      `;
+      const issued = await issueTokens(tx, userRows[0]!, {
+        userAgent: c.req.header('User-Agent') ?? null,
+        ip: c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? null,
+      });
+
+      return { userId, accountId, tokens: issued };
     });
 
     const env = getEnv();
@@ -322,7 +397,14 @@ function authRouter() {
       console.warn('[email-send] verify-email failed:', (err as Error).message);
     }
 
-    return c.json({ id: result.userId, account_id: result.accountId }, 201);
+    return c.json({
+      id: result.userId,
+      account_id: result.accountId,
+      access_token: result.tokens.access_token,
+      refresh_token: result.tokens.refresh_token,
+      token_type: 'Bearer',
+      expires_in: ACCESS_TTL,
+    }, 201);
   });
 
   app.post('/login', zValidator('json', loginSchema), async (c) => {
@@ -636,6 +718,18 @@ function authRouter() {
         from profiles where id = ${user.sub}
       `;
 
+      const phones = await tx<{
+        id: string;
+        phone_e164: string;
+        verified_at: Date | null;
+        is_primary: boolean;
+      }[]>`
+        select id, phone_e164, verified_at, is_primary
+        from profile_phone_numbers
+        where profile_id = ${user.sub}
+        order by is_primary desc, created_at asc
+      `;
+
       const accounts = await tx<{
         account_id: string;
         name: string;
@@ -649,7 +743,7 @@ function authRouter() {
         where am.user_id = ${user.sub}
       `;
 
-      return { user: u, profile: profileRows[0] ?? null, accounts };
+      return { user: u, profile: profileRows[0] ?? null, phones, accounts };
     });
     return c.json(data);
   });

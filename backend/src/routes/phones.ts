@@ -43,13 +43,14 @@ function phonesRouter() {
     const { phone_e164, is_primary } = c.req.valid('json');
     const result = await withUserDb(c, async (tx) => {
       const [row] = await tx<{ id: string }[]>`
-        insert into profile_phone_numbers (profile_id, phone_e164, is_primary)
-        values (${user.sub}, ${phone_e164}, ${is_primary})
+        insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
+        values (${user.sub}, ${phone_e164}, ${is_primary}, now())
+        on conflict (profile_id, phone_e164)
+        do update set is_primary = excluded.is_primary, verified_at = coalesce(profile_phone_numbers.verified_at, now())
         returning id
       `;
       return { id: row!.id };
     });
-    // TODO: send WhatsApp/SMS verification code
     return c.json(result, 201);
   });
 
