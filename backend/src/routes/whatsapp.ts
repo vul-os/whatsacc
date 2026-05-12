@@ -139,14 +139,19 @@ function whatsappRouter() {
               returning id, profile_id
             `;
             const chat = chatRows[0]!;
-            await tx`
+            const inboundRows = await tx<{ id: string }[]>`
               insert into whatsapp_messages
                 (chat_id, direction, kind, body, provider_message_id, status, ts)
               values
                 (${chat.id}, 'in', ${msg.type}, ${tx.json(msg as unknown as JSONValue)},
                  ${msg.id}, 'received', to_timestamp(${Number(msg.timestamp)}))
               on conflict do nothing
+              returning id
             `;
+            if (inboundRows.length === 0) {
+              console.log('WA duplicate message ignored:', { providerMessageId: msg.id });
+              continue;
+            }
 
             if (msg.type === 'text') {
               const body = msg.text?.body?.toLowerCase().trim() ?? '';
@@ -321,7 +326,8 @@ function whatsappRouter() {
               const reply = msg.interactive?.list_reply || msg.interactive?.button_reply;
               if (reply) {
                 const parts = reply.id.split(':');
-                const command = parts.length > 1 ? parts[0] : 'open';
+                const rawCommand = parts.length > 1 ? parts[0] : 'open';
+                const command = rawCommand.startsWith('close') ? 'close' : 'open';
                 const apId = parts.length > 1 ? parts[1]! : reply.id;
                 
                 // Try consuming as visitor first
@@ -353,7 +359,7 @@ function whatsappRouter() {
                   const result = await logAccess(tx, {
                     user_id: memberProfileId,
                     access_point_id: apId,
-                    command: command === 'close' ? 'close' : 'open',
+                    command,
                     source: 'whatsapp',
                   });
 
