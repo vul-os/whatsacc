@@ -72,6 +72,8 @@ const maintenanceSchema = z
   })
   .strict();
 
+import { getAccountQuotaStatus } from '../lib/billing/quota.ts';
+
 export async function logAccess(
   tx: TxSql,
   args: {
@@ -82,7 +84,7 @@ export async function logAccess(
     lat?: number;
     long?: number;
   },
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   const apRows = await tx<{
     location_id: string;
     account_id: string;
@@ -94,6 +96,35 @@ export async function logAccess(
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
 
+  // Enforce quota for 'open' commands
+  if (args.command === 'open') {
+    const quota = await getAccountQuotaStatus(tx, ap.account_id);
+    if (!quota.allowed) {
+      await tx`
+        insert into access_logs
+          (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
+        values
+          (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
+           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, false, 'quota_exhausted')
+      `;
+      return { ok: false, error: 'quota_exhausted' };
+    }
+
+    // If using PAYG (no included opens left), debit the wallet
+    if (quota.remaining_included === 0 && quota.payg_price_cents > 0) {
+      await tx`
+        update wallets
+        set balance_cents = balance_cents - ${quota.payg_price_cents},
+            updated_at = now()
+        where account_id = ${ap.account_id}
+      `;
+      await tx`
+        insert into wallet_transactions (account_id, delta_cents, reason, reference)
+        values (${ap.account_id}, ${-quota.payg_price_cents}, 'payg_open', ${args.access_point_id})
+      `;
+    }
+  }
+
   await tx`
     insert into access_logs
       (access_point_id, location_id, account_id, user_id, command, source, lat, long, success)
@@ -102,6 +133,7 @@ export async function logAccess(
        ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, true)
   `;
   // TODO: enqueue device_command and dispatch via Durable Object.
+  return { ok: true };
 }
 
 type AccessPointWithMeter = {
@@ -566,7 +598,7 @@ function accessRouter() {
             buttons: [
               {
                 type: 'reply',
-                reply: { id: apRows[0]!.id, title: `Open ${apRows[0]!.name}` },
+                reply: { id: `open_ap:${apRows[0]!.id}`, title: `Open ${apRows[0]!.name}` },
               },
             ],
           },
@@ -582,7 +614,7 @@ function accessRouter() {
               {
                 title: 'Available Gates',
                 rows: apRows.slice(0, 10).map((r) => ({
-                  id: r.id,
+                  id: `open_ap:${r.id}`,
                   title: r.name,
                 })),
               },

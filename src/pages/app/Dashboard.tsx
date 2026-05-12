@@ -6,6 +6,7 @@ import { AccessPointAction } from '@/components/access/AccessPointAction';
 import { CreateLocationModal } from '@/components/locations/CreateLocationModal';
 import { useAuth } from '@/lib/auth';
 import { useFormatZar } from '@/lib/billing/currency';
+import { QuotaBanner } from '@/components/billing/QuotaBanner';
 import {
   api,
   type AccessPointDetail,
@@ -155,6 +156,8 @@ export default function Dashboard() {
             </p>
           )}
         </header>
+
+        {currentAccount?.id && <QuotaBanner accountId={currentAccount.id} />}
 
         {error && (
           <Card className="border-terracotta/40 p-4">
