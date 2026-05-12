@@ -15,6 +15,9 @@ export type SessionUser = {
   name: string;
   avatar_url: string | null;
   has_verified_phone: boolean;
+  has_slack_identity: boolean;
+  slack_user_id: string | null;
+  slack_handle: string | null;
 };
 
 export type SessionAccount = {
@@ -62,6 +65,9 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
       name: fallbackName,
       avatar_url: me.profile?.avatar_url ?? null,
       has_verified_phone: me.phones.some((p) => p.verified_at !== null),
+      has_slack_identity: Boolean(me.profile?.slack_user_id || me.profile?.slack_handle),
+      slack_user_id: me.profile?.slack_user_id ?? null,
+      slack_handle: me.profile?.slack_handle ?? null,
     },
     accounts: me.accounts.map((a) => ({
       id: a.account_id,

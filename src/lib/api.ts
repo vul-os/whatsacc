@@ -154,6 +154,8 @@ export type MeResponse = {
     display_name: string | null;
     avatar_url: string | null;
     locale: string | null;
+    slack_user_id: string | null;
+    slack_handle: string | null;
   } | null;
   phones: Array<{
     id: string;
@@ -206,6 +208,9 @@ export const api = {
 
   phoneAdd: (body: { phone_e164: string; is_primary?: boolean }) =>
     apiFetch<{ id: string }>('/phones/me/phones', { method: 'POST', body }),
+
+  slackUpdate: (body: { slack_user_id?: string; slack_handle?: string }) =>
+    apiFetch<void>('/auth/me/slack', { method: 'PUT', body }),
 
   forgotPassword: (email: string) =>
     apiFetch<void>('/auth/forgot-password', { method: 'POST', body: { email } }),

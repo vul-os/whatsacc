@@ -18,11 +18,170 @@ export default function Settings() {
         description="Rename or remove this location, and manage your account password."
       />
       <div className="grid grid-cols-1 gap-6 max-w-3xl">
+        <ContactSection />
         <LocationsSection />
         <PasswordSection />
       </div>
     </>
   );
+}
+
+function ContactSection() {
+  const { user, refreshMe } = useAuth();
+  const [phones, setPhones] = useState<Array<{ id: string; phone_e164: string; verified_at: string | null; is_primary: boolean }> | null>(null);
+  const [phone, setPhone] = useState('');
+  const [slack, setSlack] = useState(user?.slack_user_id ?? user?.slack_handle ?? '');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [savingSlack, setSavingSlack] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const refreshPhones = useCallback(async () => {
+    try {
+      const r = await api.phones();
+      setPhones(r.phones);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not load phone numbers.');
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPhones();
+  }, [refreshPhones]);
+
+  useEffect(() => {
+    setSlack(user?.slack_user_id ?? user?.slack_handle ?? '');
+  }, [user?.slack_handle, user?.slack_user_id]);
+
+  async function savePhone(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    setErrorMsg(null);
+    const trimmed = phone.replace(/\s+/g, '');
+    if (!/^\+[1-9]\d{6,14}$/.test(trimmed)) {
+      setErrorMsg('Use E.164 format, for example +27821234567.');
+      return;
+    }
+    setSavingPhone(true);
+    try {
+      await api.phoneAdd({ phone_e164: trimmed, is_primary: true });
+      setPhone('');
+      await refreshPhones();
+      await refreshMe();
+      setMessage('WhatsApp number saved.');
+    } catch (err) {
+      setErrorMsg(toApiMessage(err, 'Could not save WhatsApp number.'));
+    } finally {
+      setSavingPhone(false);
+    }
+  }
+
+  async function saveSlack(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    setErrorMsg(null);
+    const trimmed = slack.trim().replace(/^@+/, '');
+    if (!trimmed) {
+      setErrorMsg('Enter your Slack user ID or handle.');
+      return;
+    }
+    const upper = trimmed.toUpperCase();
+    const body = /^[UW][A-Z0-9]{2,32}$/.test(upper)
+      ? { slack_user_id: upper }
+      : { slack_handle: trimmed };
+    setSavingSlack(true);
+    try {
+      await api.slackUpdate(body);
+      await refreshMe();
+      setMessage('Slack identity saved.');
+    } catch (err) {
+      setErrorMsg(toApiMessage(err, 'Could not save Slack identity.'));
+    } finally {
+      setSavingSlack(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="font-display text-2xl">Contact channels</h2>
+      <p className="text-sm text-ink/65 mt-1">
+        Add WhatsApp and Slack details for chat-based access and bot menus.
+      </p>
+
+      {message && <p className="mt-4 text-sm text-moss">{message}</p>}
+      {errorMsg && <p className="mt-4 text-sm text-terracotta-deep">{errorMsg}</p>}
+
+      <div className="mt-6 grid gap-6">
+        <form onSubmit={savePhone} className="rounded-xl border border-ink/10 bg-paper/45 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block flex-1">
+              <span className="text-sm font-medium text-ink/85">WhatsApp number</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+27821234567"
+                className="mt-1.5 w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
+              />
+            </label>
+            <Button type="submit" variant="ink" disabled={savingPhone}>
+              {savingPhone ? 'Saving…' : 'Save number'}
+            </Button>
+          </div>
+          <div className="mt-4 text-sm text-ink/65">
+            {phones === null ? (
+              'Loading saved numbers…'
+            ) : phones.length === 0 ? (
+              'No WhatsApp number saved.'
+            ) : (
+              <ul className="space-y-1">
+                {phones.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-ink">{p.phone_e164}</span>
+                    {p.is_primary && <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45">primary</span>}
+                    <span className={p.verified_at ? 'text-moss' : 'text-gold'}>
+                      {p.verified_at ? 'verified' : 'pending'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </form>
+
+        <form onSubmit={saveSlack} className="rounded-xl border border-ink/10 bg-paper/45 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block flex-1">
+              <span className="text-sm font-medium text-ink/85">Slack ID or handle</span>
+              <input
+                value={slack}
+                onChange={(e) => setSlack(e.target.value)}
+                placeholder="@name or U123ABC"
+                className="mt-1.5 w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
+              />
+            </label>
+            <Button type="submit" variant="ink" disabled={savingSlack}>
+              {savingSlack ? 'Saving…' : 'Save Slack'}
+            </Button>
+          </div>
+          <p className="mt-3 text-sm text-ink/65">
+            Current:{' '}
+            <span className="font-mono text-ink">
+              {user?.slack_user_id ?? (user?.slack_handle ? `@${user.slack_handle}` : 'not set')}
+            </span>
+          </p>
+        </form>
+      </div>
+    </Card>
+  );
+}
+
+function toApiMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiError
+    ? (err.detail ?? err.code)
+    : err instanceof Error
+      ? err.message
+      : fallback;
 }
 
 function LocationsSection() {

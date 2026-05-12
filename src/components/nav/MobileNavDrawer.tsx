@@ -37,7 +37,7 @@ export function MobileNavDrawer({
       />
       <aside className="relative w-72 max-w-[85vw] bg-paper-cool border-r border-ink/10 shadow-xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-ink/10">
-          <Link to="/app" onClick={onClose} className="inline-flex items-center gap-2">
+          <Link to="/" onClick={onClose} className="inline-flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-ink text-paper">
               <ArchMark className="h-5 w-5" />
             </span>

@@ -5,29 +5,61 @@
    soft slate for body text, clay for surface variation. */
 
 :root {
-  --ink: #1a1f36;
-  --ink-soft: #2c3350;
-  --ink-faint: rgba(26, 31, 54, 0.6);
-  --ink-whisper: rgba(26, 31, 54, 0.12);
+  color-scheme: light;
 
-  --paper: #f4ede2;
-  --paper-warm: #ece2d1;
-  --paper-cool: #f8f3ea;
-  --paper-edge: rgba(26, 31, 54, 0.08);
+  --ink: #2b2118;
+  --ink-soft: #46382d;
+  --ink-faint: rgba(43, 33, 24, 0.6);
+  --ink-whisper: rgba(43, 33, 24, 0.12);
 
-  --terracotta: #d6624d;
-  --terracotta-deep: #b14b39;
-  --terracotta-soft: #e8a293;
+  --paper: #faf7f2;
+  --paper-warm: #efe7dc;
+  --paper-cool: #fffdf8;
+  --paper-edge: rgba(43, 33, 24, 0.08);
 
-  --gold: #c8a45c;
-  --gold-soft: #e3c98a;
+  --terracotta: #cc785c;
+  --terracotta-deep: #a9573d;
+  --terracotta-soft: #e5aa96;
 
-  --slate: #6b7188;
-  --moss: #4a6b58;
-  --clay: #cab39a;
+  --gold: #b5945a;
+  --gold-soft: #dfc282;
 
-  --signal: #2c5f4f; /* successful gate-open green, not whatsapp */
+  --slate: #746b63;
+  --moss: #5f735f;
+  --clay: #c8ad93;
+
+  --signal: #3d6b58; /* successful gate-open green, not whatsapp */
 
   --shadow-paper: 0 1px 0 rgba(26, 31, 54, 0.04), 0 12px 32px -16px rgba(26, 31, 54, 0.18);
   --shadow-deep: 0 24px 48px -24px rgba(26, 31, 54, 0.4);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ink: #f4eee6;
+  --ink-soft: #e4d8ca;
+  --ink-faint: rgba(244, 238, 230, 0.62);
+  --ink-whisper: rgba(244, 238, 230, 0.14);
+
+  --paper: #191512;
+  --paper-warm: #241e19;
+  --paper-cool: #211b17;
+  --paper-edge: rgba(244, 238, 230, 0.1);
+
+  --terracotta: #d9896d;
+  --terracotta-deep: #f0a187;
+  --terracotta-soft: #9f5b48;
+
+  --gold: #d0ad6c;
+  --gold-soft: #8e7448;
+
+  --slate: #b7aca0;
+  --moss: #91aa8d;
+  --clay: #806957;
+
+  --signal: #86b99b;
+
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+  --shadow-deep: 0 28px 56px -24px rgba(0, 0, 0, 0.8);
 }

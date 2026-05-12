@@ -5,8 +5,27 @@ import { AppTopBar } from '@/components/nav/AppTopBar';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
 
+const DISMISSED_BANNERS_KEY = 'whatsacc.dismissedBanners';
+
 export default function AppLayout() {
   const { signedIn, loading, user } = useAuth();
+  const [dismissedBanners, setDismissedBanners] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(window.localStorage.getItem(DISMISSED_BANNERS_KEY) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+
+  function dismissBanner(key: string) {
+    setDismissedBanners((prev) => {
+      const next = prev.includes(key) ? prev : [...prev, key];
+      try { window.localStorage.setItem(DISMISSED_BANNERS_KEY, JSON.stringify(next)); } catch {/**/}
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-paper grid place-items-center text-ink/50 text-sm">
@@ -22,7 +41,12 @@ export default function AppLayout() {
       <div className="flex-1 min-w-0 flex flex-col">
         <AppTopBar />
         <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 sm:py-10 max-w-[1400px] w-full mx-auto">
-          {user && !user.has_verified_phone && <WhatsAppNumberBanner />}
+          {user && !user.has_verified_phone && !dismissedBanners.includes('whatsapp') && (
+            <WhatsAppNumberBanner onDismiss={() => dismissBanner('whatsapp')} />
+          )}
+          {user && !user.has_slack_identity && !dismissedBanners.includes('slack') && (
+            <SlackIdentityBanner onDismiss={() => dismissBanner('slack')} />
+          )}
           <Outlet />
         </main>
       </div>
@@ -30,7 +54,7 @@ export default function AppLayout() {
   );
 }
 
-function WhatsAppNumberBanner() {
+function WhatsAppNumberBanner({ onDismiss }: { onDismiss: () => void }) {
   const { refreshMe } = useAuth();
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -85,6 +109,89 @@ function WhatsAppNumberBanner() {
             className="h-10 px-4 rounded-full bg-ink text-paper text-sm font-medium disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Add number'}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="h-10 px-3 rounded-full text-sm text-ink/55 hover:text-ink"
+            aria-label="Dismiss WhatsApp number banner"
+          >
+            Dismiss
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function SlackIdentityBanner({ onDismiss }: { onDismiss: () => void }) {
+  const { refreshMe } = useAuth();
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmed = value.trim().replace(/^@+/, '');
+    if (!trimmed) {
+      setError('Enter your Slack user ID or handle.');
+      return;
+    }
+
+    const upper = trimmed.toUpperCase();
+    const body = /^[UW][A-Z0-9]{2,32}$/.test(upper)
+      ? { slack_user_id: upper }
+      : { slack_handle: trimmed };
+
+    setSaving(true);
+    try {
+      await api.slackUpdate(body);
+      await refreshMe();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? (err.detail ?? err.code)
+          : err instanceof Error
+            ? err.message
+            : 'Could not save Slack identity.',
+      );
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="mb-6 rounded-xl border border-moss/30 bg-paper-cool px-4 py-3 sm:px-5">
+      <form onSubmit={onSubmit} className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-ink">Add your Slack identity</p>
+          <p className="text-xs text-ink/65 mt-0.5">
+            Link Slack so the bot can welcome you, show the menu, and route access commands.
+          </p>
+          {error && <p className="text-xs text-terracotta-deep mt-1">{error}</p>}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="@name or U123ABC"
+            autoComplete="off"
+            className="h-10 w-full sm:w-48 rounded-xl bg-paper border border-ink/15 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ink"
+          />
+          <button
+            type="submit"
+            disabled={saving}
+            className="h-10 px-4 rounded-full bg-ink text-paper text-sm font-medium disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : 'Add Slack'}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="h-10 px-3 rounded-full text-sm text-ink/55 hover:text-ink"
+            aria-label="Dismiss Slack identity banner"
+          >
+            Dismiss
           </button>
         </div>
       </form>

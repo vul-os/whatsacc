@@ -4,17 +4,20 @@ import { ArchMark } from '@/components/illustrations/ArchMark';
 import { LinkButton } from '@/components/ui/Button';
 import { CurrencySelector } from '@/components/nav/CurrencySelector';
 import { cn } from '@/lib/cn';
+import { useAuth } from '@/lib/auth';
+import { useTheme } from '@/lib/theme';
 
 const links = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/security', label: 'Security' },
   { to: '/docs', label: 'Docs' },
-  { to: '/login', label: 'Login' },
 ];
 
 export function TopNav() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
+  const { signedIn } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   // close menu on route change
   useEffect(() => {
@@ -61,23 +64,46 @@ export function TopNav() {
               {l.label}
             </NavLink>
           ))}
+          <NavLink
+            to={signedIn ? '/app' : '/login'}
+            className={({ isActive }) =>
+              cn(
+                'px-3.5 py-2 text-sm rounded-full transition-colors',
+                isActive ? 'text-ink' : 'text-ink/60 hover:text-ink',
+              )
+            }
+          >
+            {signedIn ? 'Dashboard' : 'Login'}
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link
-            to="/app"
-            className="hidden lg:inline-flex text-sm text-ink/60 hover:text-ink px-3 py-2"
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="h-9 w-9 grid place-items-center rounded-full border border-ink/10 bg-paper-cool text-ink/70 hover:text-ink hover:border-ink/25 transition-colors"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
           >
-            Open app
-          </Link>
+            {theme === 'dark' ? (
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M20.5 14.5A7.5 7.5 0 0 1 9.5 3.5 8.6 8.6 0 1 0 20.5 14.5Z" />
+              </svg>
+            )}
+          </button>
           <CurrencySelector className="hidden sm:inline-block" />
           <LinkButton
-            to="/signup"
+            to={signedIn ? '/app' : '/signup'}
             variant="ink"
             size="sm"
             className="hidden sm:inline-flex"
           >
-            Get started
+            {signedIn ? 'Go to dashboard' : 'Get started'}
           </LinkButton>
           <button
             type="button"
@@ -137,10 +163,10 @@ export function TopNav() {
             ))}
             <li className="border-b border-ink/10">
               <Link
-                to="/app"
+                to={signedIn ? '/app' : '/login'}
                 className="flex items-center justify-between py-4 font-display text-2xl text-ink/80"
               >
-                <span>Open app</span>
+                <span>{signedIn ? 'Dashboard' : 'Login'}</span>
                 <span aria-hidden className="text-terracotta">&rarr;</span>
               </Link>
             </li>
@@ -154,8 +180,8 @@ export function TopNav() {
           </div>
 
           <div className="mt-6">
-            <LinkButton to="/signup" variant="ink" size="lg" className="w-full">
-              Get started
+            <LinkButton to={signedIn ? '/app' : '/signup'} variant="ink" size="lg" className="w-full">
+              {signedIn ? 'Go to dashboard' : 'Get started'}
             </LinkButton>
           </div>
 

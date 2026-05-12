@@ -2,20 +2,20 @@
 @import "./tokens.css";
 
 @theme {
-  --color-ink: #1a1f36;
-  --color-ink-soft: #2c3350;
-  --color-paper: #f4ede2;
-  --color-paper-warm: #ece2d1;
-  --color-paper-cool: #f8f3ea;
-  --color-terracotta: #d6624d;
-  --color-terracotta-deep: #b14b39;
-  --color-terracotta-soft: #e8a293;
-  --color-gold: #c8a45c;
-  --color-gold-soft: #e3c98a;
-  --color-slate: #6b7188;
-  --color-moss: #4a6b58;
-  --color-clay: #cab39a;
-  --color-signal: #2c5f4f;
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-paper-warm: var(--paper-warm);
+  --color-paper-cool: var(--paper-cool);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-deep: var(--terracotta-deep);
+  --color-terracotta-soft: var(--terracotta-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-slate: var(--slate);
+  --color-moss: var(--moss);
+  --color-clay: var(--clay);
+  --color-signal: var(--signal);
 
   --font-display: "Fraunces", "Iowan Old Style", "Apple Garamond", serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -36,8 +36,8 @@ body {
 
 body {
   background-image:
-    radial-gradient(1200px 600px at 90% -10%, rgba(214, 98, 77, 0.05), transparent 60%),
-    radial-gradient(800px 400px at -10% 30%, rgba(200, 164, 92, 0.06), transparent 60%);
+    radial-gradient(1200px 600px at 90% -10%, color-mix(in srgb, var(--terracotta) 9%, transparent), transparent 60%),
+    radial-gradient(800px 400px at -10% 30%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 60%);
   background-attachment: fixed;
 }
 

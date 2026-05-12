@@ -10,6 +10,7 @@ import {
   type WhatsAppInteractive,
 } from '../lib/whatsapp.ts';
 import { tryConsumeGrant, logAccess } from './access.ts';
+import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -131,57 +132,7 @@ function whatsappRouter() {
             `;
 
             if (msg.type === 'text') {
-              // 1. Lookup temporary grants (visitors)
-              const visitorGrants = await tx<
-                {
-                  id: string;
-                  max_uses: number | null;
-                  uses_count: number;
-                  ap_id: string;
-                  ap_name: string;
-                  loc_name: string;
-                }[]
-              >`
-                select g.id, g.max_uses, g.uses_count,
-                       ap.id as ap_id, ap.name as ap_name,
-                       l.name as loc_name
-                from temporary_access_grants g
-                join temporary_access_grant_access_points t on t.grant_id = g.id
-                join access_points ap on ap.id = t.access_point_id
-                join locations l on l.id = ap.location_id
-                where g.phone_e164 = ${from}
-                  and g.status = 'active'
-                  and g.starts_at <= now()
-                  and g.ends_at > now()
-                  and (g.max_uses is null or g.uses_count < g.max_uses)
-                order by g.ends_at asc
-              `;
-
-              // 2. Lookup member access (registered users)
-              const memberGrants = await tx<
-                {
-                  ap_id: string;
-                  ap_name: string;
-                  loc_name: string;
-                }[]
-              >`
-                select ap.id as ap_id, ap.name as ap_name, l.name as loc_name
-                from profile_phone_numbers ppn
-                join profiles p on p.id = ppn.profile_id
-                join account_members am on am.user_id = p.id
-                join locations l on l.account_id = am.account_id
-                join access_points ap on ap.location_id = l.id
-                where ppn.phone_e164 = ${from}
-                  and ppn.verified_at is not null
-                  and am.status = 'active'
-                  and ap.status = 'active'
-              `;
-
-              // Combine them
-              const allGrants = [
-                ...visitorGrants.map(g => ({ ...g, type: 'visitor' as const })),
-                ...memberGrants.map(g => ({ ...g, id: null, max_uses: null, uses_count: 0, type: 'member' as const })),
-              ];
+              const allGrants = await getAvailableAccessPoints(tx, { phoneE164: from });
 
               if (allGrants.length === 0) {
                 replies.push({
@@ -193,7 +144,7 @@ function whatsappRouter() {
               } else if (allGrants.length === 1) {
                 const g = allGrants[0]!;
                 const footer = g.type === 'visitor' 
-                  ? { text: `You have ${g.max_uses === null ? 'unlimited' : g.max_uses - g.uses_count} uses remaining.` }
+                  ? { text: `You have ${g.max_uses === null ? 'unlimited' : (g.max_uses ?? 0) - (g.uses_count ?? 0)} uses remaining.` }
                   : undefined;
 
                 replies.push({
@@ -292,7 +243,6 @@ function whatsappRouter() {
               }
             }
           }
-          // TODO: handle status updates (delivered/read) by upserting whatsapp_messages.status
         }
       }
     });

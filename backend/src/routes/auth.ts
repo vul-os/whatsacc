@@ -69,6 +69,15 @@ const updatePasswordSchema = z
   })
   .strict();
 const verifyEmailSchema = z.object({ token: z.string().min(1) }).strict();
+const slackIdentitySchema = z
+  .object({
+    slack_user_id: z.string().regex(/^[UW][A-Z0-9]{2,32}$/).optional(),
+    slack_handle: z.string().min(1).max(80).optional(),
+  })
+  .strict()
+  .refine((v) => Boolean(v.slack_user_id || v.slack_handle), {
+    message: 'slack_user_id or slack_handle is required',
+  });
 
 type UserRow = {
   id: string;
@@ -713,8 +722,10 @@ function authRouter() {
         display_name: string | null;
         avatar_url: string | null;
         locale: string | null;
+        slack_user_id: string | null;
+        slack_handle: string | null;
       }[]>`
-        select id, display_name, avatar_url, locale
+        select id, display_name, avatar_url, locale, slack_user_id, slack_handle
         from profiles where id = ${user.sub}
       `;
 
@@ -746,6 +757,25 @@ function authRouter() {
       return { user: u, profile: profileRows[0] ?? null, phones, accounts };
     });
     return c.json(data);
+  });
+
+  app.put('/me/slack', requireAuth(), zValidator('json', slackIdentitySchema), async (c) => {
+    const user = getUser(c);
+    const body = c.req.valid('json');
+    const handle = body.slack_handle?.replace(/^@+/, '').trim() || null;
+    const slackUserId = body.slack_user_id?.trim().toUpperCase() || null;
+
+    await withUserDb(c, async (tx) => {
+      await tx`
+        update profiles
+        set slack_user_id = coalesce(${slackUserId}, slack_user_id),
+            slack_handle = coalesce(${handle}, slack_handle),
+            updated_at = now()
+        where id = ${user.sub}
+      `;
+    });
+
+    return c.body(null, 204);
   });
 
   // Google OAuth
