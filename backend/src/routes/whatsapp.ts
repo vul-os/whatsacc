@@ -65,6 +65,12 @@ type WhatsAppPayload = {
   }>;
 };
 
+function signupLinkForPhone(phoneE164: string): string {
+  const base = getEnv().APP_PUBLIC_URL.replace(/\/$/, '');
+  const params = new URLSearchParams({ wa_phone: phoneE164 });
+  return `${base}/signup?${params.toString()}`;
+}
+
 function whatsappRouter() {
   const app = new Hono<AppEnv>();
 
@@ -158,6 +164,27 @@ function whatsappRouter() {
               const allGrants = await getAvailableAccessPoints(tx, { phoneE164: from });
 
               if (allGrants.length === 0) {
+                const linkedRows = await tx<{ exists: boolean }[]>`
+                  select exists (
+                    select 1
+                    from profile_phone_numbers
+                    where phone_e164 = ${from}
+                      and verified_at is not null
+                  ) as "exists"
+                `;
+                if (!linkedRows[0]?.exists) {
+                  replies.push({
+                    type: 'text',
+                    to: msg.from,
+                    chatId: chat.id,
+                    body: [
+                      "Hello! This WhatsApp number isn't linked to a whatsacc account yet.",
+                      `Create your account here: ${signupLinkForPhone(from)}`,
+                      "After signup, we'll ask if you want to connect this number.",
+                    ].join('\n\n'),
+                  });
+                  continue;
+                }
                 replies.push({
                   type: 'text',
                   to: msg.from,

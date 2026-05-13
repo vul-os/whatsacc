@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
@@ -7,6 +7,7 @@ import { ApiError, api, type CountryRef } from '@/lib/api';
 import { clearReferral, getReferral } from '@/lib/referral';
 
 const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
+export const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
 const PHONE_E164_RE = /^\+[1-9]\d{6,14}$/;
 
 type Step = 'auth' | 'kind' | 'location';
@@ -36,21 +37,43 @@ export default function Signup() {
 
   // Submission + flow
   const [submitting, setSubmitting] = useState(false);
+  const [connectingPhone, setConnectingPhone] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
-  const { registerWithPassword } = useAuth();
+  const { registerWithPassword, refreshMe } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const pendingInviteToken = useMemo(() => {
     if (typeof window === 'undefined') return null;
     try { return sessionStorage.getItem(PENDING_INVITE_KEY); } catch { return null; }
   }, []);
   const isInviteSignup = Boolean(pendingInviteToken);
+  const pendingWhatsAppPhone = useMemo(() => {
+    const fromUrl = searchParams.get('wa_phone');
+    const normalized = fromUrl?.replace(/\s+/g, '') ?? '';
+    if (PHONE_E164_RE.test(normalized)) {
+      try { sessionStorage.setItem(PENDING_WHATSAPP_PHONE_KEY, normalized); } catch {/**/}
+      return normalized;
+    }
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = sessionStorage.getItem(PENDING_WHATSAPP_PHONE_KEY);
+      return stored && PHONE_E164_RE.test(stored) ? stored : null;
+    } catch {
+      return null;
+    }
+  }, [searchParams]);
 
   const referral = useMemo(() => getReferral(), []);
   const googleStartUrl = useMemo(() => {
     if (!referral?.slug) return api.googleStartUrl();
     return `${api.googleStartUrl()}?ref=${encodeURIComponent(referral.slug)}`;
   }, [referral]);
+
+  function rememberPendingWhatsAppPhone() {
+    if (!pendingWhatsAppPhone) return;
+    try { sessionStorage.setItem(PENDING_WHATSAPP_PHONE_KEY, pendingWhatsAppPhone); } catch {/**/}
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +158,27 @@ export default function Signup() {
     await submitSignup();
   }
 
+  async function connectPendingWhatsAppPhone() {
+    if (!pendingWhatsAppPhone) return;
+    setErrorMsg(null);
+    setConnectingPhone(true);
+    try {
+      await api.phoneAdd({ phone_e164: pendingWhatsAppPhone, is_primary: true });
+      try { sessionStorage.removeItem(PENDING_WHATSAPP_PHONE_KEY); } catch {/**/}
+      await refreshMe();
+      navigate('/app', { replace: true });
+    } catch (err) {
+      setErrorMsg(toMessage(err));
+    } finally {
+      setConnectingPhone(false);
+    }
+  }
+
+  function skipPendingWhatsAppPhone() {
+    try { sessionStorage.removeItem(PENDING_WHATSAPP_PHONE_KEY); } catch {/**/}
+    navigate('/app', { replace: true });
+  }
+
   return (
     <AuthLayout
       asideOrder="last"
@@ -160,6 +204,11 @@ export default function Signup() {
       {submittedEmail ? (
         <SuccessPanel
           email={submittedEmail}
+          pendingWhatsAppPhone={pendingWhatsAppPhone}
+          connectingPhone={connectingPhone}
+          errorMsg={errorMsg}
+          onConnectWhatsApp={connectPendingWhatsAppPhone}
+          onSkipWhatsApp={skipPendingWhatsAppPhone}
           onContinue={() => navigate('/app', { replace: true })}
           onRedo={() => setSubmittedEmail(null)}
         />
@@ -179,6 +228,7 @@ export default function Signup() {
                 <>
                   <a
                     href={googleStartUrl}
+                    onClick={rememberPendingWhatsAppPhone}
                     className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
                   >
                     <GoogleMark />
@@ -200,7 +250,14 @@ export default function Signup() {
                 </p>
               )}
 
-              <div className={`${isInviteSignup || referral ? 'mt-6' : 'mt-0'} space-y-3`}>
+              {pendingWhatsAppPhone && !isInviteSignup && (
+                <p className="mt-4 px-3 py-2 rounded-xl bg-terracotta/10 border border-terracotta/25 text-sm text-ink/80">
+                  After signup, you can connect{' '}
+                  <span className="font-mono text-ink">{pendingWhatsAppPhone}</span> for WhatsApp access.
+                </p>
+              )}
+
+              <div className={`${isInviteSignup || referral || pendingWhatsAppPhone ? 'mt-6' : 'mt-0'} space-y-3`}>
                 <Field
                   label="Your name"
                   value={name}
@@ -514,10 +571,20 @@ function KindCard({
 
 function SuccessPanel({
   email,
+  pendingWhatsAppPhone,
+  connectingPhone,
+  errorMsg,
+  onConnectWhatsApp,
+  onSkipWhatsApp,
   onContinue,
   onRedo,
 }: {
   email: string;
+  pendingWhatsAppPhone: string | null;
+  connectingPhone: boolean;
+  errorMsg: string | null;
+  onConnectWhatsApp: () => void;
+  onSkipWhatsApp: () => void;
   onContinue: () => void;
   onRedo: () => void;
 }) {
@@ -532,6 +599,38 @@ function SuccessPanel({
         We sent a verification link too — clicking it confirms your email but isn't required to
         sign in.
       </div>
+      {pendingWhatsAppPhone && (
+        <div className="mt-4 rounded-xl border border-terracotta/25 bg-terracotta/10 px-4 py-4">
+          <p className="text-sm font-medium text-ink">Connect WhatsApp number?</p>
+          <p className="mt-1 text-sm text-ink/70">
+            Link <span className="font-mono text-ink">{pendingWhatsAppPhone}</span> to this account
+            so WhatsApp messages from that number can find your access.
+          </p>
+          {errorMsg && (
+            <p className="mt-3 text-sm text-terracotta-deep" role="alert">
+              {errorMsg}
+            </p>
+          )}
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="ink"
+              size="md"
+              className="flex-1"
+              onClick={onConnectWhatsApp}
+              disabled={connectingPhone}
+            >
+              {connectingPhone ? 'Connecting…' : 'Connect number'}
+            </Button>
+            <button
+              type="button"
+              onClick={onSkipWhatsApp}
+              className="h-10 px-4 rounded-full text-sm text-ink/65 hover:text-ink"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       <Button variant="ink" size="lg" className="mt-6 w-full" onClick={onContinue}>
         Go to dashboard
       </Button>

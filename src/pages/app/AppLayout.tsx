@@ -6,9 +6,20 @@ import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
 
 const DISMISSED_BANNERS_KEY = 'whatsacc.dismissedBanners';
+const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
+const PHONE_E164_RE = /^\+[1-9]\d{6,14}$/;
 
 export default function AppLayout() {
   const { signedIn, loading, user } = useAuth();
+  const [pendingWhatsAppPhone, setPendingWhatsAppPhone] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = window.sessionStorage.getItem(PENDING_WHATSAPP_PHONE_KEY);
+      return stored && PHONE_E164_RE.test(stored) ? stored : null;
+    } catch {
+      return null;
+    }
+  });
   const [dismissedBanners, setDismissedBanners] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -41,6 +52,12 @@ export default function AppLayout() {
       <div className="flex-1 min-w-0 flex flex-col">
         <AppTopBar />
         <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 sm:py-10 max-w-[1400px] w-full mx-auto">
+          {user && pendingWhatsAppPhone && (
+            <ConnectWhatsAppBanner
+              phone={pendingWhatsAppPhone}
+              onDone={() => setPendingWhatsAppPhone(null)}
+            />
+          )}
           {user && !user.has_verified_phone && !dismissedBanners.includes('whatsapp') && (
             <WhatsAppNumberBanner onDismiss={() => dismissBanner('whatsapp')} />
           )}
@@ -51,6 +68,69 @@ export default function AppLayout() {
         </main>
       </div>
     </div>
+  );
+}
+
+function ConnectWhatsAppBanner({ phone, onDone }: { phone: string; onDone: () => void }) {
+  const { refreshMe } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function clearPending() {
+    try { window.sessionStorage.removeItem(PENDING_WHATSAPP_PHONE_KEY); } catch {/**/}
+    onDone();
+  }
+
+  async function connectPhone() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.phoneAdd({ phone_e164: phone, is_primary: true });
+      await refreshMe();
+      clearPending();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? (err.detail ?? err.code)
+          : err instanceof Error
+            ? err.message
+            : 'Could not connect WhatsApp number.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="mb-6 rounded-xl border border-terracotta/30 bg-paper-warm px-4 py-3 sm:px-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-ink">Connect WhatsApp number?</p>
+          <p className="text-xs text-ink/65 mt-0.5">
+            Link <span className="font-mono text-ink">{phone}</span> to this account so messages from
+            that number can find your access.
+          </p>
+          {error && <p className="text-xs text-terracotta-deep mt-1">{error}</p>}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <button
+            type="button"
+            onClick={connectPhone}
+            disabled={saving}
+            className="h-10 px-4 rounded-full bg-ink text-paper text-sm font-medium disabled:opacity-60"
+          >
+            {saving ? 'Connecting…' : 'Connect number'}
+          </button>
+          <button
+            type="button"
+            onClick={clearPending}
+            className="h-10 px-3 rounded-full text-sm text-ink/55 hover:text-ink"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
