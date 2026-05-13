@@ -23,7 +23,9 @@
     "seed:user": "node --env-file=../.env scripts/seed-user.mjs",
     "seed:demo": "node --env-file=../.env scripts/seed-demo-data.mjs",
     "payouts": "node --env-file=../.env scripts/run-monthly-payouts.mjs",
-    "payouts:dev": "node --env-file=../.env.dev scripts/run-monthly-payouts.mjs"
+    "payouts:dev": "node --env-file=../.env.dev scripts/run-monthly-payouts.mjs",
+    "test:billing": "node --env-file=../.env scripts/test-billing.mjs",
+    "test:billing:dev": "node --env-file=../.env.dev scripts/test-billing.mjs"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.2",

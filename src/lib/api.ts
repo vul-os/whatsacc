@@ -436,6 +436,14 @@ export const api = {
   // Analytics
   accountSummary: (accountId: string) =>
     apiFetch<AccountSummary>(`/analytics/accounts/${accountId}/summary`),
+
+  tiers: (opts: { country?: string; region?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (opts.country) qs.set('country', opts.country);
+    if (opts.region) qs.set('region', opts.region);
+    const s = qs.toString();
+    return apiFetch<BillingTiersResponse>(`/billing/tiers${s ? `?${s}` : ''}`);
+  },
 };
 
 export type LocationRow = {
@@ -685,4 +693,26 @@ export type WalletVerifyResponse = {
   amount_cents: number;
   currency: string;
   already_credited: boolean;
+};
+
+export type BillingTier = {
+  code: string;
+  name: string;
+  price: number;
+  currency: string;
+  included_opens: number;
+  included_residents: number;
+  included_devices: number;
+  included_locations: number;
+  web_portal: boolean;
+  blurb: string;
+};
+
+export type BillingTiersResponse = {
+  region: string;
+  region_name: string;
+  currency: string;
+  countries: readonly string[];
+  payg_open_price: number;
+  tiers: BillingTier[];
 };

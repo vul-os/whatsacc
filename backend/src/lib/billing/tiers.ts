@@ -5,7 +5,7 @@
 
 export type RegionCode = 'us-ca' | 'eu-west' | 'za' | 'latam' | 'in-sea';
 
-export type TierCode = 'free' | 'starter' | 'growth' | 'business' | 'scale';
+export type TierCode = 'free' | 'basic' | 'starter' | 'growth' | 'business' | 'scale';
 
 export interface Tier {
   code: TierCode;
@@ -41,6 +41,7 @@ export interface Region {
 
 const COMMON_TIER_SHAPE = [
   { code: 'free' as const,     name: 'Free',     residents:    5, devices:  1, locations:  1, opensPerMonth:   100, blurb: 'Try it. Web portal access included.' },
+  { code: 'basic' as const,    name: 'Basic',    residents:   20, devices:  2, locations:  1, opensPerMonth:   300, blurb: 'One location, essentials included.' },
   { code: 'starter' as const,  name: 'Starter',  residents:   30, devices:  3, locations:  1, opensPerMonth:   900, blurb: 'For a single estate or building.' },
   { code: 'growth' as const,   name: 'Growth',   residents:  100, devices:  8, locations:  2, opensPerMonth:  3000, blurb: 'Most popular — small estate.' },
   { code: 'business' as const, name: 'Business', residents:  300, devices: 20, locations:  5, opensPerMonth:  9000, blurb: 'Multi-site or large estate.' },
@@ -57,7 +58,7 @@ const REGION_PRICING = {
     currency: 'USD',
     fxToUsd: 1.0,
     paygOpenPriceLocal: 0.10,
-    prices: { free: 0, starter: 38.99, growth: 99.00, business: 249.00, scale: 699.00 },
+    prices: { free: 0, basic: 9.99, starter: 38.99, growth: 99.00, business: 249.00, scale: 699.00 },
   },
   'eu-west': {
     name: 'Western Europe',
@@ -65,7 +66,7 @@ const REGION_PRICING = {
     currency: 'EUR',
     fxToUsd: 1.08,
     paygOpenPriceLocal: 0.08,
-    prices: { free: 0, starter: 31.99, growth: 82.99, business: 209.00, scale: 579.00 },
+    prices: { free: 0, basic: 8.99, starter: 31.99, growth: 82.99, business: 209.00, scale: 579.00 },
   },
   'za': {
     name: 'South Africa',
@@ -73,7 +74,7 @@ const REGION_PRICING = {
     currency: 'ZAR',
     fxToUsd: 0.054,
     paygOpenPriceLocal: 1.50,
-    prices: { free: 0, starter: 349, growth: 899, business: 2299, scale: 6299 },
+    prices: { free: 0, basic: 99.99, starter: 349, growth: 899, business: 2299, scale: 6299 },
   },
   'latam': {
     name: 'Brazil / LATAM',
@@ -81,7 +82,7 @@ const REGION_PRICING = {
     currency: 'USD',
     fxToUsd: 1.0,
     paygOpenPriceLocal: 0.04,
-    prices: { free: 0, starter: 14.99, growth: 38.99, business: 97.99, scale: 269.00 },
+    prices: { free: 0, basic: 4.99, starter: 14.99, growth: 38.99, business: 97.99, scale: 269.00 },
   },
   'in-sea': {
     name: 'India / SE Asia',
@@ -89,7 +90,7 @@ const REGION_PRICING = {
     currency: 'USD',
     fxToUsd: 1.0,
     paygOpenPriceLocal: 0.03,
-    prices: { free: 0, starter: 11.99, growth: 30.99, business: 77.99, scale: 219.00 },
+    prices: { free: 0, basic: 3.99, starter: 11.99, growth: 30.99, business: 77.99, scale: 219.00 },
   },
 } as const;
 

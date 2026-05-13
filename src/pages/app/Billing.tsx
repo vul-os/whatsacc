@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { useFormatZar } from '@/lib/billing/currency';
-import { ApiError, api, type AccountBilling, type InvoiceSummary, type WalletVerifyResponse } from '@/lib/api';
+import { ApiError, api, type AccountBilling, type BillingTier, type BillingTiersResponse, type InvoiceSummary, type WalletVerifyResponse } from '@/lib/api';
 
 export default function Billing() {
   const { currentAccount } = useAuth();
@@ -27,6 +27,7 @@ export default function Billing() {
   };
   const [billing, setBilling] = useState<AccountBilling | null>(null);
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  const [tiersData, setTiersData] = useState<BillingTiersResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [verifyResult, setVerifyResult] = useState<WalletVerifyResponse | null>(null);
@@ -37,10 +38,14 @@ export default function Billing() {
     if (!accountId) return;
     setLoading(true);
     try {
-      const data = await api.accountBilling(accountId);
-      const invoiceData = await api.invoices(accountId).catch(() => ({ invoices: [] }));
+      const [data, invoiceData, td] = await Promise.all([
+        api.accountBilling(accountId),
+        api.invoices(accountId).catch(() => ({ invoices: [] })),
+        api.tiers({ region: 'za' }).catch(() => null),
+      ]);
       setBilling(data);
       setInvoices(invoiceData.invoices);
+      setTiersData(td);
       setErrorMsg(null);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'account_billing_not_found') {
@@ -155,6 +160,30 @@ export default function Billing() {
           <TopUpForm accountId={accountId} onError={setErrorMsg} />
         </Card>
       </div>
+
+      {tiersData && (
+        <div className="mb-6">
+          <h2 className="font-display text-2xl mb-4">Plans</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {tiersData.tiers.map((tier) => (
+              <TierCard
+                key={tier.code}
+                tier={tier}
+                currency={tiersData.currency}
+                currentPlanCode={billing?.subscription?.plan_code ?? null}
+              />
+            ))}
+          </div>
+          {tiersData.payg_open_price > 0 && (
+            <p className="mt-3 text-xs text-ink/50">
+              Pay-as-you-go opens above your plan cap:{' '}
+              <span className="font-medium text-ink/70">
+                {tiersData.currency} {tiersData.payg_open_price.toFixed(2)}/open
+              </span>
+            </p>
+          )}
+        </div>
+      )}
 
       <Card className="p-0 overflow-hidden">
         <div className="px-6 py-4 border-b border-ink/10">
@@ -282,6 +311,54 @@ export default function Billing() {
       setErrorMsg(err instanceof Error ? err.message : 'Could not download invoice.');
     }
   }
+}
+
+function TierCard({
+  tier,
+  currency,
+  currentPlanCode,
+}: {
+  tier: BillingTier;
+  currency: string;
+  currentPlanCode: string | null;
+}) {
+  const isCurrent = tier.code === currentPlanCode;
+  const isFree = tier.price === 0;
+
+  return (
+    <div
+      className={`relative flex flex-col rounded-2xl border p-4 ${
+        isCurrent
+          ? 'border-moss bg-moss/5'
+          : 'border-ink/12 bg-paper hover:border-ink/25'
+      } transition-colors`}
+    >
+      {isCurrent && (
+        <span className="absolute -top-2.5 left-4 rounded-full bg-moss px-2.5 py-0.5 text-[10px] uppercase tracking-widest text-paper font-medium">
+          Current
+        </span>
+      )}
+      <p className="font-display text-base font-semibold leading-tight">{tier.name}</p>
+      <p className="mt-1 font-display text-2xl font-bold">
+        {isFree ? (
+          <span>Free</span>
+        ) : (
+          <>
+            <span className="text-sm font-normal text-ink/55 align-top mt-1 mr-0.5">{currency[0]}</span>
+            {tier.price % 1 === 0 ? tier.price.toFixed(0) : tier.price.toFixed(2)}
+            <span className="text-xs font-normal text-ink/45">/mo</span>
+          </>
+        )}
+      </p>
+      <p className="mt-2 text-[11px] text-ink/55 leading-snug flex-1">{tier.blurb}</p>
+      <ul className="mt-3 space-y-1 text-[11px] text-ink/65">
+        <li>{tier.included_opens.toLocaleString()} opens/mo</li>
+        <li>{tier.included_residents} residents</li>
+        <li>{tier.included_devices} device{tier.included_devices !== 1 ? 's' : ''}</li>
+        <li>{tier.included_locations} location{tier.included_locations !== 1 ? 's' : ''}</li>
+      </ul>
+    </div>
+  );
 }
 
 function TopUpForm({
