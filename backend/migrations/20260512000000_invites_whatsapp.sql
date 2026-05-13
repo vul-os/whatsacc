@@ -1,3 +1,14 @@
+-- 20260512000000_invites_whatsapp.sql
+-- Folded invite/contact additions and WhatsApp idempotency patch.
+-- Folded from:
+--   - 20260512000000_invite_phone.sql
+--   - 20260512010000_whatsapp_message_unique.sql
+
+
+-- ============================================================================
+-- 20260512000000_invite_phone.sql
+-- ============================================================================
+
 -- 20260512000000_invite_phone.sql
 -- Invite/profile contact additions: invite phone, location-member backfill,
 -- and optional Slack identity fields.
@@ -45,3 +56,20 @@ CREATE INDEX IF NOT EXISTS profiles_slack_handle_idx
 
 COMMENT ON COLUMN profiles.slack_user_id IS 'Slack user ID, e.g. U123ABC, used to link bot messages to a profile.';
 COMMENT ON COLUMN profiles.slack_handle IS 'Optional Slack handle without @, used for display and support.';
+
+-- ============================================================================
+-- 20260512010000_whatsapp_message_unique.sql
+-- ============================================================================
+
+-- 20260512010000_whatsapp_message_unique.sql
+-- Add unique constraint to whatsapp_messages(provider_message_id) to prevent duplicate processing on retries.
+
+-- First, clean up any existing duplicates if they exist (keep the oldest one)
+DELETE FROM whatsapp_messages a
+USING whatsapp_messages b
+WHERE a.provider_message_id = b.provider_message_id
+  AND a.id > b.id;
+
+-- Add the unique constraint
+ALTER TABLE whatsapp_messages
+ADD CONSTRAINT whatsapp_messages_provider_message_id_unique UNIQUE (provider_message_id);

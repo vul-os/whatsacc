@@ -57,7 +57,7 @@ function slackMenu(profileName?: string): string {
   ].join('\n');
 }
 
-function accessBlocks(profileName: string, gates: any[]) {
+function accessBlocks(profileName: string, gates: any[], quotaWarning?: string) {
   const blocks: any[] = [
     {
       type: 'section',
@@ -67,6 +67,13 @@ function accessBlocks(profileName: string, gates: any[]) {
       },
     },
   ];
+
+  if (quotaWarning) {
+    blocks.push({
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: quotaWarning }],
+    });
+  }
 
   for (const g of gates) {
     blocks.push({
