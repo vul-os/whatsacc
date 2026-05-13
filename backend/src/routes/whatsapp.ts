@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { JSONValue } from '../lib/db.ts';
+import type { JSONValue, TxSql } from '../lib/db.ts';
 import type { AppEnv } from '../middleware/auth.ts';
 import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
@@ -11,7 +11,7 @@ import {
   type WhatsAppInteractive,
 } from '../lib/whatsapp.ts';
 import { tryConsumeGrant, logAccess } from './access.ts';
-import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
+import { getAvailableAccessPoints, type AvailableAP } from '../lib/access-lookup.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -65,10 +65,242 @@ type WhatsAppPayload = {
   }>;
 };
 
+type PendingReply =
+  | { type: 'text'; to: string; chatId: string; body: string }
+  | { type: 'interactive'; to: string; chatId: string; interactive: WhatsAppInteractive };
+
+type LinkedLocation = { id: string; name: string };
+
 function signupLinkForPhone(phoneE164: string): string {
   const base = getEnv().APP_PUBLIC_URL.replace(/\/$/, '');
   const params = new URLSearchParams({ wa_phone: phoneE164 });
   return `${base}/signup?${params.toString()}`;
+}
+
+function uniqueLocations(gates: AvailableAP[]): LinkedLocation[] {
+  const seen = new Set<string>();
+  const locations: LinkedLocation[] = [];
+  for (const gate of gates) {
+    if (seen.has(gate.loc_id)) continue;
+    seen.add(gate.loc_id);
+    locations.push({ id: gate.loc_id, name: gate.loc_name });
+  }
+  return locations;
+}
+
+async function linkedLocationsForPhone(tx: TxSql, phoneE164: string): Promise<LinkedLocation[]> {
+  return await tx<LinkedLocation[]>`
+    select distinct l.id, l.name
+    from profile_phone_numbers ppn
+    join account_members am on am.user_id = ppn.profile_id
+    join locations l on l.account_id = am.account_id
+    where ppn.phone_e164 = ${phoneE164}
+      and ppn.verified_at is not null
+      and am.status = 'active'
+      and l.status = 'active'
+    order by l.name asc
+  `;
+}
+
+function textIncludesName(body: string, name: string): boolean {
+  return body.includes(name.toLowerCase().trim());
+}
+
+function waTitle(value: string, max = 24): string {
+  const clean = value.trim();
+  if (clean.length <= max) return clean;
+  return clean.slice(0, Math.max(1, max - 1)).trimEnd() + '…';
+}
+
+function findMentionedLocation(body: string, locations: LinkedLocation[]): LinkedLocation | null {
+  return locations.find((loc) => textIncludesName(body, loc.name)) ?? null;
+}
+
+function findMentionedGate(body: string, gates: AvailableAP[]): AvailableAP | null {
+  return gates.find((gate) => textIncludesName(body, gate.ap_name)) ?? null;
+}
+
+function pushLocationMenu(
+  replies: PendingReply[],
+  to: string,
+  chatId: string,
+  locations: LinkedLocation[],
+) {
+  replies.push({
+    type: 'interactive',
+    to,
+    chatId,
+    interactive: {
+      type: 'list',
+      header: { type: 'text', text: 'Locations' },
+      body: { text: 'Welcome back. Which location do you want to use?' },
+      action: {
+        button: 'Choose location',
+        sections: [
+          {
+            title: 'Your locations',
+            rows: locations.slice(0, 10).map((loc) => ({
+              id: `select_loc:${loc.id}`,
+              title: waTitle(loc.name),
+            })),
+          },
+        ],
+      },
+    },
+  });
+}
+
+async function gateFooter(tx: TxSql, gate: AvailableAP): Promise<string | undefined> {
+  if (gate.type === 'visitor') {
+    return `You have ${gate.max_uses === null ? 'unlimited' : (gate.max_uses ?? 0) - (gate.uses_count ?? 0)} uses remaining.`;
+  }
+  const apData = await tx<{ account_id: string }[]>`
+    select l.account_id
+    from access_points ap
+    join locations l on l.id = ap.location_id
+    where ap.id = ${gate.ap_id}
+  `;
+  if (!apData[0]) return undefined;
+  const status = await getAccountQuotaStatus(tx, apData[0].account_id);
+  const bal = (status.wallet_balance_cents / 100).toFixed(2);
+  return `Included: ${status.remaining_included}/${status.total_included} | Wallet: ${status.wallet_currency} ${bal}`;
+}
+
+async function pushGateMenu(
+  tx: TxSql,
+  replies: PendingReply[],
+  to: string,
+  chatId: string,
+  locationName: string,
+  gates: AvailableAP[],
+) {
+  if (gates.length === 1) {
+    const gate = gates[0]!;
+    const footer = await gateFooter(tx, gate);
+    replies.push({
+      type: 'interactive',
+      to,
+      chatId,
+      interactive: {
+        type: 'button',
+        body: { text: `Welcome to ${locationName}. Message "open" any time, or tap below to open ${gate.ap_name}.` },
+        footer: footer ? { text: footer } : undefined,
+        action: {
+          buttons: [{ type: 'reply', reply: { id: `open_ap:${gate.ap_id}`, title: waTitle(`Open ${gate.ap_name}`, 20) } }],
+        },
+      },
+    });
+    return;
+  }
+
+  const footer = gates[0] ? await gateFooter(tx, gates[0]) : undefined;
+  replies.push({
+    type: 'interactive',
+    to,
+    chatId,
+    interactive: {
+      type: 'list',
+      header: { type: 'text', text: locationName },
+      body: { text: `Welcome to ${locationName}. Which gate would you like to open?` },
+      footer: footer ? { text: footer } : undefined,
+      action: {
+        button: 'Select gate',
+        sections: [
+          {
+            title: 'Available gates',
+            rows: gates.slice(0, 10).map((gate) => ({
+              id: `open_ap:${gate.ap_id}`,
+              title: waTitle(gate.ap_name),
+              description: waTitle(gate.loc_name, 72),
+            })),
+          },
+        ],
+      },
+    },
+  });
+}
+
+async function pushAccessCommandResult(
+  tx: TxSql,
+  replies: PendingReply[],
+  to: string,
+  chatId: string,
+  phoneE164: string,
+  accessPointId: string,
+  gateName: string,
+  command: 'open' | 'close',
+) {
+  let grantId = await tryConsumeGrant(phoneE164, accessPointId);
+  let isMember = false;
+  let memberProfileId: string | null = null;
+
+  if (!grantId) {
+    const memberCheck = await tx<{ user_id: string }[]>`
+      select am.user_id
+      from profile_phone_numbers ppn
+      join account_members am on am.user_id = ppn.profile_id
+      join locations l on l.account_id = am.account_id
+      join access_points ap on ap.location_id = l.id
+      where ppn.phone_e164 = ${phoneE164}
+        and ppn.verified_at is not null
+        and ap.id = ${accessPointId}::uuid
+        and am.status = 'active'
+      limit 1
+    `;
+    if (memberCheck.length > 0) {
+      isMember = true;
+      memberProfileId = memberCheck[0]!.user_id;
+    }
+  }
+
+  if (!(grantId || isMember)) {
+    replies.push({
+      type: 'text',
+      to,
+      chatId,
+      body: 'Sorry, you no longer have access to this gate.',
+    });
+    return;
+  }
+
+  const result = await logAccess(tx, {
+    user_id: memberProfileId,
+    access_point_id: accessPointId,
+    command,
+    source: 'whatsapp',
+  });
+
+  if (!result.ok) {
+    replies.push({
+      type: 'text',
+      to,
+      chatId,
+      body: `Sorry, gate could not be ${command === 'close' ? 'closed' : 'opened'}: ${result.error === 'quota_exhausted' ? 'Monthly quota exhausted. Please contact admin or top up wallet.' : 'System error.'}`,
+    });
+    return;
+  }
+
+  replies.push({
+    type: 'text',
+    to,
+    chatId,
+    body: `${command === 'close' ? 'Closing' : 'Opening'} ${gateName}...`,
+  });
+
+  if (command === 'open') {
+    replies.push({
+      type: 'interactive',
+      to,
+      chatId,
+      interactive: {
+        type: 'button',
+        body: { text: `Would you like to close ${gateName}?` },
+        action: {
+          buttons: [{ type: 'reply', reply: { id: `close_ap:${accessPointId}`, title: waTitle(`Close ${gateName}`, 20) } }],
+        },
+      },
+    });
+  }
 }
 
 function whatsappRouter() {
@@ -114,9 +346,6 @@ function whatsappRouter() {
       throw BadRequest('bad_json');
     }
 
-    type PendingReply =
-      | { type: 'text'; to: string; chatId: string; body: string }
-      | { type: 'interactive'; to: string; chatId: string; interactive: WhatsAppInteractive };
     const replies: PendingReply[] = [];
 
     // Meta delivers webhooks for every phone number on the WABA, not just
@@ -162,6 +391,9 @@ function whatsappRouter() {
             if (msg.type === 'text') {
               const body = msg.text?.body?.toLowerCase().trim() ?? '';
               const allGrants = await getAvailableAccessPoints(tx, { phoneE164: from });
+              const locations = allGrants.length > 0
+                ? uniqueLocations(allGrants)
+                : await linkedLocationsForPhone(tx, from);
 
               if (allGrants.length === 0) {
                 const linkedRows = await tx<{ exists: boolean }[]>`
@@ -185,11 +417,30 @@ function whatsappRouter() {
                   });
                   continue;
                 }
+                if (locations.length === 0) {
+                  replies.push({
+                    type: 'text',
+                    to: msg.from,
+                    chatId: chat.id,
+                    body: [
+                      'Welcome to whatsacc. Your number is connected.',
+                      "You don't have a location set up yet. Open the dashboard to add Home, HQ, or your first site.",
+                      `${getEnv().APP_PUBLIC_URL.replace(/\/$/, '')}/app`,
+                    ].join('\n\n'),
+                  });
+                  continue;
+                }
                 replies.push({
                   type: 'text',
                   to: msg.from,
                   chatId: chat.id,
-                  body: "Hello! You don't have any active gate access linked to this number. Please contact the administrator if you believe this is an error.",
+                  body: [
+                    `Welcome to ${locations.length === 1 ? locations[0]!.name : 'whatsacc'}.`,
+                    locations.length === 1
+                      ? 'No gates or doors are ready at this location yet.'
+                      : `I found ${locations.length} locations, but none have active gates or doors ready yet.`,
+                    `Add an access point in the dashboard: ${getEnv().APP_PUBLIC_URL.replace(/\/$/, '')}/app/access-points`,
+                  ].join('\n\n'),
                 });
                 continue;
               }
@@ -201,247 +452,79 @@ function whatsappRouter() {
 
               if ((isOpen || isClose) && !isHelp) {
                 const command = isClose ? 'close' : 'open';
-                let target = allGrants.length === 1 ? allGrants[0] : null;
-                if (!target && allGrants.length > 1) {
-                  // Try matching by name
-                  target = allGrants.find((g) => body.includes(g.ap_name.toLowerCase())) ?? null;
+                const mentionedLocation = findMentionedLocation(body, locations);
+                const locationFiltered = mentionedLocation
+                  ? allGrants.filter((g) => g.loc_id === mentionedLocation.id)
+                  : allGrants;
+                let target = findMentionedGate(body, locationFiltered);
+
+                if (!target && mentionedLocation && locationFiltered.length === 1) {
+                  target = locationFiltered[0]!;
+                } else if (!target && locations.length === 1 && allGrants.length === 1) {
+                  target = allGrants[0]!;
                 }
 
                 if (target) {
-                  // Execute command
-                  let grantId = await tryConsumeGrant(from, target.ap_id);
-                  let isMember = false;
-                  let memberProfileId: string | null = null;
-
-                  if (!grantId) {
-                    const memberCheck = await tx<{ user_id: string }[]>`
-                      select am.user_id
-                      from profile_phone_numbers ppn
-                      join account_members am on am.user_id = ppn.profile_id
-                      join locations l on l.account_id = am.account_id
-                      join access_points ap on ap.location_id = l.id
-                      where ppn.phone_e164 = ${from}
-                        and ppn.verified_at is not null
-                        and ap.id = ${target.ap_id}::uuid
-                        and am.status = 'active'
-                      limit 1
-                    `;
-                    if (memberCheck.length > 0) {
-                      isMember = true;
-                      memberProfileId = memberCheck[0]!.user_id;
-                    }
-                  }
-
-                  if (grantId || isMember) {
-                    const result = await logAccess(tx, {
-                      user_id: memberProfileId,
-                      access_point_id: target.ap_id,
-                      command,
-                      source: 'whatsapp',
-                    });
-
-                    if (result.ok) {
-                      replies.push({
-                        type: 'text',
-                        to: msg.from,
-                        chatId: chat.id,
-                        body: `✅ ${command === 'close' ? 'Closing' : 'Opening'} ${target.ap_name}...`,
-                      });
-                      if (command === 'open') {
-                        replies.push({
-                          type: 'interactive',
-                          to: msg.from,
-                          chatId: chat.id,
-                          interactive: {
-                            type: 'button',
-                            body: { text: `Would you like to close the ${target.ap_name}?` },
-                            action: {
-                              buttons: [
-                                {
-                                  type: 'reply',
-                                  reply: { id: `close_ap:${target.ap_id}`, title: `Close ${target.ap_name}` },
-                                },
-                              ],
-                            },
-                          },
-                        });
-                      }
-                      continue; // Handled command, don't show menu
-                    } else {
-                      replies.push({
-                        type: 'text',
-                        to: msg.from,
-                        chatId: chat.id,
-                        body: `❌ Sorry, gate could not be ${command === 'close' ? 'closed' : 'opened'}: ${result.error === 'quota_exhausted' ? 'Monthly quota exhausted.' : 'System error.'}`,
-                      });
-                      continue;
-                    }
-                  }
+                  await pushAccessCommandResult(tx, replies, msg.from, chat.id, from, target.ap_id, target.ap_name, command);
+                  continue;
                 }
+
+                if (mentionedLocation) {
+                  await pushGateMenu(tx, replies, msg.from, chat.id, mentionedLocation.name, locationFiltered);
+                  continue;
+                }
+
+                if (locations.length > 1) {
+                  pushLocationMenu(replies, msg.from, chat.id, locations);
+                  continue;
+                }
+
+                await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
+                continue;
+              }
+
+              if (isHelp) {
+                if (locations.length > 1) {
+                  pushLocationMenu(replies, msg.from, chat.id, locations);
+                } else {
+                  await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
+                }
+                continue;
               }
 
               // Fallback: Show welcome menu
-              if (allGrants.length === 1) {
-                const g = allGrants[0]!;
-                // ... rest of the existing welcome logic for single gate
-                let quotaFooter: string | undefined;
-                if (g.type === 'member') {
-                  const apData = await tx<{ account_id: string }[]>`
-                    select l.account_id from access_points ap join locations l on l.id = ap.location_id where ap.id = ${g.ap_id}
-                  `;
-                  if (apData[0]) {
-                    const status = await getAccountQuotaStatus(tx, apData[0].account_id);
-                    const bal = (status.wallet_balance_cents / 100).toFixed(2);
-                    quotaFooter = `Included: ${status.remaining_included}/${status.total_included} | Wallet: ${status.wallet_currency} ${bal}`;
-                  }
-                }
-                const footerText = g.type === 'visitor' 
-                  ? `You have ${g.max_uses === null ? 'unlimited' : (g.max_uses ?? 0) - (g.uses_count ?? 0)} uses remaining.`
-                  : quotaFooter;
-
-                replies.push({
-                  type: 'interactive',
-                  to: msg.from,
-                  chatId: chat.id,
-                  interactive: {
-                    type: 'button',
-                    body: { text: `Welcome! Would you like to open the ${g.ap_name}?` },
-                    footer: footerText ? { text: footerText } : undefined,
-                    action: {
-                      buttons: [{ type: 'reply', reply: { id: `open_ap:${g.ap_id}`, title: `Open ${g.ap_name}` } }],
-                    },
-                  },
-                });
+              if (locations.length === 1) {
+                await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
               } else {
-                // ... rest of the existing welcome logic for multiple gates
-                let listFooter: string | undefined;
-                const apData = await tx<{ account_id: string }[]>`
-                  select l.account_id from access_points ap join locations l on l.id = ap.location_id where ap.id = ${allGrants[0]!.ap_id}
-                `;
-                if (apData[0]) {
-                   const status = await getAccountQuotaStatus(tx, apData[0].account_id);
-                   const bal = (status.wallet_balance_cents / 100).toFixed(2);
-                   listFooter = `Included: ${status.remaining_included}/${status.total_included} | Wallet: ${status.wallet_currency} ${bal}`;
-                }
-
-                replies.push({
-                  type: 'interactive',
-                  to: msg.from,
-                  chatId: chat.id,
-                  interactive: {
-                    type: 'list',
-                    header: { type: 'text', text: 'Gate Access' },
-                    body: { text: 'Welcome! Please select the gate you would like to open.' },
-                    footer: listFooter ? { text: listFooter } : undefined,
-                    action: {
-                      button: 'Select Gate',
-                      sections: [
-                        {
-                          title: 'Available Gates',
-                          rows: allGrants.slice(0, 10).map((g) => ({
-                            id: `open_ap:${g.ap_id}`,
-                            title: g.ap_name,
-                            description: g.loc_name,
-                          })),
-                        },
-                      ],
-                    },
-                  },
-                });
+                pushLocationMenu(replies, msg.from, chat.id, locations);
               }
             } else if (msg.type === 'interactive') {
               const reply = msg.interactive?.list_reply || msg.interactive?.button_reply;
               if (reply) {
                 const parts = reply.id.split(':');
                 const rawCommand = parts.length > 1 ? parts[0] : 'open';
-                const command = rawCommand.startsWith('close') ? 'close' : 'open';
-                const apId = parts.length > 1 ? parts[1]! : reply.id;
-                
-                // Try consuming as visitor first
-                let grantId = await tryConsumeGrant(from, apId);
-                let isMember = false;
-                let memberProfileId: string | null = null;
-
-                if (!grantId) {
-                  // If not visitor, check if they are a member
-                  const memberCheck = await tx<{ user_id: string }[]>`
-                    select am.user_id
-                    from profile_phone_numbers ppn
-                    join account_members am on am.user_id = ppn.profile_id
-                    join locations l on l.account_id = am.account_id
-                    join access_points ap on ap.location_id = l.id
-                    where ppn.phone_e164 = ${from}
-                      and ppn.verified_at is not null
-                      and ap.id = ${apId}::uuid
-                      and am.status = 'active'
-                    limit 1
-                  `;
-                  if (memberCheck.length > 0) {
-                    isMember = true;
-                    memberProfileId = memberCheck[0]!.user_id;
-                  }
-                }
-
-                if (grantId || isMember) {
-                  const result = await logAccess(tx, {
-                    user_id: memberProfileId,
-                    access_point_id: apId,
-                    command,
-                    source: 'whatsapp',
-                  });
-
-                  if (result.ok) {
-                    const gateName = reply.title.replace(/^(Open|Close) /, '');
-                    if (command === 'close') {
-                       replies.push({
-                        type: 'text',
-                        to: msg.from,
-                        chatId: chat.id,
-                        body: `✅ Closing ${gateName}...`,
-                      });
-                    } else {
-                      replies.push({
-                        type: 'text',
-                        to: msg.from,
-                        chatId: chat.id,
-                        body: `✅ Opening ${gateName}...`,
-                      });
-                      
-                      // Add "Close" button for convenience
-                      replies.push({
-                        type: 'interactive',
-                        to: msg.from,
-                        chatId: chat.id,
-                        interactive: {
-                          type: 'button',
-                          body: { text: `Would you like to close the ${gateName}?` },
-                          action: {
-                            buttons: [
-                              {
-                                type: 'reply',
-                                reply: { id: `close_ap:${apId}`, title: `Close ${gateName}` },
-                              },
-                            ],
-                          },
-                        },
-                      });
-                    }
-                  } else {
+                if (rawCommand === 'select_loc') {
+                  const locId = parts[1];
+                  const allGrants = await getAvailableAccessPoints(tx, { phoneE164: from });
+                  const locGates = allGrants.filter((g) => g.loc_id === locId);
+                  if (locGates.length === 0) {
                     replies.push({
                       type: 'text',
                       to: msg.from,
                       chatId: chat.id,
-                      body: `❌ Sorry, gate could not be ${command === 'close' ? 'closed' : 'opened'}: ${result.error === 'quota_exhausted' ? 'Monthly quota exhausted. Please contact admin or top up wallet.' : 'System error.'}`,
+                      body: 'That location has no active gates or doors ready yet.',
                     });
+                  } else {
+                    await pushGateMenu(tx, replies, msg.from, chat.id, locGates[0]!.loc_name, locGates);
                   }
-                } else {
-                  replies.push({
-                    type: 'text',
-                    to: msg.from,
-                    chatId: chat.id,
-                    body: `❌ Sorry, you no longer have access to this gate.`,
-                  });
+                  continue;
                 }
+                const command = rawCommand.startsWith('close') ? 'close' : 'open';
+                const apId = parts.length > 1 ? parts[1]! : reply.id;
+                const allGrants = await getAvailableAccessPoints(tx, { phoneE164: from });
+                const gate = allGrants.find((g) => g.ap_id === apId);
+                const gateName = gate?.ap_name ?? reply.title.replace(/^(Open|Close) /, '');
+                await pushAccessCommandResult(tx, replies, msg.from, chat.id, from, apId, gateName, command);
               }
             }
           }

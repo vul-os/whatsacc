@@ -3,6 +3,7 @@ import type { TxSql } from './db.ts';
 export type AvailableAP = {
   ap_id: string;
   ap_name: string;
+  loc_id: string;
   loc_name: string;
   type: 'member' | 'visitor';
   grant_id?: string;
@@ -30,12 +31,13 @@ export async function getAvailableAccessPoints(
         uses_count: number;
         ap_id: string;
         ap_name: string;
+        loc_id: string;
         loc_name: string;
       }[]
     >`
       select g.id, g.max_uses, g.uses_count,
              ap.id as ap_id, ap.name as ap_name,
-             l.name as loc_name
+             l.id as loc_id, l.name as loc_name
       from temporary_access_grants g
       join temporary_access_grant_access_points t on t.grant_id = g.id
       join access_points ap on ap.id = t.access_point_id
@@ -52,6 +54,7 @@ export async function getAvailableAccessPoints(
       results.push({
         ap_id: g.ap_id,
         ap_name: g.ap_name,
+        loc_id: g.loc_id,
         loc_name: g.loc_name,
         type: 'visitor',
         grant_id: g.id,
@@ -65,10 +68,11 @@ export async function getAvailableAccessPoints(
       {
         ap_id: string;
         ap_name: string;
+        loc_id: string;
         loc_name: string;
       }[]
     >`
-      select ap.id as ap_id, ap.name as ap_name, l.name as loc_name
+      select ap.id as ap_id, ap.name as ap_name, l.id as loc_id, l.name as loc_name
       from profile_phone_numbers ppn
       join profiles p on p.id = ppn.profile_id
       join account_members am on am.user_id = p.id
@@ -85,6 +89,7 @@ export async function getAvailableAccessPoints(
         results.push({
           ap_id: g.ap_id,
           ap_name: g.ap_name,
+          loc_id: g.loc_id,
           loc_name: g.loc_name,
           type: 'member',
         });
@@ -98,10 +103,11 @@ export async function getAvailableAccessPoints(
       {
         ap_id: string;
         ap_name: string;
+        loc_id: string;
         loc_name: string;
       }[]
     >`
-      select ap.id as ap_id, ap.name as ap_name, l.name as loc_name
+      select ap.id as ap_id, ap.name as ap_name, l.id as loc_id, l.name as loc_name
       from profiles p
       join account_members am on am.user_id = p.id
       join locations l on l.account_id = am.account_id
@@ -115,6 +121,7 @@ export async function getAvailableAccessPoints(
         results.push({
           ap_id: g.ap_id,
           ap_name: g.ap_name,
+          loc_id: g.loc_id,
           loc_name: g.loc_name,
           type: 'member',
         });
