@@ -19,6 +19,12 @@ const createAccountSchema = z
   })
   .strict();
 
+const updateAccountSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+  })
+  .strict();
+
 const inviteSchema = z
   .object({
     email: z.string().email().toLowerCase(),
@@ -93,6 +99,22 @@ function accountsRouter() {
     });
     if (!data) throw NotFound('account_not_found');
     return c.json(data);
+  });
+
+  app.patch('/:id', zValidator('json', updateAccountSchema), async (c) => {
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    await withUserDb(c, async (tx) => {
+      const rows = await tx<{ id: string }[]>`
+        update accounts
+        set name = coalesce(${body.name ?? null}, name),
+            updated_at = now()
+        where id = ${id}
+        returning id
+      `;
+      if (rows.length === 0) throw NotFound('account_not_found');
+    });
+    return c.body(null, 204);
   });
 
   app.get('/:id/members', async (c) => {

@@ -240,6 +240,9 @@ export const api = {
   accountBilling: (accountId: string) =>
     apiFetch<AccountBilling>(`/billing/accounts/${accountId}/billing`),
 
+  accountUpdate: (accountId: string, body: { name?: string }) =>
+    apiFetch<void>(`/accounts/${accountId}`, { method: 'PATCH', body }),
+
   walletTopup: (body: { account_id: string; amount_cents: number; callback_path?: string }) =>
     apiFetch<TopupResponse>('/billing/wallet/topup', { method: 'POST', body }),
 

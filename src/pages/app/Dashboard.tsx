@@ -88,6 +88,10 @@ export default function Dashboard() {
   // Brand-new account: no locations yet — show focused onboarding instead.
   const isOnboarding = summary !== null && locations.length === 0;
 
+  useEffect(() => {
+    if (isOnboarding) setCreatingLocation(true);
+  }, [isOnboarding]);
+
   if (isOnboarding) {
     return (
       <>
@@ -123,6 +127,8 @@ export default function Dashboard() {
 
         {creatingLocation && (
           <CreateLocationModal
+            accountId={currentAccount?.id}
+            mode="current-account"
             onClose={() => setCreatingLocation(false)}
             onCreated={async (newAccountId) => {
               setCreatingLocation(false);
