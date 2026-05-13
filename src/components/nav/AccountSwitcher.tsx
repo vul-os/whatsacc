@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { CreateLocationModal } from '@/components/locations/CreateLocationModal';
 
@@ -7,10 +8,11 @@ import { CreateLocationModal } from '@/components/locations/CreateLocationModal'
 // creates a fresh account/location pair. Always interactive — even with a
 // single location the user needs the create affordance here.
 export function AccountSwitcher() {
-  const { user, accounts, currentAccount, setCurrentAccount, refreshMe } = useAuth();
+  const { user, accounts, currentAccount, setCurrentAccount, refreshMe, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Close on outside click + Escape
   useEffect(() => {
@@ -123,6 +125,17 @@ export function AccountSwitcher() {
             <p className="px-3 py-1.5 text-xs text-ink/55">
               Signed in as <span className="text-ink">{user.email}</span>
             </p>
+            <button
+              type="button"
+              onClick={async () => {
+                setOpen(false);
+                await signOut();
+                navigate('/login', { replace: true });
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-ink/65 hover:bg-paper-cool hover:text-terracotta-deep transition-colors"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       )}

@@ -47,6 +47,10 @@ export default function Signup() {
   const isInviteSignup = Boolean(pendingInviteToken);
 
   const referral = useMemo(() => getReferral(), []);
+  const googleStartUrl = useMemo(() => {
+    if (!referral?.slug) return api.googleStartUrl();
+    return `${api.googleStartUrl()}?ref=${encodeURIComponent(referral.slug)}`;
+  }, [referral]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +175,24 @@ export default function Signup() {
                 {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. No credit card.'}
               </p>
 
+              {!isInviteSignup && (
+                <>
+                  <a
+                    href={googleStartUrl}
+                    className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+                  >
+                    <GoogleMark />
+                    <span className="text-sm font-medium">Continue with Google</span>
+                  </a>
+
+                  <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
+                    <span className="flex-1 h-px bg-ink/12" />
+                    or
+                    <span className="flex-1 h-px bg-ink/12" />
+                  </div>
+                </>
+              )}
+
               {referral && (
                 <p className="mt-4 px-3 py-2 rounded-xl bg-moss/10 border border-moss/30 text-sm text-ink/80">
                   You were invited by{' '}
@@ -178,7 +200,7 @@ export default function Signup() {
                 </p>
               )}
 
-              <div className="mt-6 space-y-3">
+              <div className={`${isInviteSignup || referral ? 'mt-6' : 'mt-0'} space-y-3`}>
                 <Field
                   label="Your name"
                   value={name}

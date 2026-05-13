@@ -11,12 +11,12 @@ use logo make it look amazing, it must be available on frontend
 we need paystack, test payouts, referrals, normal billingcl
 have tests so that we cant get caught with referals, like if you cancel and come back etc
 
-buy domain on namecheap, whatsacc.com
-resend setup, connect dns settings
-create firebase project, then setup hosting, after that create another site for firebase project for dev
+[x] buy domain on namecheap, whatsacc.com
+[x] resend setup, connect dns settings
+[x] create firebase project, then setup hosting, after that create another site for firebase project for dev
 email templates, logo is in public folder
 login, reset password etc
-setup google oauth, need to go to console.cloud.google.com, ask if you need help
+[x] setup google oauth, need to go to console.cloud.google.com, ask if you need help
 
 test google login, after 30 mins, are you still logged on? do refresh token system work?
 
