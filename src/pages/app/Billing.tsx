@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { useFormatZar } from '@/lib/billing/currency';
-import { ApiError, api, type AccountBilling, type WalletVerifyResponse } from '@/lib/api';
+import { ApiError, api, type AccountBilling, type InvoiceSummary, type WalletVerifyResponse } from '@/lib/api';
 
 export default function Billing() {
   const { currentAccount } = useAuth();
@@ -26,6 +26,7 @@ export default function Billing() {
     }
   };
   const [billing, setBilling] = useState<AccountBilling | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [verifyResult, setVerifyResult] = useState<WalletVerifyResponse | null>(null);
@@ -37,7 +38,9 @@ export default function Billing() {
     setLoading(true);
     try {
       const data = await api.accountBilling(accountId);
+      const invoiceData = await api.invoices(accountId).catch(() => ({ invoices: [] }));
       setBilling(data);
+      setInvoices(invoiceData.invoices);
       setErrorMsg(null);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'account_billing_not_found') {
@@ -165,7 +168,7 @@ export default function Billing() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['Reference', 'Amount', 'Status', 'Initiated'].map((c) => (
+                {['Reference', 'Amount', 'Status', 'Initiated', ''].map((c) => (
                   <th
                     key={c}
                     className="text-left px-6 py-3 text-[11px] uppercase tracking-[0.18em] text-ink/55 font-normal"
@@ -188,6 +191,73 @@ export default function Billing() {
                   <td className="px-6 py-4 text-ink/65">
                     {new Date(it.created_at).toLocaleString()}
                   </td>
+                  <td className="px-6 py-4">
+                    {it.invoice_id && (
+                      <button
+                        type="button"
+                        onClick={() => downloadInvoice({ id: it.invoice_id!, number: it.provider_reference })}
+                        className="text-sm underline underline-offset-4 decoration-terracotta hover:text-terracotta-deep"
+                      >
+                        Invoice
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card className="p-0 overflow-hidden mt-6">
+        <div className="px-6 py-4 border-b border-ink/10">
+          <h2 className="font-display text-2xl">Invoices</h2>
+        </div>
+        {loading && invoices.length === 0 ? (
+          <div className="px-6 py-8 text-ink/55 text-sm">Loading…</div>
+        ) : invoices.length === 0 ? (
+          <div className="px-6 py-8 text-ink/55 text-sm">No invoices yet.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                {['Invoice', 'Amount', 'VAT', 'Status', 'Issued', 'PDF'].map((c) => (
+                  <th
+                    key={c}
+                    className="text-left px-6 py-3 text-[11px] uppercase tracking-[0.18em] text-ink/55 font-normal"
+                  >
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-t border-ink/8">
+                  <td className="px-6 py-4 font-mono text-xs">{invoice.number}</td>
+                  <td className="px-6 py-4 font-display text-lg">
+                    {formatCents(invoice.total_cents, invoice.currency)}
+                  </td>
+                  <td className="px-6 py-4 text-ink/65">
+                    {invoice.vat_cents > 0
+                      ? `${formatCents(invoice.vat_cents, invoice.currency)} · ${(invoice.vat_rate_bps / 100).toFixed(2)}%`
+                      : 'No VAT'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <InvoiceStatusPill status={invoice.status} />
+                  </td>
+                  <td className="px-6 py-4 text-ink/65">
+                    {new Date(invoice.issued_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={() => downloadInvoice(invoice)}
+                      className="text-sm underline underline-offset-4 decoration-terracotta hover:text-terracotta-deep"
+                    >
+                      Download
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -196,6 +266,22 @@ export default function Billing() {
       </Card>
     </>
   );
+
+  async function downloadInvoice(invoice: Pick<InvoiceSummary, 'id' | 'number'>) {
+    try {
+      const blob = await api.invoicePdf(invoice.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${invoice.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not download invoice.');
+    }
+  }
 }
 
 function TopUpForm({
@@ -276,6 +362,21 @@ function TopUpForm({
         {submitting ? 'Redirecting to Paystack…' : 'Continue to Paystack'}
       </Button>
     </form>
+  );
+}
+
+function InvoiceStatusPill({ status }: { status: string }) {
+  const tones: Record<string, string> = {
+    paid: 'text-moss bg-moss/10',
+    issued: 'text-ink/55 bg-ink/5',
+    void: 'text-terracotta-deep bg-terracotta/10',
+  };
+  const tone = tones[status] ?? 'text-ink/55 bg-ink/5';
+  return (
+    <span className={`inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs ${tone}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {status}
+    </span>
   );
 }
 

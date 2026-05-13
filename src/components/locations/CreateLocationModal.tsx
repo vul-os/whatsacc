@@ -8,11 +8,13 @@ export function CreateLocationModal({
   mode = 'new-account',
   onClose,
   onCreated,
+  forced = false,
 }: {
   accountId?: string;
   mode?: 'new-account' | 'current-account';
   onClose: () => void;
   onCreated: (newAccountId: string) => void;
+  forced?: boolean;
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<LocationRow['type']>('house');
@@ -61,15 +63,19 @@ export function CreateLocationModal({
     }
   }
 
+  const noop = () => {};
+
   return (
-    <Modal open onClose={onClose} className="sm:max-w-xl">
+    <Modal open onClose={forced ? noop : onClose} className="sm:max-w-xl">
       <h2 className="font-display text-2xl sm:text-3xl mb-1">
-        {mode === 'current-account' ? 'Set up your location' : 'New location'}
+        {forced ? 'Set up your first location' : mode === 'current-account' ? 'Set up your location' : 'New location'}
       </h2>
       <p className="text-sm text-ink/60 mb-5 leading-relaxed">
-        {mode === 'current-account'
-          ? 'Name the place this account belongs to. This is the org/location name you will see in the dashboard.'
-          : 'A house, complex, building, or other site. Each location has its own members and billing.'}
+        {forced
+          ? 'Give your place a name before you dive in — this is the org/location you will manage from the dashboard.'
+          : mode === 'current-account'
+            ? 'Name the place this account belongs to. This is the org/location name you will see in the dashboard.'
+            : 'A house, complex, building, or other site. Each location has its own members and billing.'}
       </p>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
@@ -112,15 +118,17 @@ export function CreateLocationModal({
         </label>
         {errorMsg && <p className="text-sm text-terracotta-deep">{errorMsg}</p>}
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-11 px-4 rounded-full text-sm text-ink/65 hover:text-ink"
-          >
-            Cancel
-          </button>
+          {!forced && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 px-4 rounded-full text-sm text-ink/65 hover:text-ink"
+            >
+              Cancel
+            </button>
+          )}
           <Button type="submit" variant="ink" disabled={submitting}>
-            {submitting ? 'Saving…' : mode === 'current-account' ? 'Save location' : 'Create'}
+            {submitting ? 'Saving…' : forced || mode === 'current-account' ? 'Save location' : 'Create'}
           </Button>
         </div>
       </form>

@@ -72,7 +72,11 @@ const maintenanceSchema = z
   })
   .strict();
 
-import { getAccountQuotaStatus } from '../lib/billing/quota.ts';
+export const WHATSAPP_ACCESS_PRICE_CENTS = 50;
+
+export type LogAccessResult =
+  | { ok: true; wallet_balance_cents: number | null }
+  | { ok: false; error: string };
 
 export async function logAccess(
   tx: TxSql,
@@ -84,7 +88,7 @@ export async function logAccess(
     lat?: number;
     long?: number;
   },
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<LogAccessResult> {
   const apRows = await tx<{
     location_id: string;
     account_id: string;
@@ -96,33 +100,42 @@ export async function logAccess(
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
 
-  // Enforce quota for 'open' commands
-  if (args.command === 'open') {
-    const quota = await getAccountQuotaStatus(tx, ap.account_id);
-    if (!quota.allowed) {
+  let newBalance: number | null = null;
+  if (args.source === 'whatsapp') {
+    const walletRows = await tx<{ balance_cents: string }[]>`
+      select balance_cents::text as balance_cents
+      from wallets
+      where account_id = ${ap.account_id}
+      for update
+    `;
+    const balance = Number(walletRows[0]?.balance_cents ?? 0);
+    if (balance < WHATSAPP_ACCESS_PRICE_CENTS) {
       await tx`
         insert into access_logs
           (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
         values
           (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
-           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, false, 'quota_exhausted')
+           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, false, 'insufficient_wallet_balance')
       `;
-      return { ok: false, error: 'quota_exhausted' };
+      return { ok: false, error: 'insufficient_wallet_balance' };
     }
 
-    // If using PAYG (no included opens left), debit the wallet
-    if (quota.remaining_included === 0 && quota.payg_price_cents > 0) {
-      await tx`
-        update wallets
-        set balance_cents = balance_cents - ${quota.payg_price_cents},
-            updated_at = now()
-        where account_id = ${ap.account_id}
-      `;
-      await tx`
-        insert into wallet_transactions (account_id, delta_cents, reason, reference)
-        values (${ap.account_id}, ${-quota.payg_price_cents}, 'payg_open', ${args.access_point_id})
-      `;
-    }
+    await tx`
+      update wallets
+      set balance_cents = balance_cents - ${WHATSAPP_ACCESS_PRICE_CENTS},
+          updated_at = now()
+      where account_id = ${ap.account_id}
+    `;
+    await tx`
+      insert into wallet_transactions (account_id, delta_cents, reason, reference)
+      values (
+        ${ap.account_id},
+        ${-WHATSAPP_ACCESS_PRICE_CENTS},
+        ${args.command === 'open' ? 'whatsapp_open' : 'whatsapp_close'},
+        ${args.access_point_id}
+      )
+    `;
+    newBalance = balance - WHATSAPP_ACCESS_PRICE_CENTS;
   }
 
   await tx`
@@ -133,7 +146,7 @@ export async function logAccess(
        ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, true)
   `;
   // TODO: enqueue device_command and dispatch via Durable Object.
-  return { ok: true };
+  return { ok: true, wallet_balance_cents: newBalance };
 }
 
 type AccessPointWithMeter = {

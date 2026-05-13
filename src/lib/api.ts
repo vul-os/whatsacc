@@ -132,6 +132,23 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
   return payload as T;
 }
 
+async function apiBlob(path: string): Promise<Blob> {
+  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  const request = async () => {
+    const h = new Headers();
+    const access = tokenStore.access;
+    if (access) h.set('Authorization', `Bearer ${access}`);
+    return await fetch(url, { headers: h });
+  };
+  let res = await request();
+  if (res.status === 401 && tokenStore.refresh) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) res = await request();
+  }
+  if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => `http_${res.status}`));
+  return await res.blob();
+}
+
 // Typed surface ------------------------------------------------------------
 
 export type AuthTokens = {
@@ -250,6 +267,15 @@ export const api = {
     apiFetch<WalletVerifyResponse>(
       `/billing/wallet/verify?reference=${encodeURIComponent(reference)}`,
     ),
+
+  invoices: (accountId: string) =>
+    apiFetch<{ invoices: InvoiceSummary[] }>(`/billing/accounts/${accountId}/invoices`),
+
+  invoicePdfUrl: (id: string) =>
+    `${API_BASE_URL}/billing/invoices/${encodeURIComponent(id)}.pdf`,
+
+  invoicePdf: (id: string) =>
+    apiBlob(`/billing/invoices/${encodeURIComponent(id)}.pdf`),
 
   accessPoints: (accountId?: string) => {
     const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
@@ -627,7 +653,22 @@ export type AccountBilling = {
     created_at: string;
     completed_at: string | null;
     provider_reference: string;
+    invoice_id: string | null;
   }>;
+};
+
+export type InvoiceSummary = {
+  id: string;
+  number: string;
+  kind: string;
+  currency: string;
+  subtotal_cents: number;
+  vat_rate_bps: number;
+  vat_cents: number;
+  total_cents: number;
+  status: string;
+  issued_at: string;
+  paid_at: string | null;
 };
 
 export type TopupResponse = {

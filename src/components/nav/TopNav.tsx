@@ -3,9 +3,9 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { LinkButton } from '@/components/ui/Button';
 import { CurrencySelector } from '@/components/nav/CurrencySelector';
+import { ThemeToggle } from '@/components/nav/ThemeToggle';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
-import { useTheme } from '@/lib/theme';
 
 const links = [
   { to: '/pricing', label: 'Pricing' },
@@ -17,7 +17,6 @@ export function TopNav() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const { signedIn } = useAuth();
-  const { theme, toggleTheme } = useTheme();
 
   // close menu on route change
   useEffect(() => {
@@ -78,24 +77,7 @@ export function TopNav() {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="h-9 w-9 grid place-items-center rounded-full border border-ink/10 bg-paper-cool text-ink/70 hover:text-ink hover:border-ink/25 transition-colors"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          >
-            {theme === 'dark' ? (
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M20.5 14.5A7.5 7.5 0 0 1 9.5 3.5 8.6 8.6 0 1 0 20.5 14.5Z" />
-              </svg>
-            )}
-          </button>
+          <ThemeToggle variant="landing" />
           <CurrencySelector className="hidden sm:inline-block" />
           <LinkButton
             to={signedIn ? '/app' : '/signup'}

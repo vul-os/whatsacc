@@ -14,6 +14,12 @@ import {
 } from '../lib/paystack.ts';
 import type { JSONValue, TxSql } from '../lib/db.ts';
 import { regionForCountry, REGIONS, type RegionCode } from '../lib/billing/tiers.ts';
+import {
+  buildInvoicePdf,
+  createInvoice,
+  vatBreakdown,
+  type InvoiceRow,
+} from '../lib/invoice.ts';
 
 const topupSchema = z
   .object({
@@ -33,6 +39,27 @@ type IntentRow = {
   currency: string;
   credited_tx_id: string | null;
 };
+
+async function createWalletTopupInvoice(tx: TxSql, intent: IntentRow): Promise<string> {
+  const total = Number(intent.amount_cents);
+  const vat = vatBreakdown(total);
+  return await createInvoice({
+    tx,
+    account_id: intent.account_id,
+    kind: 'wallet_topup',
+    payment_intent_id: intent.id,
+    total_cents: total,
+    currency: intent.currency,
+    line_items: [
+      {
+        description: 'Wallet top-up',
+        quantity: 1,
+        unit_cents: vat.subtotal_cents,
+        line_cents: vat.subtotal_cents,
+      },
+    ],
+  });
+}
 
 async function creditWalletForIntent(
   tx: TxSql,
@@ -71,6 +98,7 @@ async function creditWalletForIntent(
       where id = ${intent.account_id}
     `;
   }
+  await createWalletTopupInvoice(tx, intent);
   return { wallet_tx_id: walletTxId, already_credited: false };
 }
 
@@ -137,12 +165,15 @@ function billingRouter() {
         created_at: Date;
         completed_at: Date | null;
         provider_reference: string;
+        invoice_id: string | null;
       }[]>`
-        select id, amount_cents::text as amount_cents, currency, status, created_at,
-               completed_at, provider_reference
-        from payment_intents
-        where account_id = ${id}
-        order by created_at desc
+        select pi.id, pi.amount_cents::text as amount_cents, pi.currency, pi.status,
+               pi.created_at, pi.completed_at, pi.provider_reference,
+               i.id as invoice_id
+        from payment_intents pi
+        left join invoices i on i.payment_intent_id = pi.id
+        where pi.account_id = ${id}
+        order by pi.created_at desc
         limit 20
       `;
       return {
@@ -156,11 +187,66 @@ function billingRouter() {
         recent_intents: intents.map((it) => ({
           ...it,
           amount_cents: Number(it.amount_cents),
+          invoice_id: it.invoice_id ?? null,
         })),
       };
     });
     if (!data.subscription && !data.wallet) throw NotFound('account_billing_not_found');
     return c.json(data);
+  });
+
+  app.get('/accounts/:id/invoices', async (c) => {
+    const id = c.req.param('id');
+    const rows = await withUserDb(c, async (tx) => {
+      return await tx<InvoiceRow[]>`
+        select id, account_id, number, kind, payment_intent_id, currency,
+               subtotal_cents, vat_rate_bps, vat_cents, total_cents,
+               bill_to, issuer, line_items, status, issued_at, paid_at
+        from invoices
+        where account_id = ${id}
+        order by issued_at desc
+        limit 50
+      `;
+    });
+    return c.json({
+      invoices: rows.map((r) => ({
+        id: r.id,
+        number: r.number,
+        kind: r.kind,
+        currency: r.currency,
+        subtotal_cents: Number(r.subtotal_cents),
+        vat_rate_bps: r.vat_rate_bps,
+        vat_cents: Number(r.vat_cents),
+        total_cents: Number(r.total_cents),
+        status: r.status,
+        issued_at: r.issued_at,
+        paid_at: r.paid_at,
+      })),
+    });
+  });
+
+  app.get('/invoices/:id.pdf', async (c) => {
+    const id = c.req.param('id');
+    const row = await withUserDb(c, async (tx) => {
+      const rows = await tx<InvoiceRow[]>`
+        select id, account_id, number, kind, payment_intent_id, currency,
+               subtotal_cents, vat_rate_bps, vat_cents, total_cents,
+               bill_to, issuer, line_items, status, issued_at, paid_at
+        from invoices
+        where id = ${id}
+        limit 1
+      `;
+      return rows[0] ?? null;
+    });
+    if (!row) throw NotFound('invoice_not_found');
+    const pdf = await buildInvoicePdf(row);
+    return new Response(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${row.number}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
   });
 
   // Initialize a Paystack hosted-checkout payment. Returns the redirect URL.
@@ -184,13 +270,6 @@ function billingRouter() {
       `;
       if (!ok[0]?.ok) throw Forbidden('not_account_admin');
 
-      const acctRows = await tx<{ country_code: string }[]>`
-        select country_code from accounts where id = ${account_id}
-      `;
-      const country = acctRows[0]?.country_code ?? 'ZA';
-      const region = regionForCountry(country);
-      const currency = REGIONS[region].currency;
-
       const emailRows = await tx<{ email: string }[]>`
         select email from users where id = ${user.sub}
       `;
@@ -203,10 +282,10 @@ function billingRouter() {
            purpose, amount_cents, currency, status)
         values
           (${account_id}, ${user.sub}, 'paystack', ${reference},
-           'wallet_topup', ${amount_cents}, ${currency}, 'pending')
+           'wallet_topup', ${amount_cents}, 'ZAR', 'pending')
         returning id
       `;
-      return { id: row!.id, email, currency };
+      return { id: row!.id, email, currency: 'ZAR' };
     });
 
     // 2. Init the transaction with Paystack (network call after DB row exists,

@@ -1,65 +1,65 @@
 /* whatsacc design tokens
-   palette derived from the favicon arch motif:
-   deep navy ink, warm cream paper, terracotta hot accent.
-   supporting tones: muted gold for editorial moments,
-   soft slate for body text, clay for surface variation. */
+   palette: warm neutrals + copper accent, inspired by Claude's premium identity.
+   light: near-black ink on warm white paper.
+   dark: true near-black backgrounds — premium, not brownish. */
 
 :root {
   color-scheme: light;
 
-  --ink: #2b2118;
-  --ink-soft: #46382d;
-  --ink-faint: rgba(43, 33, 24, 0.6);
-  --ink-whisper: rgba(43, 33, 24, 0.12);
+  --ink: #141210;
+  --ink-soft: #302C28;
+  --ink-faint: rgba(20, 18, 16, 0.55);
+  --ink-whisper: rgba(20, 18, 16, 0.09);
 
-  --paper: #faf7f2;
-  --paper-warm: #efe7dc;
-  --paper-cool: #fffdf8;
-  --paper-edge: rgba(43, 33, 24, 0.08);
+  --paper: #FAFAF8;
+  --paper-warm: #F2EDE6;
+  --paper-cool: #FDFDFC;
+  --paper-edge: rgba(20, 18, 16, 0.07);
 
-  --terracotta: #cc785c;
-  --terracotta-deep: #a9573d;
-  --terracotta-soft: #e5aa96;
+  --terracotta: #C86848;
+  --terracotta-deep: #A24F32;
+  --terracotta-soft: #E8A48A;
 
-  --gold: #b5945a;
-  --gold-soft: #dfc282;
+  --gold: #B8914A;
+  --gold-soft: #DEC07A;
 
-  --slate: #746b63;
-  --moss: #5f735f;
-  --clay: #c8ad93;
+  --slate: #7C746C;
+  --moss: #5C7258;
+  --clay: #C2A88C;
 
-  --signal: #3d6b58; /* successful gate-open green, not whatsapp */
+  --signal: #3A6E56;
 
-  --shadow-paper: 0 1px 0 rgba(26, 31, 54, 0.04), 0 12px 32px -16px rgba(26, 31, 54, 0.18);
-  --shadow-deep: 0 24px 48px -24px rgba(26, 31, 54, 0.4);
+  --shadow-paper: 0 1px 2px rgba(14, 12, 10, 0.04), 0 8px 24px -8px rgba(14, 12, 10, 0.10);
+  --shadow-deep: 0 20px 40px -14px rgba(14, 12, 10, 0.20);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --ink: #f4eee6;
-  --ink-soft: #e4d8ca;
-  --ink-faint: rgba(244, 238, 230, 0.62);
-  --ink-whisper: rgba(244, 238, 230, 0.14);
+  --ink: #F5EFE6;
+  --ink-soft: #D8CFBF;
+  --ink-faint: rgba(245, 239, 230, 0.55);
+  --ink-whisper: rgba(245, 239, 230, 0.10);
 
-  --paper: #191512;
-  --paper-warm: #241e19;
-  --paper-cool: #211b17;
-  --paper-edge: rgba(244, 238, 230, 0.1);
+  /* True near-black — not brown-dark. The signature upgrade. */
+  --paper: #0F0E0C;
+  --paper-warm: #181614;
+  --paper-cool: #131210;
+  --paper-edge: rgba(245, 239, 230, 0.08);
 
-  --terracotta: #d9896d;
-  --terracotta-deep: #f0a187;
-  --terracotta-soft: #9f5b48;
+  --terracotta: #E0896A;
+  --terracotta-deep: #F0A484;
+  --terracotta-soft: #8A4A38;
 
-  --gold: #d0ad6c;
-  --gold-soft: #8e7448;
+  --gold: #D4AE6A;
+  --gold-soft: #8A6E40;
 
-  --slate: #b7aca0;
-  --moss: #91aa8d;
-  --clay: #806957;
+  --slate: #B4A89C;
+  --moss: #8AAA84;
+  --clay: #6E5A48;
 
-  --signal: #86b99b;
+  --signal: #88B89C;
 
-  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.7);
-  --shadow-deep: 0 28px 56px -24px rgba(0, 0, 0, 0.8);
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 48px -16px rgba(0, 0, 0, 0.55);
+  --shadow-deep: 0 32px 64px -24px rgba(0, 0, 0, 0.80);
 }

@@ -24,6 +24,13 @@
   --radius-arch: 999px 999px 4px 4px;
 }
 
+/* smooth theme transitions on explicit toggle */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    transition: background-color 0.35s ease, color 0.25s ease;
+  }
+}
+
 html,
 body {
   background: var(--paper);
@@ -34,11 +41,20 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ambient gradient — adapts to each mode */
 body {
   background-image:
     radial-gradient(1200px 600px at 90% -10%, color-mix(in srgb, var(--terracotta) 9%, transparent), transparent 60%),
     radial-gradient(800px 400px at -10% 30%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 60%);
   background-attachment: fixed;
+}
+
+/* dark mode gets a richer, more dramatic gradient */
+:root[data-theme='dark'] body {
+  background-image:
+    radial-gradient(1400px 700px at 100% -8%, color-mix(in srgb, var(--terracotta) 7%, transparent), transparent 55%),
+    radial-gradient(700px 350px at -5% 20%, color-mix(in srgb, var(--gold) 5%, transparent), transparent 55%),
+    radial-gradient(600px 300px at 50% 100%, color-mix(in srgb, var(--terracotta) 4%, transparent), transparent 60%);
 }
 
 ::selection {
@@ -83,21 +99,19 @@ body {
   height: 1px;
 }
 
+/* ── Keyframes ──────────────────────────────────────────────────────── */
+
 @keyframes drift {
   0%, 100% { transform: translateY(0px) rotate(0deg); }
   50% { transform: translateY(-6px) rotate(0.5deg); }
 }
-.drift {
-  animation: drift 7s ease-in-out infinite;
-}
+.drift { animation: drift 7s ease-in-out infinite; }
 
 @keyframes pulse-portal {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.9; transform: scale(1.04); }
 }
-.pulse-portal {
-  animation: pulse-portal 2.4s ease-in-out infinite;
-}
+.pulse-portal { animation: pulse-portal 2.4s ease-in-out infinite; }
 
 @keyframes signal-wave {
   0% { transform: scale(0.6); opacity: 0; }
@@ -115,5 +129,79 @@ body {
 }
 .type-cursor { animation: type-cursor 1s step-end infinite; }
 
+/* ── Theme Toggle — animated sun ↔ moon ─────────────────────────────── */
+
+/* container that stacks sun and moon on top of each other */
+.theme-toggle-track {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.theme-toggle-sun,
+.theme-toggle-moon {
+  position: absolute;
+  inset: 0;
+  width: 18px;
+  height: 18px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .theme-toggle-sun,
+  .theme-toggle-moon {
+    transition:
+      opacity 0.3s ease,
+      transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+/* light mode: sun fully visible, moon hidden behind */
+.theme-toggle-sun {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+.theme-toggle-moon {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+/* dark mode: moon slides in, sun rotates away */
+:root[data-theme='dark'] .theme-toggle-sun {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+:root[data-theme='dark'] .theme-toggle-moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+/* base focus ring — accessible, branded */
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--terracotta);
+  outline-offset: 2px;
+}
+
+/* landing variant — warm aura glows on hover */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-toggle--landing {
+    transition: box-shadow 0.35s ease, background-color 0.2s ease, border-color 0.2s ease;
+  }
+}
+.theme-toggle--landing:hover {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--gold) 18%, transparent),
+    0 0 16px 2px color-mix(in srgb, var(--gold) 12%, transparent);
+}
+:root[data-theme='dark'] .theme-toggle--landing:hover {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--terracotta) 18%, transparent),
+    0 0 16px 2px color-mix(in srgb, var(--terracotta) 12%, transparent);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
 .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--ink-whisper); border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--ink-whisper);
+  border-radius: 999px;
+}

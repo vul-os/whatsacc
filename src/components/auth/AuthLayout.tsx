@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { AuthScene } from '@/components/illustrations/AuthScene';
+import { ThemeToggle } from '@/components/nav/ThemeToggle';
 
 // Shared two-column shell for /login, /signup, /forgot-password,
 // /reset-password and similar. Aside on the left (top on mobile).
@@ -78,7 +79,10 @@ export function AuthLayout({
         </div>
       </aside>
 
-      <main className="lg:col-span-7 lg:overflow-y-auto flex items-start lg:items-center justify-center">
+      <main className="lg:col-span-7 lg:overflow-y-auto flex items-start lg:items-center justify-center relative">
+        <div className="absolute top-4 right-4 sm:top-5 sm:right-6 z-10">
+          <ThemeToggle variant="auth" />
+        </div>
         <div className="w-full max-w-[460px] mx-auto px-5 sm:px-8 py-10 sm:py-14 lg:py-12">{children}</div>
       </main>
     </div>

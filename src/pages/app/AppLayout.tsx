@@ -1,16 +1,27 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { AppSidebar } from '@/components/nav/AppSidebar';
 import { AppTopBar } from '@/components/nav/AppTopBar';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
+import { CreateLocationModal } from '@/components/locations/CreateLocationModal';
 
 const DISMISSED_BANNERS_KEY = 'whatsacc.dismissedBanners';
 const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
 const PHONE_E164_RE = /^\+[1-9]\d{6,14}$/;
 
 export default function AppLayout() {
-  const { signedIn, loading, user } = useAuth();
+  const { signedIn, loading, user, currentAccount, setCurrentAccount, refreshMe } = useAuth();
+  // null = still checking, false = has locations, true = needs setup
+  const [needsLocationSetup, setNeedsLocationSetup] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!signedIn || !currentAccount) return;
+    setNeedsLocationSetup(null);
+    api.locationsList(currentAccount.id)
+      .then(({ locations }) => setNeedsLocationSetup(locations.length === 0))
+      .catch(() => setNeedsLocationSetup(false)); // fail open — don't block on network error
+  }, [signedIn, currentAccount?.id]);
   const [pendingWhatsAppPhone, setPendingWhatsAppPhone] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -37,7 +48,7 @@ export default function AppLayout() {
     });
   }
 
-  if (loading) {
+  if (loading || needsLocationSetup === null) {
     return (
       <div className="min-h-screen bg-paper grid place-items-center text-ink/50 text-sm">
         Loading…
@@ -45,6 +56,24 @@ export default function AppLayout() {
     );
   }
   if (!signedIn) return <Navigate to="/login" replace />;
+
+  if (needsLocationSetup && currentAccount) {
+    return (
+      <div className="min-h-screen bg-paper">
+        <CreateLocationModal
+          accountId={currentAccount.id}
+          mode="current-account"
+          forced
+          onClose={() => {}}
+          onCreated={async (accountId) => {
+            await refreshMe();
+            setCurrentAccount(accountId);
+            setNeedsLocationSetup(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-paper flex">

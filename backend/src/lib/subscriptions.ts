@@ -15,6 +15,7 @@
 import { withRLS } from './db.ts';
 import { chargeAuthorization, newReference } from './paystack.ts';
 import { regionForCountry, REGIONS } from './billing/tiers.ts';
+import { createInvoice } from './invoice.ts';
 
 export const RENEWAL_BATCH_SIZE = 100;
 export const GRACE_DAYS = 7;
@@ -202,6 +203,17 @@ async function processSubscription(
             updated_at = now()
         where id = ${sub.subscription_id}
       `;
+      // Issue an invoice for the renewal — wallet-paid path has no
+      // payment_intent so we anchor idempotency on the renewal id.
+      await createInvoice({
+        tx,
+        account_id: sub.account_id,
+        kind: 'subscription',
+        external_ref: `subscription_renewal:${renewal.id}`,
+        total_cents: sub.plan_price_cents,
+        currency: sub.plan_currency,
+        line_items: [subscriptionLine(sub, periodStart, periodEnd)],
+      });
     });
     return { kind: 'wallet_paid' };
   }
@@ -284,6 +296,15 @@ async function chargeViaPaystack(
             updated_at = now()
         where id = ${sub.subscription_id}
       `;
+      await createInvoice({
+        tx,
+        account_id: sub.account_id,
+        kind: 'subscription',
+        payment_intent_id: intentId,
+        total_cents: sub.plan_price_cents,
+        currency: sub.plan_currency,
+        line_items: [subscriptionLine(sub, periodStart, periodEnd)],
+      });
     });
     return { kind: 'charged' };
   } catch (err) {
@@ -344,6 +365,23 @@ function addDays(d: Date, days: number): Date {
   const out = new Date(d);
   out.setUTCDate(out.getUTCDate() + days);
   return out;
+}
+
+function subscriptionLine(
+  sub: DueSubscription,
+  periodStart: Date,
+  periodEnd: Date,
+): { description: string; quantity: number; unit_cents: number; line_cents: number } {
+  const start = (periodStart instanceof Date ? periodStart : new Date(periodStart))
+    .toISOString()
+    .slice(0, 10);
+  const end = periodEnd.toISOString().slice(0, 10);
+  return {
+    description: `${sub.plan_code} subscription — ${start} to ${end}`,
+    quantity: 1,
+    unit_cents: sub.plan_price_cents,
+    line_cents: sub.plan_price_cents,
+  };
 }
 
 // Re-export for index.ts use even though it's unused right now in this file.

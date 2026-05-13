@@ -104,7 +104,7 @@ function locationsRouter() {
             (account_id, parent_location_id, type, name, slug, address, lat, long, status)
           values
             (${accountId}, ${body.parent_location_id ?? null}, ${body.type},
-             ${body.name}, ${body.slug ?? null}, ${tx.json((body.address ?? {}) as JSONValue)},
+             ${body.name}, ${body.slug ?? makeLocationSlug(body.name)}, ${tx.json((body.address ?? {}) as JSONValue)},
              ${body.lat ?? null}, ${body.long ?? null}, 'active')
           returning id
         `;
