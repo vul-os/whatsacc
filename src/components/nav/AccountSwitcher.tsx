@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { CreateLocationModal } from '@/components/locations/CreateLocationModal';
+import { Avatar } from '@/components/ui/Avatar';
 
 // User-facing pill in the top bar. Drops down to a list of accounts the user
 // belongs to so they can switch tenants and a "+ New location" entry that
@@ -30,7 +31,6 @@ export function AccountSwitcher() {
   }, [open]);
 
   if (!user) return null;
-  const initials = user.name.split(' ').map((s) => s[0] ?? '').join('').slice(0, 2).toUpperCase();
 
   return (
     <div className="relative" ref={wrapRef}>
@@ -41,9 +41,7 @@ export function AccountSwitcher() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-paper text-[11px] font-medium">
-          {initials || '·'}
-        </span>
+        <Avatar source={user} name={user.name} size="sm" />
         <span className="flex flex-col items-start leading-tight">
           <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45">
             {currentAccount?.role ?? '—'}

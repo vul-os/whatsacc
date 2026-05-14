@@ -721,11 +721,14 @@ function authRouter() {
         id: string;
         display_name: string | null;
         avatar_url: string | null;
+        avatar_cdn_url: string | null;
+        avatar_source: 'google' | 'user' | null;
         locale: string | null;
         slack_user_id: string | null;
         slack_handle: string | null;
       }[]>`
-        select id, display_name, avatar_url, locale, slack_user_id, slack_handle
+        select id, display_name, avatar_url, avatar_cdn_url, avatar_source,
+               locale, slack_user_id, slack_handle
         from profiles where id = ${user.sub}
       `;
 
@@ -757,6 +760,85 @@ function authRouter() {
       return { user: u, profile: profileRows[0] ?? null, phones, accounts };
     });
     return c.json(data);
+  });
+
+  // Profile updates the user controls directly. Today: display_name + avatar.
+  // Avatar URL is accepted as any https:// URL — when phase-2 BunnyCDN lands,
+  // the cdn proxy will fetch from this origin and avatar_cdn_url will carry
+  // the cached version. Setting avatar_url to null clears the customisation
+  // and frees the next Google sign-in to repopulate from the `picture` claim.
+  const profileUpdateSchema = z
+    .object({
+      display_name: z.string().trim().min(1).max(80).optional(),
+      avatar_url: z
+        .union([
+          z.string().url().max(1024).refine((s) => s.startsWith('https://'), {
+            message: 'avatar_url must be an https URL',
+          }),
+          z.null(),
+        ])
+        .optional(),
+    })
+    .strict()
+    .refine((b) => b.display_name !== undefined || b.avatar_url !== undefined, {
+      message: 'at least one of display_name, avatar_url is required',
+    });
+
+  app.patch('/me/profile', requireAuth(), zValidator('json', profileUpdateSchema), async (c) => {
+    const user = getUser(c);
+    const body = c.req.valid('json');
+
+    const updated = await withUserDb(c, async (tx) => {
+      // display_name update (independent of avatar)
+      if (body.display_name !== undefined) {
+        await tx`
+          update profiles
+             set display_name = ${body.display_name},
+                 updated_at = now()
+           where id = ${user.sub}
+        `;
+      }
+
+      // Avatar update. Three cases:
+      //   - URL provided  → store, mark source='user', clear stale cdn url.
+      //   - null provided → wipe avatar + source so the next Google sign-in
+      //                     can restore the Google picture.
+      //   - undefined     → leave untouched.
+      if (body.avatar_url !== undefined) {
+        if (body.avatar_url === null) {
+          await tx`
+            update profiles
+               set avatar_url = null,
+                   avatar_source = null,
+                   avatar_cdn_url = null,
+                   updated_at = now()
+             where id = ${user.sub}
+          `;
+        } else {
+          await tx`
+            update profiles
+               set avatar_url = ${body.avatar_url},
+                   avatar_source = 'user',
+                   avatar_cdn_url = null,
+                   updated_at = now()
+             where id = ${user.sub}
+          `;
+        }
+      }
+
+      const rows = await tx<{
+        display_name: string | null;
+        avatar_url: string | null;
+        avatar_cdn_url: string | null;
+        avatar_source: 'google' | 'user' | null;
+      }[]>`
+        select display_name, avatar_url, avatar_cdn_url, avatar_source
+        from profiles where id = ${user.sub}
+      `;
+      return rows[0] ?? null;
+    });
+
+    return c.json({ profile: updated });
   });
 
   app.put('/me/slack', requireAuth(), zValidator('json', slackIdentitySchema), async (c) => {
@@ -849,14 +931,31 @@ function authRouter() {
           `;
           userId = u!.id;
           await tx`
-            insert into profiles (id, display_name, avatar_url)
-            values (${userId}, ${idClaims.name ?? idClaims.email}, ${idClaims.picture ?? null})
+            insert into profiles (id, display_name, avatar_url, avatar_source)
+            values (${userId}, ${idClaims.name ?? idClaims.email}, ${idClaims.picture ?? null},
+                    ${idClaims.picture ? 'google' : null})
           `;
           createdNewUser = true;
         }
         await tx`
           insert into oauth_identities (user_id, provider, provider_sub, email)
           values (${userId}, 'google', ${idClaims.sub}, ${idClaims.email})
+        `;
+      }
+
+      // Refresh the avatar from Google's current `picture` claim, UNLESS the
+      // user has customised their avatar via PATCH /auth/me/profile (which
+      // sets avatar_source = 'user'). avatar_cdn_url is also cleared so the
+      // phase-2 CDN re-fetches against the new origin URL. If Google supplies
+      // no picture this turn we don't touch the column.
+      if (!createdNewUser && idClaims.picture) {
+        await tx`
+          update profiles
+             set avatar_url = ${idClaims.picture},
+                 avatar_source = 'google',
+                 avatar_cdn_url = null
+           where id = ${userId}
+             and (avatar_source is distinct from 'user')
         `;
       }
 

@@ -4,6 +4,7 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { Avatar, resolveAvatarUrl } from '@/components/ui/Avatar';
 import { ApiError, api, type LocationRow } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -18,11 +19,158 @@ export default function Settings() {
         description="Rename or remove this location, and manage your account password."
       />
       <div className="grid grid-cols-1 gap-6 max-w-3xl">
+        <ProfileSection />
         <ContactSection />
         <LocationsSection />
         <PasswordSection />
       </div>
     </>
+  );
+}
+
+function ProfileSection() {
+  const { user, refreshMe } = useAuth();
+  const [displayName, setDisplayName] = useState(user?.name ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Keep local state in sync when the user record refreshes (e.g. after a
+  // Google sign-in refreshes the avatar from Google).
+  useEffect(() => { setDisplayName(user?.name ?? ''); }, [user?.name]);
+  useEffect(() => { setAvatarUrl(user?.avatar_url ?? ''); }, [user?.avatar_url]);
+
+  const sourceLabel =
+    user?.avatar_source === 'user'
+      ? 'Set by you'
+      : user?.avatar_source === 'google'
+        ? 'From your Google account · refreshed on each sign-in'
+        : 'No avatar set';
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    setErrorMsg(null);
+    const trimmedName = displayName.trim();
+    const trimmedUrl = avatarUrl.trim();
+
+    if (trimmedName.length === 0) {
+      setErrorMsg('Display name cannot be empty.');
+      return;
+    }
+    if (trimmedUrl.length > 0 && !/^https:\/\//i.test(trimmedUrl)) {
+      setErrorMsg('Avatar URL must start with https://');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const body: { display_name?: string; avatar_url?: string | null } = {};
+      if (trimmedName !== (user?.name ?? '')) body.display_name = trimmedName;
+      if (trimmedUrl !== (user?.avatar_url ?? '')) {
+        body.avatar_url = trimmedUrl.length === 0 ? null : trimmedUrl;
+      }
+      if (Object.keys(body).length === 0) {
+        setMessage('Nothing to save.');
+      } else {
+        await api.profileUpdate(body);
+        await refreshMe();
+        setMessage('Profile saved.');
+      }
+    } catch (err) {
+      setErrorMsg(toApiMessage(err, 'Could not save profile.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetToGoogle() {
+    setMessage(null);
+    setErrorMsg(null);
+    setSaving(true);
+    try {
+      await api.profileUpdate({ avatar_url: null });
+      await refreshMe();
+      setMessage('Avatar cleared — sign out and back in with Google to refresh.');
+    } catch (err) {
+      setErrorMsg(toApiMessage(err, 'Could not reset avatar.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="font-display text-xl mb-1">Your profile</h2>
+      <p className="text-sm text-ink/55 mb-5">
+        How you appear inside whatsacc. Avatar can be any https URL — Google picture, Gravatar,
+        a hosted image, anywhere.
+      </p>
+
+      <form onSubmit={save} className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-6 gap-y-5 items-start">
+        <div className="flex flex-col items-center gap-2 sm:items-start">
+          <Avatar
+            url={avatarUrl.trim() || resolveAvatarUrl(user) || null}
+            name={displayName || user?.email || null}
+            size="xl"
+            toneClass="bg-ink text-paper"
+          />
+          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 max-w-[160px] text-center sm:text-left leading-snug">
+            {sourceLabel}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-sm font-medium text-ink/85 block mb-1.5">Display name</span>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+              maxLength={80}
+              className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] text-ink focus:outline-none focus:ring-2 focus:ring-ink/20 focus:border-ink/40"
+            />
+          </label>
+
+          <label className="block">
+            <span className="flex items-baseline justify-between mb-1.5">
+              <span className="text-sm font-medium text-ink/85">Avatar URL</span>
+              <span className="text-xs text-ink/45">https only · leave empty to use Google</span>
+            </span>
+            <input
+              type="url"
+              inputMode="url"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://example.com/me.png"
+              maxLength={1024}
+              className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] text-ink placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-ink/20 focus:border-ink/40"
+            />
+          </label>
+
+          {message && <p className="text-sm text-moss" role="status">{message}</p>}
+          {errorMsg && <p className="text-sm text-terracotta-deep" role="alert">{errorMsg}</p>}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button type="submit" variant="ink" disabled={saving}>
+              {saving ? 'Saving…' : 'Save profile'}
+            </Button>
+            {user?.avatar_source === 'user' && (
+              <button
+                type="button"
+                onClick={resetToGoogle}
+                disabled={saving}
+                className="h-10 px-4 rounded-full text-sm text-ink/65 hover:text-ink"
+              >
+                Reset to Google picture
+              </button>
+            )}
+          </div>
+        </div>
+      </form>
+    </Card>
   );
 }
 

@@ -170,6 +170,8 @@ export type MeResponse = {
     id: string;
     display_name: string | null;
     avatar_url: string | null;
+    avatar_cdn_url: string | null;
+    avatar_source: 'google' | 'user' | null;
     locale: string | null;
     slack_user_id: string | null;
     slack_handle: string | null;
@@ -228,6 +230,12 @@ export const api = {
 
   slackUpdate: (body: { slack_user_id?: string; slack_handle?: string }) =>
     apiFetch<void>('/auth/me/slack', { method: 'PUT', body }),
+
+  profileUpdate: (body: { display_name?: string; avatar_url?: string | null }) =>
+    apiFetch<{ profile: NonNullable<MeResponse['profile']> }>('/auth/me/profile', {
+      method: 'PATCH',
+      body,
+    }),
 
   forgotPassword: (email: string) =>
     apiFetch<void>('/auth/forgot-password', { method: 'POST', body: { email } }),
