@@ -360,6 +360,31 @@ export default function Billing() {
 
 }
 
+function humanizePlanError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case 'already_on_plan': return "You're already on this plan.";
+      case 'card_required':   return 'No card on file — choose "Pay & activate" to add one first.';
+      case 'card_declined':   return 'Card was declined. Try a different card from Top up wallet.';
+      case 'card_charge_failed':
+        return err.detail
+          ? `Card couldn't be charged: ${err.detail}`
+          : "Card couldn't be charged. Try again or use a different card.";
+      case 'payment_init_failed':
+        return err.detail
+          ? `Payment provider rejected the request: ${err.detail}`
+          : 'Payment provider rejected the request. Check your email address and try again.';
+      case 'plan_not_found':       return 'That plan is not available in your region.';
+      case 'subscription_not_found': return 'No active subscription on this account. Contact support.';
+      case 'not_account_admin':    return 'You need to be an account owner or admin to change the plan.';
+      case 'internal_error':       return 'Server hiccup. Please try again — if it keeps failing, contact support.';
+      default:                     return err.detail ?? err.code ?? fallback;
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 // ── Plan card ──────────────────────────────────────────────────────────────
 
 function PlanCard({
@@ -440,15 +465,7 @@ function PlanSelectModal({
       await api.changePlan(accountId, tier.code);
       onSwitched();
     } catch (err) {
-      setErrorMsg(
-        err instanceof ApiError
-          ? err.code === 'already_on_plan'
-            ? "You're already on this plan."
-            : err.code === 'card_declined'
-              ? 'Card was declined. Please add a different card via Top up wallet.'
-              : err.detail ?? err.code
-          : err instanceof Error ? err.message : 'Could not switch plan.',
-      );
+      setErrorMsg(humanizePlanError(err, 'Could not switch plan.'));
       setSubmitting(false);
     }
   }
@@ -461,7 +478,7 @@ function PlanSelectModal({
       sessionStorage.setItem('pending_plan_code', tier.code);
       window.location.href = res.authorization_url;
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Could not start payment.');
+      setErrorMsg(humanizePlanError(err, 'Could not start payment.'));
       setSubmitting(false);
     }
   }

@@ -257,6 +257,7 @@ function billingRouter() {
 
       let intentId: string | null = null;
       let authCode: string | null = null;
+      let reference: string | null = null;
 
       if (plan.price_cents > 0) {
         const cardRows = await tx<{ paystack_authorization_code: string | null }[]>`
@@ -265,7 +266,7 @@ function billingRouter() {
         authCode = cardRows[0]?.paystack_authorization_code ?? null;
         if (!authCode) throw BadRequest('card_required', 'No saved card. Use subscription-checkout to add one.');
 
-        const reference = newReference('sp');
+        reference = newReference('sp');
         const [intentRow] = await tx<{ id: string }[]>`
           insert into payment_intents
             (account_id, initiated_by, provider, provider_reference, purpose, amount_cents, currency, status)
@@ -277,24 +278,22 @@ function billingRouter() {
         intentId = intentRow!.id;
       }
 
-      return { plan, sub: subRows[0], intentId };
+      return { plan, sub: subRows[0], intentId, authCode, reference };
     });
 
-    // ── Step 2: charge card (outside transaction) ────────────────────────
+    // ── Step 2: charge the saved card. Reuse the intent's reference +
+    //          authorization_code captured in step 1 so the intent row and
+    //          the Paystack record share an identifier — the webhook then
+    //          reconciles by reference. Previously this minted a *new*
+    //          reference here and Paystack/webhook drifted out of sync. ────
     if (ctx.intentId && ctx.plan.price_cents > 0) {
-      const reference = newReference('sp');
       let charge: PaystackVerifyData;
       try {
         charge = await chargeAuthorization({
           email: user.email,
           amountCents: ctx.plan.price_cents,
-          authorizationCode: (await withUserDb(c, async (tx) => {
-            const rows = await tx<{ paystack_authorization_code: string }[]>`
-              select paystack_authorization_code from accounts where id = ${id}
-            `;
-            return rows[0].paystack_authorization_code;
-          })),
-          reference,
+          authorizationCode: ctx.authCode!,
+          reference: ctx.reference!,
           currency: ctx.plan.currency,
           metadata: { purpose: 'subscription', plan_code, account_id: id },
         });
@@ -403,20 +402,34 @@ function billingRouter() {
     });
 
     const callbackUrl = env.PAYSTACK_CALLBACK_URL ?? `${env.APP_PUBLIC_URL}/app/billing`;
-    const init = await initializeTransaction({
-      email: user.email,
-      amountCents: plan.price_cents,
-      reference,
-      currency: plan.currency,
-      callbackUrl,
-      metadata: {
-        account_id: id,
-        intent_id: intentId,
-        purpose: 'subscription',
-        plan_code,
-        initiated_by: user.sub,
-      },
-    });
+    let init;
+    try {
+      init = await initializeTransaction({
+        email: user.email,
+        amountCents: plan.price_cents,
+        reference,
+        currency: plan.currency,
+        callbackUrl,
+        metadata: {
+          account_id: id,
+          intent_id: intentId,
+          purpose: 'subscription',
+          plan_code,
+          initiated_by: user.sub,
+        },
+      });
+    } catch (err) {
+      // Paystack rejected the request (bad email, rate limited, dead key, etc).
+      // Mark the intent failed so it doesn't dangle, and surface a clean 400
+      // to the UI instead of a generic 500.
+      await withAnonDb(async (tx) => {
+        await tx`update payment_intents set status='failed', updated_at=now() where id=${intentId}`;
+      });
+      throw BadRequest(
+        'payment_init_failed',
+        (err as Error).message || 'Payment provider rejected the request.',
+      );
+    }
 
     await withAnonDb(async (tx) => {
       await tx`
@@ -526,20 +539,33 @@ function billingRouter() {
     });
 
     // 2. Init the transaction with Paystack (network call after DB row exists,
-    //    so reconciliation can fix orphaned intents later).
-    const init = await initializeTransaction({
-      email: intent.email,
-      amountCents: amount_cents,
-      reference,
-      currency: intent.currency,
-      callbackUrl,
-      metadata: {
-        account_id,
-        intent_id: intent.id,
-        purpose: 'wallet_topup',
-        initiated_by: user.sub,
-      },
-    });
+    //    so reconciliation can fix orphaned intents later). Wrap so a
+    //    provider rejection (bad email, dead key, rate-limit) surfaces as a
+    //    400 with detail rather than a generic 500.
+    let init;
+    try {
+      init = await initializeTransaction({
+        email: intent.email,
+        amountCents: amount_cents,
+        reference,
+        currency: intent.currency,
+        callbackUrl,
+        metadata: {
+          account_id,
+          intent_id: intent.id,
+          purpose: 'wallet_topup',
+          initiated_by: user.sub,
+        },
+      });
+    } catch (err) {
+      await withAnonDb(async (tx) => {
+        await tx`update payment_intents set status='failed', updated_at=now() where id=${intent.id}`;
+      });
+      throw BadRequest(
+        'payment_init_failed',
+        (err as Error).message || 'Payment provider rejected the request.',
+      );
+    }
 
     await withAnonDb(async (tx) => {
       await tx`
@@ -567,7 +593,18 @@ function billingRouter() {
   // webhook and short-circuits if already credited.
   app.get('/wallet/verify', zValidator('query', verifyQuerySchema), async (c) => {
     const { reference } = c.req.valid('query');
-    const verifyData = await verifyTransaction(reference);
+    let verifyData: PaystackVerifyData;
+    try {
+      verifyData = await verifyTransaction(reference);
+    } catch (err) {
+      // Paystack rejected the verify call (unknown reference, network blip,
+      // dead key). Surface a 400 with the underlying message so the UI can
+      // tell the user "payment not confirmed" instead of a blank 500.
+      throw BadRequest(
+        'verify_failed',
+        (err as Error).message || 'Could not verify the payment.',
+      );
+    }
 
     const result = await withUserDb(c, async (tx) => {
       const rows = await tx<IntentRow[]>`
@@ -757,14 +794,31 @@ function webhookRouter() {
           const verifyData = await verifyTransaction(data.reference);
           if (verifyData.status === 'success') {
             const intentRows = await tx<IntentRow[]>`
-              select id, account_id, status, amount_cents, currency, credited_tx_id
+              select id, account_id, purpose, status, amount_cents, currency, credited_tx_id
               from payment_intents
               where provider = 'paystack' and provider_reference = ${data.reference}
               for update
             `;
             const intent = intentRows[0];
             if (intent) {
-              await creditWalletForIntent(tx, intent, verifyData);
+              // Wallet credit applies only to wallet_topup intents. Subscription
+              // intents are activated by the synchronous handler or the redirect
+              // verify endpoint — crediting the wallet for those would be a
+              // duplicate credit on top of the already-charged subscription.
+              if (intent.purpose === 'wallet_topup') {
+                await creditWalletForIntent(tx, intent, verifyData);
+              } else if (intent.purpose === 'subscription') {
+                // Just mark the intent succeeded for audit; the
+                // verify-on-redirect path already activated the plan.
+                await tx`
+                  update payment_intents
+                  set status = 'succeeded',
+                      completed_at = coalesce(completed_at, now()),
+                      raw_verify = ${tx.json(verifyData as unknown as JSONValue)},
+                      updated_at = now()
+                  where id = ${intent.id} and status = 'pending'
+                `;
+              }
             }
           }
         } else if (
