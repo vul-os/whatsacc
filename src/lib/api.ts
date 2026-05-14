@@ -165,6 +165,8 @@ export type MeResponse = {
     status: string;
     email_verified_at: string | null;
     is_platform_admin: boolean;
+    /** false when the user has only ever signed in via OAuth (no password set). */
+    has_password: boolean;
   };
   profile: {
     id: string;

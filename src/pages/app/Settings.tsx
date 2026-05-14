@@ -9,22 +9,54 @@ import { ApiError, api, type LocationRow } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 export default function Settings() {
-  const { currentAccount } = useAuth();
+  const { currentAccount, user } = useAuth();
+  // OAuth-only accounts (Google sign-in) have no password to change. Show a
+  // small explainer instead of an empty/broken password form.
+  const hasPassword = user?.has_password ?? false;
 
   return (
     <>
       <PageHeader
         kicker="Settings"
         title={currentAccount?.name ?? 'Settings'}
-        description="Rename or remove this location, and manage your account password."
+        description={
+          hasPassword
+            ? 'Rename or remove this location, and manage your account password.'
+            : 'Rename or remove this location, and manage your sign-in identity.'
+        }
       />
       <div className="grid grid-cols-1 gap-6 max-w-3xl">
         <ProfileSection />
         <ContactSection />
         <LocationsSection />
-        <PasswordSection />
+        {hasPassword ? <PasswordSection /> : <SignInIdentitySection />}
       </div>
     </>
+  );
+}
+
+// Calm explainer for users who signed in with Google and have no password
+// set. Tells them how to add one if they want a fallback.
+function SignInIdentitySection() {
+  return (
+    <Card>
+      <h2 className="font-display text-xl mb-1">Sign-in</h2>
+      <p className="text-sm text-ink/55 mb-4">
+        You signed in with Google. There is no password on this account, so there is nothing to
+        change here.
+      </p>
+      <div className="rounded-xl bg-paper-cool border border-ink/10 px-4 py-3 text-[13.5px] text-ink/75 leading-relaxed">
+        Want a password as a backup sign-in method? Use the{' '}
+        <a
+          href="/forgot-password"
+          className="underline underline-offset-4 decoration-terracotta text-ink hover:text-terracotta-deep"
+        >
+          forgot-password
+        </a>{' '}
+        flow with this email — you&rsquo;ll set a password without unlinking Google. Both
+        methods will then work.
+      </div>
+    </Card>
   );
 }
 

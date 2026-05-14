@@ -18,6 +18,7 @@ export type SessionUser = {
   avatar_source: 'google' | 'user' | null;
   has_verified_phone: boolean;
   has_slack_identity: boolean;
+  has_password: boolean;
   slack_user_id: string | null;
   slack_handle: string | null;
 };
@@ -69,6 +70,7 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
       avatar_cdn_url: me.profile?.avatar_cdn_url ?? null,
       avatar_source: me.profile?.avatar_source ?? null,
       has_verified_phone: me.phones.some((p) => p.verified_at !== null),
+      has_password: me.user.has_password,
       has_slack_identity: Boolean(me.profile?.slack_user_id || me.profile?.slack_handle),
       slack_user_id: me.profile?.slack_user_id ?? null,
       slack_handle: me.profile?.slack_handle ?? null,

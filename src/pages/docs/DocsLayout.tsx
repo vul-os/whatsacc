@@ -152,10 +152,4 @@ export function DocSection({
   );
 }
 
-export function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre className="rounded-2xl bg-ink text-paper p-5 sm:p-6 overflow-x-auto text-[12.5px] font-mono leading-relaxed border border-ink/0">
-      <code>{children}</code>
-    </pre>
-  );
-}
+export { CodeBlock } from './CodeBlock';

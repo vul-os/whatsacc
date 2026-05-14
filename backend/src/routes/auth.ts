@@ -710,8 +710,10 @@ function authRouter() {
         email_verified_at: Date | null;
         is_platform_admin: boolean;
         referral_slug: string | null;
+        has_password: boolean;
       }[]>`
-        select id, email, status, email_verified_at, is_platform_admin, referral_slug
+        select id, email, status, email_verified_at, is_platform_admin, referral_slug,
+               (password_hash is not null) as has_password
         from users where id = ${user.sub}
       `;
       const u = userRows[0];

@@ -319,6 +319,123 @@ body {
   .starfield .sf-twinkle-12 { animation-delay: 0.8s; animation-duration: 4.3s; }
 }
 
+/* ── Docs syntax highlighting (Prism) ─────────────────────────────────
+   Token colours are warm/editorial so code reads like part of the page,
+   not a Discord screenshot. Both modes: deep ink surface, paper text,
+   terracotta + gold + moss for tokens. */
+
+.hl-figure {
+  border-radius: 18px;
+  background-color: #14110E;
+  color: #F4EDE2;
+  border: 1px solid color-mix(in srgb, #F4EDE2 8%, transparent);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(14, 12, 10, 0.06), 0 12px 32px -16px rgba(14, 12, 10, 0.30);
+}
+:root[data-theme='dark'] .hl-figure {
+  background-color: #0B0A09;
+  border-color: rgba(245, 239, 230, 0.10);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 40px -16px rgba(0, 0, 0, 0.55);
+}
+
+.hl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px 8px 18px;
+  border-bottom: 1px solid rgba(244, 237, 226, 0.08);
+  background: linear-gradient(180deg, rgba(244, 237, 226, 0.04), rgba(244, 237, 226, 0));
+}
+.hl-lang {
+  font: 500 10.5px/1 var(--font-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 237, 226, 0.55);
+}
+.hl-copy {
+  font: 500 11px/1 var(--font-sans);
+  color: rgba(244, 237, 226, 0.65);
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 237, 226, 0.12);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.hl-copy:hover {
+  color: #F4EDE2;
+  border-color: rgba(244, 237, 226, 0.35);
+  background: rgba(244, 237, 226, 0.05);
+}
+.hl-copy:focus-visible {
+  outline: 2px solid var(--terracotta);
+  outline-offset: 2px;
+}
+
+.hl-pre {
+  margin: 0;
+  padding: 18px 20px;
+  overflow-x: auto;
+  font: 500 12.5px/1.65 var(--font-mono);
+  color: #F4EDE2;
+  background: transparent;
+  -moz-tab-size: 2;
+  tab-size: 2;
+}
+.hl-pre code {
+  display: block;
+  white-space: pre;
+  font-feature-settings: 'liga' 0, 'calt' 0;
+}
+
+/* ── Prism token palette ─────────────────────────────────────────────── */
+.hl-pre .token.comment,
+.hl-pre .token.prolog,
+.hl-pre .token.doctype,
+.hl-pre .token.cdata { color: rgba(244, 237, 226, 0.40); font-style: italic; }
+
+.hl-pre .token.punctuation { color: rgba(244, 237, 226, 0.55); }
+
+.hl-pre .token.property,
+.hl-pre .token.tag,
+.hl-pre .token.constant,
+.hl-pre .token.symbol,
+.hl-pre .token.deleted { color: #E0896A; }
+
+.hl-pre .token.boolean,
+.hl-pre .token.number { color: #DEC07A; }
+
+.hl-pre .token.selector,
+.hl-pre .token.attr-name,
+.hl-pre .token.string,
+.hl-pre .token.char,
+.hl-pre .token.builtin,
+.hl-pre .token.url,
+.hl-pre .token.inserted { color: #B8C7A8; }
+
+.hl-pre .token.atrule,
+.hl-pre .token.attr-value,
+.hl-pre .token.keyword { color: #D4AE6A; font-weight: 500; }
+
+.hl-pre .token.function,
+.hl-pre .token.class-name { color: #F0DCA0; }
+
+.hl-pre .token.operator,
+.hl-pre .token.entity,
+.hl-pre .token.variable { color: #E8A48A; }
+
+.hl-pre .token.regex,
+.hl-pre .token.important { color: #C86848; }
+
+.hl-pre .token.bold { font-weight: 700; }
+.hl-pre .token.italic { font-style: italic; }
+.hl-pre .token.namespace { opacity: 0.7; }
+
+/* http verb / status colours */
+.hl-pre .token.request-line .token.method { color: #DEC07A; font-weight: 600; }
+.hl-pre .token.response-status .token.status { color: #B8C7A8; font-weight: 600; }
+
 /* ── Scrollbar ───────────────────────────────────────────────────────── */
 .scrollbar-thin::-webkit-scrollbar { width: 6px; }
 .scrollbar-thin::-webkit-scrollbar-thumb {
