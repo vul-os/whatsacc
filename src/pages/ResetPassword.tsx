@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { ApiError, api } from '@/lib/api';
 
@@ -63,7 +64,7 @@ export default function ResetPassword() {
         </p>
       }
     >
-      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em] text-ink">
         Set a new password
       </h1>
 
@@ -95,37 +96,27 @@ export default function ResetPassword() {
           <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
             Choose something at least 8 characters long.
           </p>
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <label className="block">
-              <span className="text-sm font-medium text-ink/85 block mb-1.5">New password</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                autoFocus
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-ink/85 block mb-1.5">Confirm</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                placeholder="••••••••"
-                className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
-              />
-            </label>
-            {errorMsg && (
-              <p className="text-sm text-terracotta-deep" role="alert">
-                {errorMsg}
-              </p>
-            )}
+          <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+            <Field
+              label="New password"
+              type="password"
+              autoComplete="new-password"
+              required
+              autoFocus
+              value={password}
+              onChange={setPassword}
+              placeholder="••••••••"
+            />
+            <Field
+              label="Confirm"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={setConfirm}
+              placeholder="••••••••"
+              error={errorMsg}
+            />
             <Button type="submit" variant="ink" size="lg" className="w-full" disabled={submitting}>
               {submitting ? 'Updating…' : 'Save new password'}
             </Button>
@@ -135,7 +126,7 @@ export default function ResetPassword() {
 
       <p className="mt-6 text-sm text-ink/60">
         Need a fresh link?{' '}
-        <Link to="/forgot-password" className="underline underline-offset-4 decoration-terracotta">
+        <Link to="/forgot-password" className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink">
           Request a new one
         </Link>
         .

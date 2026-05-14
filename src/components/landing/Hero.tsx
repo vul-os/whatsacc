@@ -1,5 +1,5 @@
 import { LinkButton } from '@/components/ui/Button';
-import { HeroPortal } from '@/components/illustrations/HeroPortal';
+import { HeroCelestial } from '@/components/illustrations/HeroCelestial';
 
 // Hardware brands that the controllers integrate with — used as a quiet
 // trust band below the fold. Stays restrained: small caps, ink/45 colour,
@@ -20,7 +20,7 @@ export function Hero() {
     // hero + trust band are visible without scrolling on a typical laptop.
     // Uses 100svh on mobile to avoid the address-bar resize jank.
     <section className="relative overflow-hidden flex flex-col min-h-[calc(100svh-64px)]">
-      <div className="flex-1 mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-4 pb-6 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-6 lg:gap-y-0 lg:items-center">
+      <div className="flex-1 relative mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-4 pb-6 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-6 lg:gap-y-0 lg:items-center">
         {/* ── left: copy + ctas + capabilities ───────────────────────── */}
         <div className="col-span-12 lg:col-span-7 relative z-10 order-1 lg:order-1">
           {/* eyebrow — small, calm, capability-first */}
@@ -110,14 +110,10 @@ export function Hero() {
           </p>
         </div>
 
-        {/* ── right: portal illustration ─────────────────────────── */}
+        {/* ── right: celestial body ───────────────────────────────── */}
         <div className="col-span-12 lg:col-span-5 order-2 lg:order-2 relative">
           <div className="relative mx-auto max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[440px]">
-            <span className="hidden lg:block absolute -left-4 -top-4 h-5 w-5 border-l border-t border-ink/30" aria-hidden />
-            <span className="hidden lg:block absolute -right-4 -top-4 h-5 w-5 border-r border-t border-ink/30" aria-hidden />
-            <span className="hidden lg:block absolute -left-4 -bottom-4 h-5 w-5 border-l border-b border-ink/30" aria-hidden />
-            <span className="hidden lg:block absolute -right-4 -bottom-4 h-5 w-5 border-r border-b border-ink/30" aria-hidden />
-            <HeroPortal className="block w-full h-auto" />
+            <HeroCelestial className="block w-full h-auto" />
           </div>
         </div>
       </div>

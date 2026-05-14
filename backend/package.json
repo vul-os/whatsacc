@@ -9,6 +9,8 @@
     "deploy": "wrangler deploy",
     "deploy:dev": "wrangler deploy --env=dev",
     "deploy:main": "wrangler deploy --env=main",
+    "secrets:dev": "node scripts/push-secrets.mjs dev",
+    "secrets:main": "node scripts/push-secrets.mjs main",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/lib",

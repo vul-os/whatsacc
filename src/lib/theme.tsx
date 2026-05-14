@@ -41,7 +41,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [setTheme, theme]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    const root = document.documentElement;
+    const isInitial = root.dataset.theme === undefined || root.dataset.theme === theme;
+    root.dataset.theme = theme;
+    // tag the root only during an explicit swap so the heavy cross-fade
+    // runs once and doesn't piggy-back on hover/focus transitions
+    if (!isInitial) {
+      root.dataset.theming = '';
+      const t = window.setTimeout(() => {
+        delete root.dataset.theming;
+      }, 700);
+      return () => window.clearTimeout(t);
+    }
   }, [theme]);
 
   const value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme]);

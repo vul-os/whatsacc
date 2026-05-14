@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api, type CountryRef } from '@/lib/api';
@@ -219,7 +220,7 @@ export default function Signup() {
           {/* ── Step 1: auth ───────────────────────────────────────────── */}
           {step === 'auth' && (
             <>
-              <h1 className="font-display-tight text-3xl sm:text-4xl">Create your account</h1>
+              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">Create your account</h1>
               <p className="mt-2 text-sm text-ink/60">
                 {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. No credit card.'}
               </p>
@@ -229,7 +230,7 @@ export default function Signup() {
                   <a
                     href={googleStartUrl}
                     onClick={rememberPendingWhatsAppPhone}
-                    className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+                    className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
                   >
                     <GoogleMark />
                     <span className="text-sm font-medium">Continue with Google</span>
@@ -326,7 +327,7 @@ export default function Signup() {
           {/* ── Step 2: account kind ───────────────────────────────────── */}
           {step === 'kind' && (
             <>
-              <h1 className="font-display-tight text-3xl sm:text-4xl">What is this for?</h1>
+              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">What is this for?</h1>
               <p className="mt-2 text-sm text-ink/60">
                 We tailor the dashboard a little. You can switch later.
               </p>
@@ -387,7 +388,7 @@ export default function Signup() {
           {/* ── Step 3: first location ─────────────────────────────────── */}
           {step === 'location' && (
             <form onSubmit={onFinalSubmit}>
-              <h1 className="font-display-tight text-3xl sm:text-4xl">Your first location</h1>
+              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">Your first location</h1>
               <p className="mt-2 text-sm text-ink/60">
                 Each location has its own gates, members and billing. You can add more after.
               </p>
@@ -425,17 +426,26 @@ export default function Signup() {
 
                 <label className="block">
                   <span className="text-sm font-medium text-ink/85 block mb-1.5">Country</span>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
-                  >
-                    {countries.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="relative block">
+                    <select
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="appearance-none w-full h-11 rounded-xl bg-paper-cool border border-ink/15 pl-3 pr-10 text-[15px] text-ink hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-ink/20 focus:border-ink/40 transition-colors"
+                    >
+                      {countries.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      viewBox="0 0 12 12"
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-ink/45"
+                      aria-hidden
+                    >
+                      <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
                 </label>
               </div>
 
@@ -590,7 +600,7 @@ function SuccessPanel({
 }) {
   return (
     <>
-      <h1 className="font-display-tight text-3xl sm:text-4xl">You're in.</h1>
+      <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">You're in.</h1>
       <p className="mt-3 text-sm text-ink/70">
         Signed up as <span className="font-medium text-ink">{email}</span>. Continue to your
         dashboard to add access points and invite members.
@@ -663,44 +673,6 @@ function toMessage(err: unknown): string {
   }
   if (err instanceof Error) return err.message;
   return 'Something went wrong.';
-}
-
-function Field({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  autoComplete,
-  required,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  autoComplete?: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="flex items-baseline justify-between mb-1.5">
-        <span className="text-sm font-medium text-ink/85">{label}</span>
-        {hint && <span className="text-xs text-ink/50">{hint}</span>}
-      </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        required={required}
-        className="w-full h-11 rounded-xl bg-paper-cool border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
-      />
-    </label>
-  );
 }
 
 function GoogleMark() {
