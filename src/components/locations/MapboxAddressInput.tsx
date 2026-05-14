@@ -1,6 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const TOKEN = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_MAPBOX_TOKEN ?? '';
+
+// SA-targeted geocoding: country filter narrows the corpus server-side and
+// proximity=ip biases ranking toward the requester. en-ZA uses local place
+// names (e.g. "Newlands" without USA disambiguation suffixes).
+const GEOCODE_COUNTRY = 'za';
+const GEOCODE_LANG = 'en-ZA';
 
 type GeoFeature = {
   id: string;
@@ -32,31 +38,53 @@ export function MapboxAddressInput({
   const [fetching, setFetching] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Cancel any in-flight geocode when the user keeps typing — without this
+  // a slow request can overwrite the response from a newer keystroke.
+  const inflight = useRef<AbortController | null>(null);
 
   const search = useCallback(async (q: string) => {
     if (!TOKEN || q.length < 3) { setSuggestions([]); setOpen(false); return; }
+    inflight.current?.abort();
+    const ctl = new AbortController();
+    inflight.current = ctl;
     setFetching(true);
     try {
+      const params = new URLSearchParams({
+        access_token: TOKEN,
+        types: 'address',
+        limit: '5',
+        language: GEOCODE_LANG,
+        country: GEOCODE_COUNTRY,
+        proximity: 'ip',
+        autocomplete: 'true',
+      });
       const url =
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json` +
-        `?access_token=${TOKEN}&types=address,place&limit=5&language=en`;
-      const res = await fetch(url);
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?${params.toString()}`;
+      const res = await fetch(url, { signal: ctl.signal });
       const data = (await res.json()) as { features: GeoFeature[] };
-      setSuggestions(data.features ?? []);
-      setOpen((data.features ?? []).length > 0);
-    } catch {
+      // Only commit results if this is still the latest request.
+      if (inflight.current === ctl) {
+        setSuggestions(data.features ?? []);
+        setOpen((data.features ?? []).length > 0);
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
       setSuggestions([]);
     } finally {
-      setFetching(false);
+      if (inflight.current === ctl) setFetching(false);
     }
   }, []);
+
+  // Drop any pending request when the component unmounts so we don't update
+  // state on an unmounted node.
+  useEffect(() => () => inflight.current?.abort(), []);
 
   function onInput(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     setQuery(q);
     if (value) onChange(null);
     if (debounce.current) clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => search(q), 300);
+    debounce.current = setTimeout(() => search(q), 220);
   }
 
   function select(f: GeoFeature) {
