@@ -6,6 +6,7 @@ import { withUserDb, withAnonDb } from '../middleware/rls.ts';
 import { BadRequest, Forbidden, NotFound } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
 import {
+  chargeAuthorization,
   initializeTransaction,
   newReference,
   verifyTransaction,
@@ -25,7 +26,7 @@ const topupSchema = z
   .object({
     account_id: z.string().uuid(),
     amount_cents: z.number().int().positive().max(10_000_000), // ZAR 100k cap
-    callback_path: z.string().regex(/^\/[\w\-/]*$/).optional(),
+    callback_path: z.string().regex(/^\/[\w\-/?=&%]*$/).optional(),
   })
   .strict();
 
@@ -34,6 +35,7 @@ const verifyQuerySchema = z.object({ reference: z.string().min(8).max(120) });
 type IntentRow = {
   id: string;
   account_id: string;
+  purpose: string;
   status: 'pending' | 'succeeded' | 'failed' | 'abandoned';
   amount_cents: string | number;
   currency: string;
@@ -91,13 +93,19 @@ async function creditWalletForIntent(
         updated_at = now()
     where id = ${intent.id}
   `;
-  if (verifyData.customer?.customer_code) {
-    await tx`
-      update accounts
-      set paystack_customer_code = coalesce(paystack_customer_code, ${verifyData.customer.customer_code})
-      where id = ${intent.account_id}
-    `;
-  }
+  const auth = verifyData.authorization;
+  await tx`
+    update accounts
+    set
+      paystack_customer_code = coalesce(paystack_customer_code, ${verifyData.customer?.customer_code ?? null}),
+      paystack_authorization_code = coalesce(
+        paystack_authorization_code,
+        ${auth?.reusable ? (auth.authorization_code ?? null) : null}
+      ),
+      card_last4 = coalesce(card_last4, ${auth?.last4 ?? null}),
+      card_brand = coalesce(card_brand, ${auth?.brand ?? auth?.card_type ?? null})
+    where id = ${intent.account_id}
+  `;
   await createWalletTopupInvoice(tx, intent);
   return { wallet_tx_id: walletTxId, already_credited: false };
 }
@@ -157,6 +165,15 @@ function billingRouter() {
       const walletRows = await tx<{ balance_cents: string; currency: string }[]>`
         select balance_cents::text as balance_cents, currency from wallets where account_id = ${id}
       `;
+      const cardRows = await tx<{
+        card_last4: string | null;
+        card_brand: string | null;
+        has_authorization: boolean;
+      }[]>`
+        select card_last4, card_brand,
+               (paystack_authorization_code is not null) as has_authorization
+        from accounts where id = ${id}
+      `;
       const intents = await tx<{
         id: string;
         amount_cents: string;
@@ -184,6 +201,13 @@ function billingRouter() {
               currency: walletRows[0].currency,
             }
           : null,
+        payment_method: cardRows[0]
+          ? {
+              card_last4: cardRows[0].card_last4,
+              card_brand: cardRows[0].card_brand,
+              has_authorization: Boolean(cardRows[0].has_authorization),
+            }
+          : null,
         recent_intents: intents.map((it) => ({
           ...it,
           amount_cents: Number(it.amount_cents),
@@ -193,6 +217,219 @@ function billingRouter() {
     });
     if (!data.subscription && !data.wallet) throw NotFound('account_billing_not_found');
     return c.json(data);
+  });
+
+  const changePlanSchema = z.object({ plan_code: z.string().min(1) }).strict();
+  const subCheckoutSchema = z.object({ plan_code: z.string().min(1) }).strict();
+
+  // Switch plan. For paid plans the saved card is charged directly via
+  // Paystack charge_authorization. Wallet is NOT touched — it is usage-only.
+  app.post('/accounts/:id/plan', zValidator('json', changePlanSchema), async (c) => {
+    const id = c.req.param('id');
+    const { plan_code } = c.req.valid('json');
+    const user = getUser(c);
+
+    // ── Step 1: validate, reserve intent row (if paid) ──────────────────
+    const ctx = await withUserDb(c, async (tx) => {
+      const adminCheck = await tx<{ ok: boolean }[]>`
+        select app.is_account_admin(${id}) as ok
+      `;
+      if (!adminCheck[0]?.ok) throw Forbidden('not_account_admin');
+
+      const planRows = await tx<{ id: string; price_cents: number; currency: string; name: string }[]>`
+        select p.id, p.price_cents::int as price_cents, p.currency, p.name
+        from plans p
+        join wallets w on w.currency = p.currency and w.account_id = ${id}
+        where p.code = ${plan_code}
+        limit 1
+      `;
+      if (!planRows[0]) throw BadRequest('plan_not_found', `Plan '${plan_code}' not found`);
+      const plan = planRows[0];
+
+      const subRows = await tx<{ id: string; plan_code: string }[]>`
+        select s.id, p.code as plan_code
+        from account_subscriptions s
+        join plans p on p.id = s.plan_id
+        where s.account_id = ${id}
+      `;
+      if (!subRows[0]) throw NotFound('subscription_not_found');
+      if (subRows[0].plan_code === plan_code) throw BadRequest('already_on_plan');
+
+      let intentId: string | null = null;
+      let authCode: string | null = null;
+
+      if (plan.price_cents > 0) {
+        const cardRows = await tx<{ paystack_authorization_code: string | null }[]>`
+          select paystack_authorization_code from accounts where id = ${id}
+        `;
+        authCode = cardRows[0]?.paystack_authorization_code ?? null;
+        if (!authCode) throw BadRequest('card_required', 'No saved card. Use subscription-checkout to add one.');
+
+        const reference = newReference('sp');
+        const [intentRow] = await tx<{ id: string }[]>`
+          insert into payment_intents
+            (account_id, initiated_by, provider, provider_reference, purpose, amount_cents, currency, status)
+          values
+            (${id}, ${user.sub}, 'paystack', ${reference}, 'subscription',
+             ${plan.price_cents}, ${plan.currency}, 'pending')
+          returning id
+        `;
+        intentId = intentRow!.id;
+      }
+
+      return { plan, sub: subRows[0], intentId };
+    });
+
+    // ── Step 2: charge card (outside transaction) ────────────────────────
+    if (ctx.intentId && ctx.plan.price_cents > 0) {
+      const reference = newReference('sp');
+      let charge: PaystackVerifyData;
+      try {
+        charge = await chargeAuthorization({
+          email: user.email,
+          amountCents: ctx.plan.price_cents,
+          authorizationCode: (await withUserDb(c, async (tx) => {
+            const rows = await tx<{ paystack_authorization_code: string }[]>`
+              select paystack_authorization_code from accounts where id = ${id}
+            `;
+            return rows[0].paystack_authorization_code;
+          })),
+          reference,
+          currency: ctx.plan.currency,
+          metadata: { purpose: 'subscription', plan_code, account_id: id },
+        });
+      } catch (err) {
+        await withUserDb(c, async (tx) => {
+          await tx`update payment_intents set status='failed', updated_at=now() where id=${ctx.intentId}`;
+        });
+        throw BadRequest('card_charge_failed', (err as Error).message);
+      }
+
+      if (charge.status !== 'success') {
+        await withUserDb(c, async (tx) => {
+          await tx`update payment_intents set status='failed', updated_at=now() where id=${ctx.intentId}`;
+        });
+        throw BadRequest('card_declined', charge.gateway_response ?? 'Card was declined.');
+      }
+
+      // ── Step 3: record success + activate subscription ───────────────
+      const periodStart = new Date();
+      const periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      await withUserDb(c, async (tx) => {
+        await tx`
+          update payment_intents
+          set status='succeeded', completed_at=now(),
+              raw_verify=${tx.json(charge as unknown as JSONValue)},
+              updated_at=now()
+          where id=${ctx.intentId}
+        `;
+        await createInvoice({
+          tx,
+          account_id: id,
+          kind: 'subscription',
+          payment_intent_id: ctx.intentId!,
+          total_cents: ctx.plan.price_cents,
+          currency: ctx.plan.currency,
+          line_items: [{
+            description: `${ctx.plan.name} subscription — ${periodStart.toISOString().slice(0,10)} to ${periodEnd.toISOString().slice(0,10)}`,
+            quantity: 1,
+            unit_cents: ctx.plan.price_cents,
+            line_cents: ctx.plan.price_cents,
+          }],
+        });
+        await tx`
+          update account_subscriptions
+          set plan_id=${ctx.plan.id}, status='active',
+              current_period_start=${periodStart},
+              current_period_end=${periodEnd},
+              updated_at=now()
+          where id=${ctx.sub.id}
+        `;
+      });
+
+      return c.json({ plan_code, price_cents: ctx.plan.price_cents }, 200);
+    }
+
+    // ── Free plan: just update subscription, no charge ───────────────────
+    await withUserDb(c, async (tx) => {
+      await tx`
+        update account_subscriptions
+        set plan_id=${ctx.plan.id}, status='active',
+            current_period_start=null, current_period_end=null,
+            updated_at=now()
+        where id=${ctx.sub.id}
+      `;
+    });
+
+    return c.json({ plan_code, price_cents: 0 }, 200);
+  });
+
+  // For users with no saved card: initiate a Paystack hosted checkout to
+  // collect the card and pay the first month. On return, the verify endpoint
+  // activates the plan instead of crediting the wallet.
+  app.post('/accounts/:id/subscription-checkout', zValidator('json', subCheckoutSchema), async (c) => {
+    const id = c.req.param('id');
+    const { plan_code } = c.req.valid('json');
+    const env = getEnv();
+    if (!env.PAYSTACK_SECRET_KEY) throw BadRequest('paystack_not_configured');
+    const user = getUser(c);
+
+    const { plan, intentId, reference } = await withUserDb(c, async (tx) => {
+      const adminCheck = await tx<{ ok: boolean }[]>`select app.is_account_admin(${id}) as ok`;
+      if (!adminCheck[0]?.ok) throw Forbidden('not_account_admin');
+
+      const planRows = await tx<{ id: string; price_cents: number; currency: string; name: string }[]>`
+        select p.id, p.price_cents::int as price_cents, p.currency, p.name
+        from plans p
+        join wallets w on w.currency = p.currency and w.account_id = ${id}
+        where p.code = ${plan_code}
+        limit 1
+      `;
+      if (!planRows[0]) throw BadRequest('plan_not_found', `Plan '${plan_code}' not found`);
+      if (planRows[0].price_cents === 0) throw BadRequest('plan_is_free', 'Free plan does not need checkout.');
+
+      const ref = newReference('sc');
+      const [intentRow] = await tx<{ id: string }[]>`
+        insert into payment_intents
+          (account_id, initiated_by, provider, provider_reference, purpose, amount_cents, currency, status)
+        values
+          (${id}, ${user.sub}, 'paystack', ${ref}, 'subscription',
+           ${planRows[0].price_cents}, ${planRows[0].currency}, 'pending')
+        returning id
+      `;
+      return { plan: planRows[0], intentId: intentRow!.id, reference: ref };
+    });
+
+    const callbackUrl = env.PAYSTACK_CALLBACK_URL ?? `${env.APP_PUBLIC_URL}/app/billing`;
+    const init = await initializeTransaction({
+      email: user.email,
+      amountCents: plan.price_cents,
+      reference,
+      currency: plan.currency,
+      callbackUrl,
+      metadata: {
+        account_id: id,
+        intent_id: intentId,
+        purpose: 'subscription',
+        plan_code,
+        initiated_by: user.sub,
+      },
+    });
+
+    await withAnonDb(async (tx) => {
+      await tx`
+        update payment_intents
+        set authorization_url=${init.authorization_url}, access_code=${init.access_code},
+            raw_init=${tx.json({ ...init } as unknown as JSONValue)}, updated_at=now()
+        where id=${intentId}
+      `;
+    });
+
+    // Store plan_code in sessionStorage is handled client-side; server also
+    // carries it in Paystack metadata for redundancy.
+    return c.json({ intent_id: intentId, reference, authorization_url: init.authorization_url, access_code: init.access_code }, 201);
   });
 
   app.get('/accounts/:id/invoices', async (c) => {
@@ -334,7 +571,7 @@ function billingRouter() {
 
     const result = await withUserDb(c, async (tx) => {
       const rows = await tx<IntentRow[]>`
-        select id, account_id, status, amount_cents, currency, credited_tx_id
+        select id, account_id, purpose, status, amount_cents, currency, credited_tx_id
         from payment_intents
         where provider = 'paystack' and provider_reference = ${reference}
         for update
@@ -342,33 +579,126 @@ function billingRouter() {
       const intent = rows[0];
       if (!intent) throw NotFound('intent_not_found');
 
-      if (verifyData.status === 'success') {
-        const credited = await creditWalletForIntent(tx, intent, verifyData);
+      if (verifyData.status !== 'success') {
+        const next = verifyData.status === 'abandoned' ? 'abandoned' : 'failed';
+        await tx`
+          update payment_intents
+          set status = ${next},
+              raw_verify = ${tx.json(verifyData as unknown as JSONValue)},
+              updated_at = now()
+          where id = ${intent.id} and status = 'pending'
+        `;
+        return {
+          status: next as 'failed' | 'abandoned',
+          intent_id: intent.id,
+          account_id: intent.account_id,
+          amount_cents: Number(intent.amount_cents),
+          currency: intent.currency,
+          already_credited: false,
+          plan_activated: null as string | null,
+        };
+      }
+
+      // ── Subscription checkout: activate plan, save card, no wallet credit ──
+      if (intent.purpose === 'subscription') {
+        if (intent.credited_tx_id) {
+          return {
+            status: 'succeeded' as const,
+            intent_id: intent.id,
+            account_id: intent.account_id,
+            amount_cents: Number(intent.amount_cents),
+            currency: intent.currency,
+            already_credited: true,
+            plan_activated: null as string | null,
+          };
+        }
+
+        const planCode = verifyData.metadata?.plan_code as string | undefined;
+        if (!planCode) throw BadRequest('plan_code_missing', 'plan_code not found in Paystack metadata');
+
+        const planRows = await tx<{ id: string; price_cents: number; name: string }[]>`
+          select p.id, p.price_cents::int, p.name
+          from plans p
+          join wallets w on w.currency = p.currency and w.account_id = ${intent.account_id}
+          where p.code = ${planCode}
+          limit 1
+        `;
+        if (!planRows[0]) throw BadRequest('plan_not_found');
+
+        const periodStart = new Date();
+        const periodEnd = new Date(periodStart);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+        // Mark intent succeeded (use credited_tx_id as an idempotency sentinel
+        // even though no wallet transaction is created — we reuse the column
+        // to store the subscription_id instead).
+        await tx`
+          update payment_intents
+          set status='succeeded', completed_at=now(),
+              raw_verify=${tx.json(verifyData as unknown as JSONValue)},
+              updated_at=now()
+          where id=${intent.id}
+        `;
+
+        // Save card details
+        const auth = verifyData.authorization;
+        await tx`
+          update accounts
+          set
+            paystack_customer_code = coalesce(paystack_customer_code, ${verifyData.customer?.customer_code ?? null}),
+            paystack_authorization_code = coalesce(paystack_authorization_code,
+              ${auth?.reusable ? (auth.authorization_code ?? null) : null}),
+            card_last4 = coalesce(card_last4, ${auth?.last4 ?? null}),
+            card_brand = coalesce(card_brand, ${auth?.brand ?? auth?.card_type ?? null})
+          where id=${intent.account_id}
+        `;
+
+        // Activate subscription
+        await tx`
+          update account_subscriptions
+          set plan_id=${planRows[0].id}, status='active',
+              current_period_start=${periodStart},
+              current_period_end=${periodEnd},
+              updated_at=now()
+          where account_id=${intent.account_id}
+        `;
+
+        await createInvoice({
+          tx,
+          account_id: intent.account_id,
+          kind: 'subscription',
+          payment_intent_id: intent.id,
+          total_cents: Number(intent.amount_cents),
+          currency: intent.currency,
+          line_items: [{
+            description: `${planRows[0].name} subscription — ${periodStart.toISOString().slice(0,10)} to ${periodEnd.toISOString().slice(0,10)}`,
+            quantity: 1,
+            unit_cents: Number(intent.amount_cents),
+            line_cents: Number(intent.amount_cents),
+          }],
+        });
+
         return {
           status: 'succeeded' as const,
           intent_id: intent.id,
           account_id: intent.account_id,
           amount_cents: Number(intent.amount_cents),
           currency: intent.currency,
-          already_credited: credited.already_credited,
+          already_credited: false,
+          plan_activated: planCode,
         };
       }
 
-      const next = verifyData.status === 'abandoned' ? 'abandoned' : 'failed';
-      await tx`
-        update payment_intents
-        set status = ${next},
-            raw_verify = ${tx.json(verifyData as unknown as JSONValue)},
-            updated_at = now()
-        where id = ${intent.id} and status = 'pending'
-      `;
+      // ── Wallet topup: credit wallet as before ───────────────────────────
+      const credited = await creditWalletForIntent(tx, intent, verifyData);
       return {
-        status: next,
+        status: 'succeeded' as const,
         intent_id: intent.id,
         account_id: intent.account_id,
         amount_cents: Number(intent.amount_cents),
         currency: intent.currency,
-        already_credited: false,
+        already_credited: credited.already_credited,
+        plan_activated: null as string | null,
       };
     });
 

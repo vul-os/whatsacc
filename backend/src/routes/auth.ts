@@ -791,9 +791,10 @@ function authRouter() {
       },
       600,
     );
+    const isHttps = new URL(c.req.url).protocol === 'https:';
     setCookie(c, 'gauth', cookieJwt, {
       httpOnly: true,
-      secure: true,
+      secure: isHttps,
       sameSite: 'Lax',
       path: '/',
       maxAge: 600,

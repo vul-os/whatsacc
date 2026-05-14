@@ -110,6 +110,7 @@ function createSql(connectionString: string): Sql {
 // collected with the request.
 let _activeConnectionString: string | null = null;
 let _activeSql: Sql | null = null;
+let _testSql: Sql | null = null;
 
 /**
  * Set the connection string for this request. Called by the Worker entry
@@ -126,7 +127,12 @@ export function setDbConnectionString(connectionString: string): void {
   }
 }
 
+export function setSqlForTests(sql: Sql | null): void {
+  _testSql = sql;
+}
+
 export function getSql(): Sql {
+  if (_testSql) return _testSql;
   if (!_activeConnectionString) {
     throw new Error('Database not initialized — call setDbConnectionString first');
   }

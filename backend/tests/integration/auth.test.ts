@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertExists, assertNotEquals } from '../helpers/assert.ts';
 import { withRLS } from '@/lib/db.ts';
 import { hashToken } from '@/lib/refresh.ts';
 import { bootTestApp } from '../helpers/app.ts';
@@ -24,6 +24,7 @@ dbTest('register: creates user, account, slug, and returns 201', async () => {
       email: 'alice@test.local',
       password: 'Pa55word_test',
       display_name: 'Alice',
+      location_name: 'Alice HQ',
       country_code: 'ZA',
       account_type: 'personal',
     },
@@ -61,6 +62,7 @@ dbTest('register: rejects duplicate email with 409', async () => {
       email: 'dupe@test.local',
       password: 'Pa55word_test',
       display_name: 'Other',
+      location_name: 'Other HQ',
       country_code: 'ZA',
     },
   });
@@ -330,7 +332,7 @@ dbTest(
     const email = 'verify-happy@test.local';
     const password = 'Pa55word_verify';
     const reg = await app.request('POST', '/auth/register', {
-      json: { email, password, display_name: 'Verifier', country_code: 'ZA' },
+      json: { email, password, display_name: 'Verifier', location_name: 'Verifier HQ', country_code: 'ZA' },
     });
     assertEquals(reg.status, 201);
 
@@ -371,7 +373,7 @@ dbTest('verify-email: rejects expired tokens with token_expired', async () => {
   const app = await bootTestApp();
   const email = 'verify-expired@test.local';
   await app.request('POST', '/auth/register', {
-    json: { email, password: 'Pa55word_test', display_name: 'X', country_code: 'ZA' },
+    json: { email, password: 'Pa55word_test', display_name: 'X', location_name: 'X HQ', country_code: 'ZA' },
   });
   const plain = 'verify-expired-token-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
   await plantVerifyToken(email, new Date(Date.now() - 60 * 1000), plain);

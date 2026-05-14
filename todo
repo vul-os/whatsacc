@@ -36,3 +36,26 @@ need to test whatsapp system yourself, open and close gate, have multiple accees
 User messages a number if they already know options for location. or they can send a location first but either way they need to send a location and choose access point if theres only 1 access point then only location is needed, when user meesages hi or nothing relevant give them instructuons and list locations they are linked to or tell them they are not linked.
 
 "fold" the migrations, which means, put all the migrations into a few files, example, all billing related ones go into billing.sql etc.
+
+
+// new to-do list
+
+please fix the ui across the whole project the dark mode is not good. pleae ensure it claude themese. i want the sun 
+  turning into moon feature across the whole projects in defferent styls suitable for the page so use can see that transition
+  from any page they choose to change from light to dark. also  style ad text make it preium claude theme premium/corporate  
+
+ payout  and  refferals
+ 
+ authurized urls
+ 
+ ui 
+
+
+bunnycd avater urls cache 
+
+google auth ---avater url updates 
+al typs users must be able change avater or url even if its hosted somehwere else
+same avter system but for locations 
+change password if its a google dont show passwords configs 
+add more docs and syntax highlighting 
+

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '../helpers/assert.ts';
 import { tryConsumeGrant } from '@/routes/access.ts';
 import { withRLS } from '@/lib/db.ts';
 import { bootTestApp } from '../helpers/app.ts';

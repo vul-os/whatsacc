@@ -2,15 +2,16 @@
 // that fires 3× per day. Idempotent per (subscription_id, period_start) via
 // the subscription_renewals unique constraint, so safely re-runnable.
 //
+// Wallet is usage-only (WhatsApp/Slack credits) — subscriptions are always
+// charged to the saved card via Paystack charge_authorization.
+//
 // Flow per due subscription:
 //   1. Insert a 'pending' renewal row for the next period (idempotent).
-//   2. Try wallet pay: if balance covers price, debit wallet, extend period,
-//      mark renewal `wallet_paid`. Done.
-//   3. Else if account has a stored Paystack authorization_code, charge the
-//      card. On success: extend period + mark `charged`. On failure: leave
+//   2. If account has a stored Paystack authorization_code, charge the card.
+//      On success: extend period + mark `charged`. On failure: leave
 //      renewal `failed`, schedule retry, flip subscription to `past_due` /
 //      `expired` past grace.
-//   4. Else: mark `failed` reason='no_payment_method', flip to past_due.
+//   3. Else: mark `failed` reason='no_payment_method', flip to past_due.
 
 import { withRLS } from './db.ts';
 import { chargeAuthorization, newReference } from './paystack.ts';
@@ -32,7 +33,6 @@ export type RunRenewalsOpts = {
 
 export type RunRenewalsResult = {
   scanned: number;
-  walletPaid: number;
   charged: number;
   failed: number;
   skipped: number;
@@ -50,8 +50,6 @@ type DueSubscription = {
   paystack_authorization_code: string | null;
   paystack_customer_email: string | null;
   account_country: string;
-  wallet_balance_cents: number;
-  wallet_currency: string | null;
 };
 
 export async function runSubscriptionRenewals(
@@ -68,7 +66,6 @@ export async function runSubscriptionRenewals(
 
   const result: RunRenewalsResult = {
     scanned: due.length,
-    walletPaid: 0,
     charged: 0,
     failed: 0,
     skipped: 0,
@@ -79,7 +76,6 @@ export async function runSubscriptionRenewals(
     try {
       const outcome = await processSubscription(sub, now, opts.dryRun ?? false);
       switch (outcome.kind) {
-        case 'wallet_paid': result.walletPaid++; break;
         case 'charged': result.charged++; break;
         case 'skipped': result.skipped++; break;
         case 'failed':
@@ -95,7 +91,7 @@ export async function runSubscriptionRenewals(
     }
   }
 
-  log(`done — wallet_paid=${result.walletPaid} charged=${result.charged} failed=${result.failed}`);
+  log(`done — charged=${result.charged} failed=${result.failed}`);
   return result;
 }
 
@@ -110,15 +106,12 @@ async function loadDueSubscriptions(now: Date, limit: number): Promise<DueSubscr
         p.currency as plan_currency,
         p.price_cents as plan_price_cents,
         s.current_period_end,
-        s.paystack_authorization_code,
+        a.paystack_authorization_code,
         a.paystack_customer_code as paystack_customer_email,
-        a.country_code as account_country,
-        coalesce(w.balance_cents, 0)::bigint as wallet_balance_cents,
-        w.currency as wallet_currency
+        a.country_code as account_country
       from account_subscriptions s
       join plans p on p.id = s.plan_id
       join accounts a on a.id = s.account_id
-      left join wallets w on w.account_id = s.account_id
       where s.status in ('active','past_due','trialing')
         and (s.current_period_end is null or s.current_period_end <= ${now.toISOString()})
         and a.status = 'active'
@@ -130,7 +123,6 @@ async function loadDueSubscriptions(now: Date, limit: number): Promise<DueSubscr
 }
 
 type Outcome =
-  | { kind: 'wallet_paid' }
   | { kind: 'charged' }
   | { kind: 'skipped' }
   | { kind: 'failed'; reason: string };
@@ -171,59 +163,12 @@ async function processSubscription(
   }
   if (dryRun) return { kind: 'skipped' };
 
-  // 2. Wallet path: if wallet has enough in matching currency, debit it.
-  if (
-    sub.wallet_currency === sub.plan_currency &&
-    sub.wallet_balance_cents >= sub.plan_price_cents
-  ) {
-    await withRLS(adminCtx, async (tx) => {
-      await tx`
-        update wallets
-        set balance_cents = balance_cents - ${sub.plan_price_cents},
-            updated_at = now()
-        where account_id = ${sub.account_id}
-          and balance_cents >= ${sub.plan_price_cents}
-      `;
-      await tx`
-        insert into wallet_transactions (account_id, delta_cents, reason, reference)
-        values (${sub.account_id}, ${-sub.plan_price_cents}, 'subscription', ${`renewal:${renewal.id}`})
-      `;
-      await tx`
-        update subscription_renewals
-        set status = 'wallet_paid', updated_at = now()
-        where id = ${renewal.id}
-      `;
-      await tx`
-        update account_subscriptions
-        set status = 'active',
-            current_period_start = ${periodStart.toISOString?.() ?? periodStart},
-            current_period_end = ${periodEnd.toISOString()},
-            grace_period_end = null,
-            last_renewal_id = ${renewal.id},
-            updated_at = now()
-        where id = ${sub.subscription_id}
-      `;
-      // Issue an invoice for the renewal — wallet-paid path has no
-      // payment_intent so we anchor idempotency on the renewal id.
-      await createInvoice({
-        tx,
-        account_id: sub.account_id,
-        kind: 'subscription',
-        external_ref: `subscription_renewal:${renewal.id}`,
-        total_cents: sub.plan_price_cents,
-        currency: sub.plan_currency,
-        line_items: [subscriptionLine(sub, periodStart, periodEnd)],
-      });
-    });
-    return { kind: 'wallet_paid' };
-  }
-
-  // 3. Card-charge path via Paystack stored authorization.
+  // Card-charge path via Paystack stored authorization.
   if (sub.paystack_authorization_code && sub.paystack_customer_email) {
     return await chargeViaPaystack(sub, renewal.id, periodStart, periodEnd);
   }
 
-  // 4. No payment method — flip to past_due, set grace period.
+  // No saved card — flip to past_due, set grace period.
   return await markFailed(sub, renewal.id, 'no_payment_method', now);
 }
 

@@ -32,6 +32,14 @@ export type PaystackVerifyData = {
   customer?: { customer_code?: string; email?: string };
   metadata?: Record<string, unknown> | null;
   gateway_response?: string;
+  authorization?: {
+    authorization_code?: string;
+    card_type?: string;
+    last4?: string;
+    bank?: string;
+    brand?: string;
+    reusable?: boolean;
+  };
 };
 
 type Envelope<T> = { status: boolean; message: string; data: T };

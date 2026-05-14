@@ -268,6 +268,18 @@ export const api = {
       `/billing/wallet/verify?reference=${encodeURIComponent(reference)}`,
     ),
 
+  changePlan: (accountId: string, plan_code: string) =>
+    apiFetch<{ plan_code: string; price_cents: number }>(
+      `/billing/accounts/${accountId}/plan`,
+      { method: 'POST', body: { plan_code } },
+    ),
+
+  subscriptionCheckout: (accountId: string, plan_code: string) =>
+    apiFetch<TopupResponse>(
+      `/billing/accounts/${accountId}/subscription-checkout`,
+      { method: 'POST', body: { plan_code } },
+    ),
+
   invoices: (accountId: string) =>
     apiFetch<{ invoices: InvoiceSummary[] }>(`/billing/accounts/${accountId}/invoices`),
 
@@ -370,6 +382,8 @@ export const api = {
     type?: 'house' | 'complex' | 'building' | 'other';
     country_code?: string;
     address?: Record<string, unknown>;
+    lat?: number;
+    long?: number;
   }) => apiFetch<{ id: string; account_id: string }>('/locations', { method: 'POST', body }),
 
   locationDelete: (id: string) =>
@@ -653,6 +667,11 @@ export type AccountBilling = {
     current_period_end: string | null;
   } | null;
   wallet: { balance_cents: number; currency: string } | null;
+  payment_method: {
+    card_last4: string | null;
+    card_brand: string | null;
+    has_authorization: boolean;
+  } | null;
   recent_intents: Array<{
     id: string;
     amount_cents: number;
@@ -693,6 +712,7 @@ export type WalletVerifyResponse = {
   amount_cents: number;
   currency: string;
   already_credited: boolean;
+  plan_activated: string | null;
 };
 
 export type BillingTier = {

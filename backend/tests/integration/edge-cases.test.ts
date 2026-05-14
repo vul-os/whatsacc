@@ -2,7 +2,7 @@
 // per-area integration suites and target failure modes the happy-path
 // tests don't exercise.
 
-import { assert, assertEquals, assertExists, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertExists, assertNotEquals } from '../helpers/assert.ts';
 import { withRLS } from '@/lib/db.ts';
 import { runMonthlyPayouts } from '@/lib/payouts.ts';
 import { bootTestApp } from '../helpers/app.ts';
@@ -97,6 +97,7 @@ dbTest('auth: register with extra unknown fields is rejected (strict schema)', a
       email: 'extra@test.local',
       password: 'Pa55word_test',
       display_name: 'X',
+      location_name: 'X HQ',
       country_code: 'ZA',
       // mass-assignment attempts
       is_platform_admin: true,
@@ -139,7 +140,7 @@ dbTest('auth: reset-password rejects expired tokens', async () => {
 
 dbTest('billing: webhook with unrelated event_type is acknowledged but does nothing', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -169,7 +170,7 @@ dbTest('billing: webhook with unrelated event_type is acknowledged but does noth
 
 dbTest('billing: topup amount must be positive (zero rejected)', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -187,7 +188,7 @@ dbTest('billing: topup amount must be positive (zero rejected)', async () => {
 
 dbTest('billing: verify with unknown reference returns 404', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -204,7 +205,7 @@ dbTest('billing: verify with unknown reference returns 404', async () => {
 
 dbTest('billing: charge.failed webhook flips a pending intent to failed', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -269,6 +270,7 @@ dbTest('referrals: signing up with the OWN slug does NOT self-attribute', async 
       email: 'self@test.local',
       password: 'Pa55word_test',
       display_name: 'Self',
+      location_name: 'Self HQ',
       country_code: 'ZA',
       referral_slug: me.referral_slug,
     },
@@ -359,7 +361,7 @@ dbTest('referrals: KYC partial update preserves existing fields (COALESCE merge)
 
 dbTest('cron: zero eligible candidates → no Paystack calls, all counters zero', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const r = await runMonthlyPayouts({ period: '2026-05' });
@@ -374,7 +376,7 @@ dbTest('cron: zero eligible candidates → no Paystack calls, all counters zero'
 
 dbTest('cron: mixed batch — eligible + ineligible users, only the eligible get paid', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -413,7 +415,7 @@ dbTest('cron: mixed batch — eligible + ineligible users, only the eligible get
 
 dbTest('cron: dry-run never calls Paystack and creates no payout rows', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -439,7 +441,7 @@ dbTest('cron: dry-run never calls Paystack and creates no payout rows', async ()
 
 dbTest('cron: separate periods can both be dispatched in sequence', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();

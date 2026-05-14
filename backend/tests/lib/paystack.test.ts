@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse } from '@std/assert';
+import { assert, assertEquals, assertFalse } from '../helpers/assert.ts';
 import { resetEnvCache } from '@/lib/env.ts';
 import { newReference, verifyWebhookSignature } from '@/lib/paystack.ts';
 
@@ -7,8 +7,8 @@ import { newReference, verifyWebhookSignature } from '@/lib/paystack.ts';
 const SECRET = 'sk_test_dummy';
 
 function setTestEnv() {
-  if (!Deno.env.get('JWT_SECRET')) Deno.env.set('JWT_SECRET', 'unused');
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'unused';
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   resetEnvCache();
 }
 
@@ -26,14 +26,14 @@ async function hmacHex(secret: string, body: string): Promise<string> {
     .join('');
 }
 
-Deno.test('paystack webhook signature: accepts a valid HMAC-SHA512 over the raw body', async () => {
+test('paystack webhook signature: accepts a valid HMAC-SHA512 over the raw body', async () => {
   setTestEnv();
   const body = JSON.stringify({ event: 'charge.success', data: { id: 1, reference: 'wt_x' } });
   const sig = await hmacHex(SECRET, body);
   assert(await verifyWebhookSignature(body, sig));
 });
 
-Deno.test('paystack webhook signature: rejects tampered body', async () => {
+test('paystack webhook signature: rejects tampered body', async () => {
   setTestEnv();
   const body = JSON.stringify({ event: 'charge.success', data: { id: 1, reference: 'wt_x' } });
   const sig = await hmacHex(SECRET, body);
@@ -41,12 +41,12 @@ Deno.test('paystack webhook signature: rejects tampered body', async () => {
   assertFalse(await verifyWebhookSignature(tampered, sig));
 });
 
-Deno.test('paystack webhook signature: rejects empty signature', async () => {
+test('paystack webhook signature: rejects empty signature', async () => {
   setTestEnv();
   assertFalse(await verifyWebhookSignature('any', ''));
 });
 
-Deno.test('paystack newReference: prefixed and unique', () => {
+test('paystack newReference: prefixed and unique', () => {
   const a = newReference('wt');
   const b = newReference('wt');
   assert(a.startsWith('wt_'));

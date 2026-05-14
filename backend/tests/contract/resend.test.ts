@@ -15,13 +15,13 @@
 //   2. The from-domain is verified on your Resend account
 //   3. Account invite + password reset templates render the expected fields
 
-import { assertEquals, assertExists } from '@std/assert';
+import { assertEquals, assertExists } from '../helpers/assert.ts';
 import { contractTest, envValue } from '../helpers/contract.ts';
 import { resetEnvCache } from '@/lib/env.ts';
 import { sendEmail } from '@/lib/email.ts';
 
 function setupRealResendEnv() {
-  Deno.env.set('RESEND_API_KEY', envValue('RESEND_TEST_API_KEY')!);
+  process.env.RESEND_API_KEY = envValue('RESEND_TEST_API_KEY')!;
   resetEnvCache();
 }
 
@@ -31,7 +31,7 @@ contractTest(
   async () => {
     setupRealResendEnv();
     const to = envValue('RESEND_TEST_TO_EMAIL')!;
-    const from = Deno.env.get('RESEND_TEST_FROM') ?? undefined;
+    const from = process.env.RESEND_TEST_FROM ?? undefined;
 
     // sendEmail returns void; if Resend rejects (bad domain, bad key, bad
     // payload), it logs to stderr but doesn't throw. Wrap with our own
@@ -76,7 +76,7 @@ contractTest(
   async () => {
     setupRealResendEnv();
     const to = envValue('RESEND_TEST_TO_EMAIL')!;
-    const from = Deno.env.get('RESEND_TEST_FROM') ?? 'whatsacc <noreply@whatsacc.com>';
+    const from = process.env.RESEND_TEST_FROM ?? 'whatsacc <noreply@whatsacc.com>';
     const key = envValue('RESEND_TEST_API_KEY')!;
 
     const res = await fetch('https://api.resend.com/emails', {

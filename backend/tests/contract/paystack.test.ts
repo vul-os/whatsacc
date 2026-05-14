@@ -19,7 +19,7 @@
 //   6. End-to-end transfer dispatch via runMonthlyPayouts() against real Paystack
 //   7. HMAC signature: event signed with our secret matches verifyWebhookSignature
 
-import { assert, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertExists, assertStringIncludes } from '../helpers/assert.ts';
 import {
   contractTest,
   envValue,
@@ -60,9 +60,9 @@ const TEST_CARD_SUCCESS = {
 
 function setupRealPaystackEnv() {
   // Point our lib at the real test API by populating the env it reads.
-  Deno.env.set('PAYSTACK_SECRET_KEY', envValue('PAYSTACK_TEST_SECRET_KEY')!);
+  process.env.PAYSTACK_SECRET_KEY = envValue('PAYSTACK_TEST_SECRET_KEY')!;
   if (envValue('PAYSTACK_TEST_PUBLIC_KEY')) {
-    Deno.env.set('PAYSTACK_PUBLIC_KEY', envValue('PAYSTACK_TEST_PUBLIC_KEY')!);
+    process.env.PAYSTACK_PUBLIC_KEY = envValue('PAYSTACK_TEST_PUBLIC_KEY')!;
   }
   resetEnvCache();
 }

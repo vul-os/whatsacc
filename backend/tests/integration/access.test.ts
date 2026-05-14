@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '../helpers/assert.ts';
 import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
 import { registerUser, seedLocationWithAccessPoint } from '../helpers/fixtures.ts';

@@ -32,6 +32,8 @@ const createTopLevelLocationSchema = z
       .transform((v) => v.toUpperCase())
       .default('ZA'),
     address: z.record(z.unknown()).optional(),
+    lat: z.number().optional(),
+    long: z.number().optional(),
   })
   .strict();
 
@@ -159,13 +161,15 @@ function locationsRouter() {
       });
       const rows = await tx<{ id: string }[]>`
         insert into locations
-          (account_id, type, name, slug, address, status)
+          (account_id, type, name, slug, address, lat, long, status)
         values (
           ${accountId},
           ${body.type},
           ${body.name},
           ${makeLocationSlug(body.name)},
           ${tx.json((body.address ?? {}) as JSONValue)},
+          ${body.lat ?? null},
+          ${body.long ?? null},
           'active'
         )
         returning id

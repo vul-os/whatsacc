@@ -1,6 +1,8 @@
 // Helpers for contract tests against real third-party services.
 // Each contract test is skipped unless its required env var is set.
 
+import { test } from 'vitest';
+
 export type ContractEnv =
   | 'PAYSTACK_TEST_SECRET_KEY'
   | 'PAYSTACK_TEST_PUBLIC_KEY'
@@ -8,7 +10,7 @@ export type ContractEnv =
   | 'RESEND_TEST_TO_EMAIL';
 
 export function envValue(name: ContractEnv): string | null {
-  const v = (Deno.env.get(name) ?? '').trim();
+  const v = (process.env[name] ?? '').trim();
   return v || null;
 }
 
@@ -18,13 +20,9 @@ export function contractTest(
   fn: () => Promise<void>,
 ): void {
   const missing = required.filter((k) => !envValue(k));
-  Deno.test({
-    name: missing.length ? `${name} [SKIP — missing ${missing.join(', ')}]` : name,
-    ignore: missing.length > 0,
-    sanitizeResources: false,
-    sanitizeOps: false,
-    fn,
-  });
+  const title = missing.length ? `${name} [SKIP - missing ${missing.join(', ')}]` : name;
+  const runner = missing.length ? test.skip : test;
+  runner(title, fn);
 }
 
 /** Random reference safe for Paystack (max 100 chars, alphanumerics + -=._). */

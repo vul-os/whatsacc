@@ -7,7 +7,7 @@
 // tests/integration/billing.test.ts — this file is for the "what if a user
 // tries to game the system" cases.
 
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '../helpers/assert.ts';
 import postgres from 'postgres';
 import { withRLS } from '@/lib/db.ts';
 import { bootTestApp } from '../helpers/app.ts';
@@ -37,6 +37,7 @@ dbTest('abuse: re-registering with the same email is rejected (no double attribu
       email: refereeEmail,
       password: 'Pa55word_test',
       display_name: 'Imposter',
+      location_name: 'Imposter HQ',
       country_code: 'ZA',
     },
   });
@@ -111,7 +112,7 @@ dbTest('abuse: changing slug after referrals exist preserves earnings on the ref
 
 dbTest('abuse: a user with no referrer earns nobody anything when topping up', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -139,7 +140,7 @@ dbTest('abuse: a user with no referrer earns nobody anything when topping up', a
 
 dbTest('abuse: webhook replay does not double-credit referral earnings', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -303,7 +304,7 @@ dbTest(
     // can't actually run two transactions in parallel through it, but a
     // dedicated client can hold the advisory lock while the route tries
     // to acquire it on the shared client.
-    const url = Deno.env.get('DATABASE_URL')!;
+    const url = process.env.DATABASE_URL!;
     const holder = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
     try {
       // Acquire the same xact-lock the route uses, on a separate connection.
