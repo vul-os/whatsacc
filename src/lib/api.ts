@@ -461,6 +461,9 @@ export const api = {
   accountSummary: (accountId: string) =>
     apiFetch<AccountSummary>(`/analytics/accounts/${accountId}/summary`),
 
+  accountInsights: (accountId: string) =>
+    apiFetch<AccountInsights>(`/analytics/accounts/${accountId}/insights`),
+
   tiers: (opts: { country?: string; region?: string } = {}) => {
     const qs = new URLSearchParams();
     if (opts.country) qs.set('country', opts.country);
@@ -527,6 +530,27 @@ export type AccountSummary = {
     location_name: string | null;
     actor_email: string | null;
   }>;
+};
+
+export type AccountInsights = {
+  account_id: string;
+  days: Array<{ day: string; opens: number; denied: number }>;
+  breakdown: Array<{
+    access_point_id: string;
+    access_point_name: string | null;
+    location_name: string | null;
+    opens: number;
+  }>;
+  totals: {
+    opens_7d: number;
+    denied_7d: number;
+    closes_7d: number;
+    opens_prev_7d: number;
+  };
+  members: {
+    member_count: number;
+    active_members_7d: number;
+  };
 };
 
 export type TemporaryAccessGrant = {

@@ -72,23 +72,26 @@ export function CreateLocationModal({
   }
 
   const noop = () => {};
+  const title = forced
+    ? 'Set up your first location'
+    : mode === 'current-account'
+      ? 'Set up your location'
+      : 'New location';
+  const subtitle = forced
+    ? 'Give your place a name and confirm its address before you dive in.'
+    : mode === 'current-account'
+      ? 'Name and verify the address of this location.'
+      : 'A house, complex, building, or other site. Each location has its own members and billing.';
+  const submitLabel = submitting
+    ? 'Saving…'
+    : forced || mode === 'current-account'
+      ? 'Save location'
+      : 'Create';
 
   return (
     <Modal open onClose={forced ? noop : onClose} className="sm:max-w-xl">
-      <h2 className="font-display text-2xl sm:text-3xl mb-1">
-        {forced
-          ? 'Set up your first location'
-          : mode === 'current-account'
-            ? 'Set up your location'
-            : 'New location'}
-      </h2>
-      <p className="text-sm text-ink/60 mb-5 leading-relaxed">
-        {forced
-          ? 'Give your place a name and confirm its address before you dive in.'
-          : mode === 'current-account'
-            ? 'Name and verify the address of this location.'
-            : 'A house, complex, building, or other site. Each location has its own members and billing.'}
-      </p>
+      <h2 className="font-display text-2xl sm:text-3xl mb-1">{title}</h2>
+      <p className="text-sm text-ink/60 mb-5 leading-relaxed">{subtitle}</p>
 
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
@@ -123,19 +126,19 @@ export function CreateLocationModal({
         </fieldset>
 
         <div>
-          <div className="flex items-baseline justify-between mb-1.5">
+          <div className="flex items-baseline justify-between mb-1.5 gap-3">
             <span className="text-sm font-medium text-ink/85">Address</span>
-            <span className="text-[11px] text-ink/45 flex items-center gap-1">
+            <span className="text-[11px] text-ink/45 flex items-center gap-1 whitespace-nowrap">
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
                 <path d="M5 1a3 3 0 1 1 0 6A3 3 0 0 1 5 1zm0 7.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Used for geofencing security
+              Used for geofencing
             </span>
           </div>
           <MapboxAddressInput value={address} onChange={setAddress} required />
           <p className="mt-2 text-xs text-ink/45 leading-relaxed">
-            Your address is used to verify you're physically at this property before granting
-            access — we never share it.
+            Your address is used to verify you&rsquo;re physically at this property before
+            granting access — we never share it.
           </p>
         </div>
 
@@ -152,11 +155,7 @@ export function CreateLocationModal({
             </button>
           )}
           <Button type="submit" variant="ink" disabled={submitting}>
-            {submitting
-              ? 'Saving…'
-              : forced || mode === 'current-account'
-                ? 'Save location'
-                : 'Create'}
+            {submitLabel}
           </Button>
         </div>
       </form>

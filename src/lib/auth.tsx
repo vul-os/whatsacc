@@ -56,6 +56,33 @@ type AuthState = {
 };
 
 const ACTIVE_ACCOUNT_KEY = 'whatsacc.activeAccount';
+// Cached /me response for instant rehydration on refresh. Bumping the version
+// invalidates older shapes (e.g. when SessionUser gains/loses a field) so
+// stale caches don't mis-render the UI on the next deploy.
+const ME_CACHE_KEY = 'whatsacc.me.v3';
+
+type CachedMe = { user: SessionUser; accounts: SessionAccount[] };
+
+function readMeCache(): CachedMe | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(ME_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedMe;
+    if (!parsed?.user || !Array.isArray(parsed.accounts)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeMeCache(value: CachedMe | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value) window.localStorage.setItem(ME_CACHE_KEY, JSON.stringify(value));
+    else window.localStorage.removeItem(ME_CACHE_KEY);
+  } catch {/**/}
+}
 
 const Ctx = createContext<AuthState | null>(null);
 
@@ -85,13 +112,24 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [accounts, setAccounts] = useState<SessionAccount[]>([]);
+  // Hydrate from the previous session's /me snapshot so the app shell paints
+  // immediately on refresh. The real /me runs in the background and replaces
+  // the cache when it returns. Tokens still need to be valid; if /me 401s
+  // the cache is wiped along with the user state.
+  const [cached] = useState<CachedMe | null>(() =>
+    typeof window !== 'undefined' && (tokenStore.access || tokenStore.refresh)
+      ? readMeCache()
+      : null,
+  );
+  const [user, setUser] = useState<SessionUser | null>(cached?.user ?? null);
+  const [accounts, setAccounts] = useState<SessionAccount[]>(cached?.accounts ?? []);
   const [activeAccountId, setActiveAccountIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try { return window.localStorage.getItem(ACTIVE_ACCOUNT_KEY); } catch { return null; }
   });
-  const [loading, setLoading] = useState(true);
+  // Only show the loading shell when we have nothing to render yet. With a
+  // cached snapshot the app boots straight to its real content.
+  const [loading, setLoading] = useState(cached === null);
   const [error, setError] = useState<string | null>(null);
 
   const setCurrentAccount = useCallback((accountId: string) => {
@@ -103,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!tokenStore.access && !tokenStore.refresh) {
       setUser(null);
       setAccounts([]);
+      writeMeCache(null);
       return;
     }
     try {
@@ -110,11 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const s = toSession(me);
       setUser(s.user);
       setAccounts(s.accounts);
+      writeMeCache(s);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         tokenStore.clear();
         setUser(null);
         setAccounts([]);
+        writeMeCache(null);
       } else {
         throw err;
       }
@@ -179,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.clear();
     setUser(null);
     setAccounts([]);
+    writeMeCache(null);
   }, []);
 
   const setTokensFromOAuth = useCallback(

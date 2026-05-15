@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 const TOKEN = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_MAPBOX_TOKEN ?? '';
 
@@ -38,9 +39,15 @@ export function MapboxAddressInput({
   const [fetching, setFetching] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   // Cancel any in-flight geocode when the user keeps typing — without this
   // a slow request can overwrite the response from a newer keystroke.
   const inflight = useRef<AbortController | null>(null);
+  // Anchor rect for the portalled suggestions dropdown. Recomputed on open
+  // and whenever the page scrolls or resizes, so the dropdown stays glued
+  // to the input even when this component lives inside a Modal that has
+  // overflow:auto (the dropdown would otherwise be clipped).
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
   const search = useCallback(async (q: string) => {
     if (!TOKEN || q.length < 3) { setSuggestions([]); setOpen(false); return; }
@@ -78,6 +85,23 @@ export function MapboxAddressInput({
   // Drop any pending request when the component unmounts so we don't update
   // state on an unmounted node.
   useEffect(() => () => inflight.current?.abort(), []);
+
+  // Keep the dropdown anchored to the input across scrolls / resizes / modal
+  // animations. Bails when the dropdown is closed so we don't churn rAF.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const recompute = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (r) setAnchorRect(r);
+    };
+    recompute();
+    window.addEventListener('scroll', recompute, true);
+    window.addEventListener('resize', recompute);
+    return () => {
+      window.removeEventListener('scroll', recompute, true);
+      window.removeEventListener('resize', recompute);
+    };
+  }, [open, suggestions.length]);
 
   function onInput(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
@@ -125,10 +149,32 @@ export function MapboxAddressInput({
     );
   }
 
+  // Compute dropdown position from the captured anchor rect. Prefer below;
+  // flip above when there isn't room (keyboard up on mobile, modal near bottom).
+  const dropdownStyle = anchorRect
+    ? (() => {
+        const margin = 6;
+        const desired = Math.min(260, suggestions.length * 56 + 8);
+        const spaceBelow = window.innerHeight - anchorRect.bottom - margin;
+        const spaceAbove = anchorRect.top - margin;
+        const above = spaceBelow < 180 && spaceAbove > spaceBelow;
+        const maxHeight = Math.max(140, Math.min(desired, above ? spaceAbove : spaceBelow));
+        return {
+          position: 'fixed' as const,
+          left: anchorRect.left,
+          width: anchorRect.width,
+          top: above ? undefined : anchorRect.bottom + margin,
+          bottom: above ? window.innerHeight - anchorRect.top + margin : undefined,
+          maxHeight,
+        };
+      })()
+    : null;
+
   return (
     <div ref={containerRef} className="space-y-3" onBlur={onBlur}>
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={onInput}
@@ -151,27 +197,33 @@ export function MapboxAddressInput({
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/35 text-xs">…</span>
         ) : null}
 
-        {open && suggestions.length > 0 && (
-          <ul className="absolute z-50 mt-1 w-full bg-paper border border-ink/10 rounded-xl shadow-xl overflow-hidden">
-            {suggestions.map((f) => (
-              <li key={f.id}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => select(f)}
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-paper-cool border-b border-ink/5 last:border-0"
-                >
-                  <span className="font-medium text-ink">
-                    {f.place_name.split(',')[0]}
-                  </span>
-                  <span className="text-ink/50 text-xs ml-1">
-                    {f.place_name.split(',').slice(1).join(',').trim()}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        {open && suggestions.length > 0 && dropdownStyle &&
+          createPortal(
+            <ul
+              role="listbox"
+              style={dropdownStyle}
+              className="z-[60] bg-paper border border-ink/10 rounded-xl shadow-[0_24px_48px_-16px_rgba(0,0,0,0.35)] overflow-y-auto overscroll-contain"
+            >
+              {suggestions.map((f) => (
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => select(f)}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-paper-cool border-b border-ink/5 last:border-0"
+                  >
+                    <span className="font-medium text-ink">
+                      {f.place_name.split(',')[0]}
+                    </span>
+                    <span className="text-ink/50 text-xs ml-1">
+                      {f.place_name.split(',').slice(1).join(',').trim()}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>,
+            document.body,
+          )}
       </div>
 
       {staticMapUrl && value && (

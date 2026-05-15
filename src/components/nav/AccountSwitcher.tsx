@@ -37,12 +37,15 @@ export function AccountSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/10 transition-colors hover:border-ink/30 hover:bg-paper-cool"
+        className="flex items-center gap-2 pl-1 pr-2 sm:pl-2.5 sm:pr-3 py-1 sm:py-1.5 rounded-full border border-ink/10 transition-colors hover:border-ink/30 hover:bg-paper-cool"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Account menu"
       >
         <Avatar source={user} name={user.name} size="sm" />
-        <span className="flex flex-col items-start leading-tight">
+        {/* labels live alongside the avatar on >=sm; mobile gets a compact
+            avatar+chevron pill so the topbar isn't overrun. */}
+        <span className="hidden sm:flex flex-col items-start leading-tight">
           <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45">
             {currentAccount?.role ?? '—'}
           </span>
@@ -58,7 +61,7 @@ export function AccountSwitcher() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-72 rounded-2xl border border-ink/10 bg-paper shadow-[0_24px_48px_-24px_rgba(26,31,54,0.25)] py-2 z-30"
+          className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1rem))] max-w-sm rounded-2xl border border-ink/10 bg-paper shadow-[0_24px_48px_-24px_rgba(26,31,54,0.25)] py-2 z-30"
         >
           <p className="px-4 py-2 text-[10px] uppercase tracking-[0.22em] text-ink/45">
             Your locations
