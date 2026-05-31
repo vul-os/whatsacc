@@ -2,7 +2,7 @@ export function PeekInside() {
   return (
     <section className="relative bg-paper-warm">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24">
-        <div className="grid grid-cols-12 gap-x-8 gap-y-6 mb-10 md:mb-12">
+        <div className="grid grid-cols-12 sm:gap-x-8 gap-y-6 mb-10 md:mb-12">
           <div className="col-span-12 lg:col-span-5">
             <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
               <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />

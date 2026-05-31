@@ -1,5 +1,6 @@
 import { LinkButton } from '@/components/ui/Button';
-import { HeroCelestial } from '@/components/illustrations/HeroCelestial';
+import { HeroGateDayNight } from '@/components/illustrations/HeroGateDayNight';
+import { HeroGateDayNightMobile } from '@/components/illustrations/HeroGateDayNightMobile';
 
 // Hardware brands that the controllers integrate with — used as a quiet
 // trust band below the fold. Stays restrained: small caps, ink/45 colour,
@@ -16,13 +17,25 @@ const capabilities = [
 
 export function Hero() {
   return (
-    // Sized to fill the first viewport (minus the ~64px sticky nav) so the
-    // hero + trust band are visible without scrolling on a typical laptop.
-    // Uses 100svh on mobile to avoid the address-bar resize jank.
-    <section className="relative overflow-hidden flex flex-col min-h-[calc(100svh-64px)]">
-      <div className="flex-1 relative mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-4 pb-6 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-12 gap-x-8 gap-y-6 lg:gap-y-0 lg:items-center">
+    // The hero fills the first viewport minus the sticky nav. On DESKTOP it's a
+    // two-column grid (copy + portrait gate), vertically centred, so the trust
+    // band lands just below the fold. On MOBILE the gate becomes a full-height
+    // atmospheric backdrop (set back at the bottom, sky transparent = page) and
+    // the copy sits on top — no cramped band, and the day/night swap reads as
+    // the whole scene changing behind the words.
+    <section className="relative overflow-hidden">
+      <div className="relative mx-auto w-full max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-6 pb-0 sm:pt-8 sm:pb-10 lg:pt-10 lg:pb-12 grid grid-cols-1 lg:grid-cols-12 gap-y-5 lg:gap-x-8 lg:gap-y-0 lg:items-center lg:content-center min-h-[calc(100svh-72px)] lg:min-h-[calc(100svh-64px)]">
+        {/* ── mobile backdrop: the gate, set back, behind the copy ──────
+            The gate sits full-size at the bottom; a soft page-coloured scrim
+            fades down over its top third so the copy always reads crisply over
+            the scene (in both themes) without dimming the gate or sun itself. */}
+        <div className="hero-mobile-scene lg:hidden absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          <HeroGateDayNightMobile className="absolute bottom-0 left-0 w-full h-auto" />
+          <div className="absolute inset-x-0 top-0 h-[62%] bg-gradient-to-b from-paper from-35% via-paper/70 via-[68%] to-transparent transition-[background-image] duration-[400ms] ease-out" />
+        </div>
+
         {/* ── left: copy + ctas + capabilities ───────────────────────── */}
-        <div className="col-span-12 lg:col-span-7 relative z-10 order-1 lg:order-1">
+        <div className="col-span-12 lg:col-span-7 min-w-0 relative z-10 order-1 lg:order-1">
           {/* eyebrow — small, calm, capability-first */}
           <div className="inline-flex items-center gap-2.5 rounded-full bg-paper-cool border border-ink/10 pl-2.5 pr-4 py-1.5">
             <span className="grid place-items-center h-5 w-5 rounded-full bg-ink text-paper text-[10px] leading-none">
@@ -83,8 +96,16 @@ export function Hero() {
             ))}
           </ul>
 
+          {/* reassurance — on phones/small screens this rides ABOVE the buttons
+              so the thin caption stays in the clean copy band and never lands on
+              the sun/gate behind it. The solid buttons below sit happily over the
+              scene. At md+ the same line tucks inline beside the ctas instead. */}
+          <p className="md:hidden mt-4 sm:mt-5 text-xs text-ink/45">
+            No credit card. Free up to 100 msgs / month.
+          </p>
+
           {/* ctas */}
-          <div className="mt-4 sm:mt-7 flex flex-wrap items-center gap-3">
+          <div className="mt-3 sm:mt-7 flex flex-wrap items-center gap-3">
             <LinkButton to="/signup" variant="ink" size="lg">
               Start free
             </LinkButton>
@@ -105,22 +126,22 @@ export function Hero() {
               No credit card. Free up to 100 msgs / month.
             </span>
           </div>
-          <p className="md:hidden mt-3 text-xs text-ink/45">
-            No credit card. Free up to 100 msgs / month.
-          </p>
         </div>
 
-        {/* ── right: celestial body ───────────────────────────────── */}
-        <div className="col-span-12 lg:col-span-5 order-2 lg:order-2 relative">
-          <div className="relative mx-auto max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[440px]">
-            <HeroCelestial className="block w-full h-auto" />
+        {/* ── right: the gate — open & sunlit by day, shut & locked by night.
+            Two compositions sharing one set of animations: a compact landscape
+            "gateway band" below lg (fits a phone viewport, grounded against the
+            trust band), and the full portrait scene at lg+ beside the copy. ── */}
+        <div className="hidden lg:block lg:col-span-5 min-w-0 order-2 relative">
+          <div className="mx-auto max-w-[500px]">
+            <HeroGateDayNight className="block w-full h-auto" />
           </div>
         </div>
       </div>
 
       {/* ── trust band: hardware integrations + 3 hard metrics ─────── */}
       <div className="border-y border-ink/10 bg-paper-warm/40">
-        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 grid grid-cols-12 gap-y-4 gap-x-8 items-center">
+        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 grid grid-cols-12 gap-y-4 sm:gap-x-8 items-center">
           <div className="col-span-12 md:col-span-5">
             <span className="text-[10px] uppercase tracking-[0.22em] text-ink/55">
               Talks to your hardware

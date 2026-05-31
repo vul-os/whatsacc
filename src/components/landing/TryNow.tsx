@@ -68,7 +68,7 @@ export function TryNow() {
   return (
     <section className="relative bg-paper border-y border-ink/10">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-16 sm:py-20 lg:py-24">
-        <div className="grid grid-cols-12 gap-y-10 gap-x-10 items-start">
+        <div className="grid grid-cols-12 gap-y-10 sm:gap-x-10 items-start">
           {/* ── Left: headline + context ─────────────────────────────── */}
           <div className="col-span-12 lg:col-span-5">
             <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
