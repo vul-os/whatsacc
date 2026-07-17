@@ -31,3 +31,9 @@ backend/coverage
 *.njsproj
 *.sln
 *.sw?
+
+# build caches
+.firebase/
+*.tsbuildinfo
+# secrets scratch
+backend/.secrets.*.json
