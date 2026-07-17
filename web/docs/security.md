@@ -15,6 +15,7 @@ there is only one binary.
 | Tenancy | App-layer org scoping enforced on every SQLite query |
 | Transport | TLS terminated by the gateway itself; tunnels stay content-blind via SNI passthrough where supported |
 | Audit | Append-only event log: every open, denial, pairing and config change |
+| Abuse limits | Cooldowns, hourly caps and optional per-location quotas at one choke point — see [Rate limits & quotas](limits.md) |
 
 ## Signed commands and key pinning
 
@@ -64,6 +65,17 @@ The offline grant path is designed to add no new soft spot: the controller check
 grant **signed by the pinned gateway key**, then a fresh nonce signed by the app key
 the grant names. Neither the LAN nor Bluetooth is trusted. Revocation converges within
 the grant TTL; see [Emergency access](emergency-access.md) for the full trade-off.
+
+## Abuse limits
+
+Every open path — portal, API, WhatsApp, Slack — funnels through one enforcement
+point that applies rate limits (cooldowns, hourly caps) and any admin-set quotas, so
+no channel can be picked to bypass them. Every denial is audit-logged with its
+reason, and the internal counters are tenant-isolated under forced row-level
+security with no policies — tenants can neither inspect nor exhaust each other's
+counters. If the counter store itself fails, opens are allowed but tagged in the
+audit log (availability wins for a physical gate; visibility is preserved). The
+full design, defaults and tuning live in [Rate limits & quotas](limits.md).
 
 ## What we deliberately don't claim
 

@@ -54,6 +54,13 @@ ones:
 | `WACC_PUBLIC_URL` | The URL the world reaches you at. Used for webhooks, invite links, the app. |
 | `WACC_DATA_DIR` | Where `whatsacc.db` and keys live. Back this directory up. |
 | `WACC_CHANNEL_*` | Per-channel credentials — see [Chat channels](channels.md). |
+| `RATE_OPEN_COOLDOWN_S` | Minimum seconds between successful opens per person per access point (default 10; `0` disables). |
+| `RATE_OPENS_PER_HOUR` | Successful opens per member per hour (default 30; `0` = kill switch). |
+| `RATE_CHAT_MSGS_PER_MIN` | Inbound chat messages per sender per minute before the bot goes quiet (default 10). |
+| `RATE_ACCOUNT_OPENS_PER_HOUR` | Successful opens per account per hour — runaway-integration ceiling (default 500; `0` = kill switch). |
+
+The four `RATE_*` variables are abuse guards, not billing — semantics, denial
+behaviour and tuning advice are in [Rate limits & quotas](limits.md).
 
 ## Reachability
 

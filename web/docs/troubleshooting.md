@@ -23,10 +23,22 @@ geofence declined you; share your live location or get closer. `outside your acc
 window` is a time-window rule. If it says *opened* and nothing moved, it's a wiring or
 controller issue — see below.
 
-**"You have 0 opens left this month."**
-An admin set a per-member open quota on your membership (an access rule, like time
-windows). The web portal keeps working (it is never quota-limited), or ask an admin to
-raise the quota under **Members**.
+**The bot says "Too many opens — try again in ~2 min."**
+You hit a built-in rate limit: the per-access-point cooldown (default 10 s between
+opens) or the hourly cap (default 30 opens/member, 500/account). These protect
+against runaway scripts, not people — waiting the stated time always clears it. The
+gateway operator tunes them via the `RATE_*` env vars; see
+[Rate limits & quotas](limits.md).
+
+**The bot says "Daily limit reached for this location."**
+An admin set a per-member or per-location daily quota (UTC day) on that location.
+This applies to every channel — chat, portal and API alike — so switching channels
+won't help. Ask an admin: they can raise or clear it under the location's **Limits**
+page, and admins themselves are exempt from quotas, so they can always let you in.
+
+**I sent several messages and the bot just went quiet.**
+The chat flood throttle (default 10 messages/min per sender). It resets within a
+minute; slow down. Gate state was never touched — this only silences replies.
 
 ## Webhooks
 
@@ -37,6 +49,18 @@ and that the tunnel/proxy passes `GET` challenges through untouched.
 **Events arrive but the audit log shows `bad signature`.**
 Your app secret / signing secret is wrong or rotated. The gateway fail-closes on
 signature mismatch by design. Paste the current secret into `.env` and restart.
+
+## API
+
+**The API returns `429 Too Many Requests`.**
+Your call was denied by a rate limit (`rate_limited`) or an admin-set daily quota
+(`quota_exceeded`) — the body carries the reason and the `Retry-After` header says
+how many seconds until a retry can succeed; honour it instead of hammering. The
+attempt was audit-logged, and a denied open never consumes quota or a visitor-pass
+use. Persistent 429s from an integration usually mean the account ceiling
+(`RATE_ACCOUNT_OPENS_PER_HOUR`, default 500) needs raising, or a quota needs a
+second look on the location's **Limits** page — see
+[Rate limits & quotas](limits.md).
 
 ## Controllers
 

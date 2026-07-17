@@ -72,6 +72,11 @@
       "file": "channels.md"
     },
     {
+      "id": "limits",
+      "title": "Rate limits & quotas",
+      "file": "limits.md"
+    },
+    {
       "id": "controllers",
       "title": "Controllers",
       "file": "controllers.md"
@@ -120,7 +125,8 @@
       "title": "Run a gateway",
       "pages": [
         "self-host",
-        "channels"
+        "channels",
+        "limits"
       ]
     },
     {

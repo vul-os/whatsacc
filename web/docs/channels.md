@@ -76,9 +76,19 @@ Track progress on [GitHub](https://github.com/vul-os/whatsacc).
   *hey gate*, 👍.
 - One access point → the gate just opens.
 - Several access points → the reply is a numbered picker; the member answers `1`/`2`/`3`.
-- Quota warnings ("you have 5 opens left this month") appear when an admin has set a
-  per-member open quota as an access rule; they link to the web portal, which is never
-  quota-limited.
+- Quota warnings appear when an admin has set a daily open quota on the location;
+  denials say so honestly and link to the web portal — see
+  [Rate limits & quotas](limits.md).
+
+## Flood protection
+
+Every channel shares one throttle: past 10 inbound messages per minute from the same
+sender (tunable via `RATE_CHAT_MSGS_PER_MIN`), **the bot goes quiet** — it stops
+replying until the minute window rolls over. The webhook itself still answers `200`,
+deliberately: an error would make Meta or Slack retry and amplify the flood. Going
+quiet only silences replies; gate opens are governed separately by the open limits in
+[Rate limits & quotas](limits.md), and denials of actual open attempts always get an
+honest reply rather than silence.
 
 ## Writing a new channel
 
