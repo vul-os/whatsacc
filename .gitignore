@@ -37,3 +37,6 @@ backend/coverage
 *.tsbuildinfo
 # secrets scratch
 backend/.secrets.*.json
+
+# wrangler local-dev secrets (per-developer)
+backend/.dev.vars

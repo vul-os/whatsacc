@@ -2,12 +2,22 @@
   "name": "whatsacc",
   "private": true,
   "version": "0.0.0",
+  "description": "Texts that open gates — decentralized chat-driven physical access control (portal + whatsacc.com site)",
+  "license": "MIT",
+  "author": "imranparuk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vul-os/whatsacc"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/postbuild.mjs",
     "build:dev": "tsc -b && vite build --mode dev",
+    "postbuild:dev": "node scripts/postbuild.mjs",
     "build:main": "tsc -b && vite build --mode main",
+    "postbuild:main": "node scripts/postbuild.mjs",
     "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
     "deploy:main": "npm run build:main && firebase deploy --only hosting:main",
     "preview": "vite preview",

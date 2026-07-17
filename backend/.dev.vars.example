@@ -1,0 +1,49 @@
+# whatsacc backend — wrangler local-dev secrets
+#
+# Copy to .dev.vars:   cp .dev.vars.example .dev.vars    (from backend/)
+#
+# `wrangler dev` reads THIS file (backend/.dev.vars), not the repo-root .env.
+# Non-secret vars (APP_ENV, APP_PUBLIC_URL) come from wrangler.toml [vars];
+# everything here is a secret binding. Deployed envs use `wrangler secret put
+# <NAME> --env=dev|main` (see scripts/push-secrets.mjs).
+#
+# Authoritative var list + semantics: src/lib/env.ts
+# Keep values in sync with ../.env so migrations/tests and the dev worker
+# hit the same database.
+
+# Required — worker refuses requests without these two
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/whatsacc?sslmode=disable
+JWT_SECRET=dev-only-change-me
+
+# Google OAuth sign-in (optional)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
+
+# Resend transactional email (optional; unset = emails logged, not sent)
+RESEND_API_KEY=
+
+# Meta WhatsApp Cloud API channel (optional)
+WHATSAPP_APP_SECRET=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+#WHATSAPP_GRAPH_VERSION=v21.0
+
+# Telegram bot channel (optional)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+
+# Slack channel (optional)
+SLACK_BOT_TOKEN=
+SLACK_SIGNING_SECRET=
+SLACK_APP_ID=
+
+# Abuse-protection rate limits (optional; defaults 10 / 30 / 10 / 500)
+#RATE_OPEN_COOLDOWN_S=10
+#RATE_OPENS_PER_HOUR=30
+#RATE_CHAT_MSGS_PER_MIN=10
+#RATE_ACCOUNT_OPENS_PER_HOUR=500
+
+# One-time instance-admin claim token (optional bootstrap)
+#ADMIN_CLAIM_TOKEN=

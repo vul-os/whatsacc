@@ -5,7 +5,6 @@
 - controller agent implementing proto/ (pairing, signed commands, offline grants, events)
 - Svelte 5 + Tauri app: admin console + LAN/BLE offline emergency access
 - Discord channel (WhatsApp + Slack shipped)
-- vulos-relay tunnel driver (proto/tunnel.md)
 
 ## carried over (still relevant)
 - [x] buy domain on namecheap, whatsacc.com
@@ -27,5 +26,5 @@
 
 ## removed by decision (do not resurrect)
 - billing / paystack / wallet / subscriptions / invoices / VAT / referrals / payouts /
-  pricing tiers / FX display — whatsacc has NO billing system. If flagship edge costs
-  ever need funding: DMTAP-style postage (see ARCHITECTURE.md), not subscriptions.
+  pricing tiers / FX display — whatsacc has NO billing system. Operators solve money
+  outside the system; see ARCHITECTURE.md §4 "Money is out of scope".

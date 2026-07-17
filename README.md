@@ -78,7 +78,7 @@ npm run screenshotter   # boots the app with mocked data → web/screenshots/{,d
 
 | Directory     | What                                                             | Status |
 | ------------- | ---------------------------------------------------------------- | ------ |
-| `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 12-chapter docs, self-contained, light/dark | ✅ |
+| `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 14-chapter docs, self-contained, light/dark | ✅ |
 | `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events | ✅ v0 draft |
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Current portal + marketing — React 19 · Vite · light/dark        | ✅ running |
@@ -97,9 +97,15 @@ Prereqs: Node 20+, Postgres 16+ (local).
 ```bash
 npm install                     # frontend deps
 cd backend && npm install       # backend deps
+cd ..
 
-npm run migrate                 # apply migrations (DATABASE_URL in ../.env)
-npm run dev                     # API via wrangler on :8787
+cp .env.example .env            # read by migrate/seed/test scripts (node --env-file)
+cp backend/.dev.vars.example backend/.dev.vars   # read by `wrangler dev` (NOT .env)
+# → set DATABASE_URL + JWT_SECRET in BOTH; everything else is optional
+
+cd backend
+npm run migrate                 # apply migrations (DATABASE_URL from ../.env)
+npm run dev                     # API via wrangler on :8787 (env from .dev.vars)
 cd .. && npm run dev            # Vite portal on :5173
 ```
 
@@ -129,6 +135,12 @@ whatsacc is a standalone open-source product in the [Vulos](https://vulos.org) s
 sovereign software you can run yourself. Reachability stays simple: a public IP with
 built-in ACME, or any tunnel you already trust (cloudflared, frp) beside the binary.
 On a LAN with Slack Socket Mode, no public URL is needed at all.
+
+## Contributing & security
+
+Dev setup, test suites and style live in [CONTRIBUTING.md](CONTRIBUTING.md).
+Vulnerabilities — this product opens physical gates — go privately via
+[SECURITY.md](SECURITY.md), never the public tracker.
 
 ## License
 

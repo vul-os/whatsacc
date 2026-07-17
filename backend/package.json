@@ -1,6 +1,14 @@
 {
   "name": "whatsacc-backend",
   "private": true,
+  "description": "whatsacc API — Cloudflare Workers + Hono + Postgres; the behavioral spec for the Go gateway port",
+  "license": "MIT",
+  "author": "imranparuk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vul-os/whatsacc",
+    "directory": "backend"
+  },
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

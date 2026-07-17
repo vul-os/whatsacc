@@ -50,13 +50,22 @@ const dir = await resolveDir(flags.dir, join(repoBackend, 'migrations'));
 // it connects to exactly one host (same way libpq via psql works fine).
 const url = new URL(databaseUrl);
 const { address } = await lookup(url.hostname, { family: 4 });
+// SSL: honor ?sslmode=disable (local Postgres / CI service containers speak
+// plain TCP and reject the SSLRequest handshake); default loopback hosts to
+// no-SSL too unless sslmode=require. Anything else (Neon etc.) uses TLS.
+const sslmode = url.searchParams.get('sslmode');
+const loopback = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+const ssl =
+  sslmode === 'disable' || (loopback && sslmode !== 'require')
+    ? false
+    : { servername: url.hostname, rejectUnauthorized: false };
 const client = new pg.Client({
   host: address,
   port: Number(url.port) || 5432,
   user: decodeURIComponent(url.username),
   password: decodeURIComponent(url.password),
   database: url.pathname.replace(/^\//, ''),
-  ssl: { servername: url.hostname, rejectUnauthorized: false },
+  ssl,
 });
 await client.connect();
 

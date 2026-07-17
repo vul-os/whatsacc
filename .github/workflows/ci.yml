@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  frontend:
+    name: frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify dist/ layout (landing + SPA shell + docs + assets)
+        run: |
+          test -f dist/index.html
+          test -f dist/app.html
+          test -f dist/docs/index.html
+          test -f dist/docs/manifest.json
+          test -f dist/docs/vendor/marked.min.js
+          test -d dist/fonts
+          test -d dist/screenshots
+          test -d dist/assets
+          grep -q 'id="root"' dist/app.html
+
+  backend:
+    name: backend (typecheck + unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:unit
+        env:
+          JWT_SECRET: ci-dummy-jwt-secret
+          APP_ENV: test
+
+  backend-integration:
+    name: backend (integration + security, real Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: whatsacc
+          POSTGRES_PASSWORD: whatsacc
+          POSTGRES_DB: whatsacc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whatsacc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # The backend's migrate/test scripts read env from the repo-root .env
+      # (node --env-file=../.env). Point them at the service container.
+      - name: Write repo-root .env for the test runner
+        run: |
+          cat > ../.env <<'EOF'
+          DATABASE_URL=postgres://whatsacc:whatsacc@localhost:5432/whatsacc_test?sslmode=disable
+          JWT_SECRET=ci-dummy-jwt-secret
+          APP_ENV=test
+          APP_PUBLIC_URL=http://test.local
+          EOF
+      - run: npm run migrate
+      - run: npm run test:integration
+      - run: npm run test:security
