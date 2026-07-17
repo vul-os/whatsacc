@@ -13,6 +13,11 @@
 <meta property="og:site_name" content="whatsacc">
 <meta property="og:title" content="whatsacc — texts that open gates">
 <meta property="og:description" content="A decentralized access network. One MIT gateway binary, three chat channels, zero cloud lock-in.">
+<meta property="og:url" content="https://whatsacc.com/">
+<meta property="og:image" content="https://whatsacc.com/screenshots/landing-hero.png">
+<meta property="og:image:width" content="1440">
+<meta property="og:image:height" content="900">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="robots" content="index,follow">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231A1F36'/%3E%3Cpath d='M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z' fill='none' stroke='%23F4EDE2' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='42' r='3' fill='%23D6624D'/%3E%3C/svg%3E">
 <script>
@@ -337,8 +342,8 @@ p{margin:0}
 /* self-host band */
 .selfhost{background:var(--band);color:var(--band-text)}
 .selfhost .eyebrow{color:rgba(250,250,248,.55)}
-.selfhost-grid{display:grid;gap:48px}
-@media(min-width:1024px){.selfhost-grid{grid-template-columns:6fr 6fr;align-items:start}}
+.selfhost-grid{display:grid;gap:48px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:1024px){.selfhost-grid{grid-template-columns:minmax(0,6fr) minmax(0,6fr);align-items:start}}
 .selfhost h2{font-size:clamp(2.2rem,5.4vw,4rem);line-height:.98;color:var(--band-text)}
 .selfhost h2 em{font-style:italic;color:var(--terracotta-soft);font-variation-settings:"SOFT" 100}
 :root[data-theme='dark'] .selfhost h2 em{color:var(--terracotta)}
@@ -541,10 +546,19 @@ p{margin:0}
               </span>
             </div>
             <div class="shot">
-              <img class="shot-light" src="screenshots/portal-dashboard.png" width="1440" height="900" loading="eager" alt="whatsacc portal dashboard — locations, live activity and controllers" onerror="this.classList.add('missing')">
-              <img class="shot-dark" src="screenshots/dark/portal-dashboard.png" width="1440" height="900" loading="eager" alt="whatsacc portal dashboard, dark theme" onerror="this.classList.add('missing')">
+              <img class="shot-light" src="screenshots/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="whatsacc portal dashboard — locations, live activity and controllers" onerror="this.classList.add('missing')">
+              <img class="shot-dark" src="screenshots/dark/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="whatsacc portal dashboard, dark theme" onerror="this.classList.add('missing')">
             </div>
           </figure>
+          <script>
+          /* hero: eagerly fetch only the active theme's screenshot; the hidden
+             variant stays lazy and loads on demand if the theme is toggled */
+          (function(){
+            var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var img = document.querySelector(dark ? '.shot .shot-dark' : '.shot .shot-light');
+            if (img) img.loading = 'eager';
+          })();
+          </script>
         </div>
         <span class="corner corner-tl" aria-hidden="true"></span>
         <span class="corner corner-br" aria-hidden="true"></span>
