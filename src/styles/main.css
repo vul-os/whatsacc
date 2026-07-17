@@ -463,17 +463,24 @@ body {
    the one-time day/night toggle stutter. The scene is rich enough static; only
    the toggle animates, and it's GPU-hinted via will-change. */
 
-/* ── Auth aside — dark editorial panel, stable across modes ─────────── */
+/* ── Auth aside — themed panel that mirrors the hero day/night gate ───
+   Tracks the page theme (light + open gate by day, dark + shut gate by night)
+   so the auth pages read as one world with the landing site. A hair warmer than
+   the form column (--paper-warm vs --paper) plus the column border gives the two
+   sides a quiet seam without breaking the single-surface feel. */
 
 .auth-aside {
-  background-color: var(--aside-surface);
-  color: var(--aside-ink);
+  background-color: var(--paper-warm);
+  color: var(--ink);
+  border-color: var(--paper-edge);
 }
+/* top scrim — fades the panel colour down over the upper scene so the kicker,
+   title and body stay crisp over the sun/glow in both themes. */
 .auth-aside-fade {
   background: linear-gradient(
-    to top,
-    var(--aside-surface),
-    color-mix(in srgb, var(--aside-surface) 85%, transparent),
+    to bottom,
+    var(--paper-warm),
+    color-mix(in srgb, var(--paper-warm) 72%, transparent) 48%,
     transparent
   );
 }

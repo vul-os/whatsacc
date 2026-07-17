@@ -44,29 +44,34 @@ export default function VerifyEmail() {
       asideTitle="One quick confirm."
       asideBody={
         <p>
-          We're checking the link you clicked. Once verified, your account is active and you can
-          sign in.
+          Click the link we sent and your account is live — no password, just your number and a
+          message.
         </p>
       }
     >
-      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em]">
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em] text-ink">
         Email verification
       </h1>
 
       {status === 'verifying' && (
-        <p className="mt-4 inline-flex items-center gap-2 text-[13px] uppercase tracking-[0.18em] text-ink/55">
-          <span className="h-1 w-1 rounded-full bg-terracotta animate-pulse" aria-hidden />
-          Verifying&hellip;
-        </p>
+        <>
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+            This only takes a moment.
+          </p>
+          <p className="mt-5 sm:mt-6 inline-flex items-center gap-2.5 text-[13px] uppercase tracking-[0.18em] text-ink/55">
+            <span className="h-1.5 w-1.5 rounded-full bg-terracotta animate-pulse" aria-hidden />
+            Verifying your link&hellip;
+          </p>
+        </>
       )}
 
       {status === 'missing' && (
         <>
-          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             This link is missing its token. Open the verification link from your email, or sign in
             to request a new one.
           </p>
-          <Button variant="ink" size="lg" className="mt-6" onClick={() => navigate('/login')}>
+          <Button variant="ink" size="lg" className="mt-5 sm:mt-6 w-full" onClick={() => navigate('/login')}>
             Go to sign in
           </Button>
         </>
@@ -74,10 +79,13 @@ export default function VerifyEmail() {
 
       {status === 'success' && (
         <>
-          <div className="mt-6 rounded-xl bg-moss/10 border border-moss/30 px-4 py-3 text-sm text-ink/85">
-            Your email is verified. You can now sign in.
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+            Your email is verified — welcome aboard.
+          </p>
+          <div className="mt-5 sm:mt-6 rounded-xl bg-moss/10 border border-moss/25 px-4 py-3.5 text-[15px] text-ink/85 leading-relaxed">
+            You can now sign in with your account.
           </div>
-          <Button variant="ink" size="lg" className="mt-6 w-full" onClick={() => navigate('/login')}>
+          <Button variant="ink" size="lg" className="mt-3 w-full" onClick={() => navigate('/login')}>
             Sign in
           </Button>
         </>
@@ -85,18 +93,21 @@ export default function VerifyEmail() {
 
       {status === 'error' && (
         <>
-          <p className="mt-3 text-sm text-terracotta-deep" role="alert">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+            There was a problem with your verification link.
+          </p>
+          <p className="mt-4 text-[15px] text-terracotta-deep leading-relaxed" role="alert">
             {errorMsg}
           </p>
-          <Button variant="ink" size="lg" className="mt-6 w-full" onClick={() => navigate('/login')}>
+          <Button variant="ink" size="lg" className="mt-5 sm:mt-6 w-full" onClick={() => navigate('/login')}>
             Go to sign in
           </Button>
         </>
       )}
 
-      <p className="mt-6 text-sm text-ink/60">
+      <p className="mt-5 sm:mt-6 text-sm text-ink/55">
         Trouble?{' '}
-        <Link to="/login" className="underline underline-offset-4 decoration-terracotta">
+        <Link to="/login" className="underline underline-offset-4 decoration-terracotta hover:text-ink/80 transition-colors">
           Sign in
         </Link>
         {' '}and we'll resend the link.

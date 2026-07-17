@@ -56,7 +56,7 @@ export default function ResetPassword() {
   return (
     <AuthLayout
       asideKicker="Reset password"
-      asideTitle="Pick a new one."
+      asideTitle="A fresh start."
       asideBody={
         <p>
           Choose a new password — at least 8 characters. Once you save, all your active sessions
@@ -70,13 +70,13 @@ export default function ResetPassword() {
 
       {missing ? (
         <>
-          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             This link is missing its token. Request a new reset link to continue.
           </p>
           <Button
             variant="ink"
             size="lg"
-            className="mt-6"
+            className="mt-5 sm:mt-6 w-full"
             onClick={() => navigate('/forgot-password')}
           >
             Request new link
@@ -84,19 +84,22 @@ export default function ResetPassword() {
         </>
       ) : done ? (
         <>
-          <div className="mt-6 rounded-xl bg-moss/10 border border-moss/30 px-4 py-3 text-sm text-ink/85">
-            Password updated. You can now sign in with the new one.
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+            Your password has been updated successfully.
+          </p>
+          <div className="mt-5 sm:mt-6 rounded-xl bg-moss/10 border border-moss/30 px-4 py-3 text-sm text-ink/85">
+            You can now sign in with your new password. All active sessions have been signed out.
           </div>
-          <Button variant="ink" size="lg" className="mt-6 w-full" onClick={() => navigate('/login')}>
+          <Button variant="ink" size="lg" className="mt-3 w-full" onClick={() => navigate('/login')}>
             Sign in
           </Button>
         </>
       ) : (
         <>
-          <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             Choose something at least 8 characters long.
           </p>
-          <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+          <form onSubmit={onSubmit} className="mt-5 sm:mt-6 space-y-3 sm:space-y-4" noValidate>
             <Field
               label="New password"
               type="password"
@@ -108,7 +111,7 @@ export default function ResetPassword() {
               placeholder="••••••••"
             />
             <Field
-              label="Confirm"
+              label="Confirm password"
               type="password"
               autoComplete="new-password"
               required
@@ -121,16 +124,15 @@ export default function ResetPassword() {
               {submitting ? 'Updating…' : 'Save new password'}
             </Button>
           </form>
+          <p className="mt-5 sm:mt-6 text-sm text-ink/60">
+            Need a fresh link?{' '}
+            <Link to="/forgot-password" className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink">
+              Request a new one
+            </Link>
+            .
+          </p>
         </>
       )}
-
-      <p className="mt-6 text-sm text-ink/60">
-        Need a fresh link?{' '}
-        <Link to="/forgot-password" className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink">
-          Request a new one
-        </Link>
-        .
-      </p>
     </AuthLayout>
   );
 }

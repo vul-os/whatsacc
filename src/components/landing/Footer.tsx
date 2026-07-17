@@ -32,12 +32,14 @@ const cols = [
 ];
 
 export function Footer() {
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
   return (
     <footer className="relative bg-ink text-paper">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-16 sm:pt-20 pb-10">
         <div className="grid grid-cols-12 gap-x-6 gap-y-10">
           <div className="col-span-12 lg:col-span-5">
-            <Link to="/" className="inline-flex items-center gap-3" aria-label="whatsacc home">
+            <Link to="/" onClick={scrollToTop} className="inline-flex items-center gap-3" aria-label="whatsacc home">
               <span className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-xl bg-paper/5 border border-paper/10">
                 <ArchMark className="h-8 w-8 sm:h-9 sm:w-9 text-paper" />
               </span>
@@ -61,7 +63,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {c.links.map((l) => (
                   <li key={l.to}>
-                    <Link to={l.to} className="text-paper/80 hover:text-paper text-sm">
+                    <Link to={l.to} onClick={scrollToTop} className="text-paper/80 hover:text-paper text-sm">
                       {l.label}
                     </Link>
                   </li>

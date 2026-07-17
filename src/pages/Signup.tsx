@@ -182,13 +182,12 @@ export default function Signup() {
 
   return (
     <AuthLayout
-      asideOrder="last"
       asideKicker={step === 'location' ? 'Almost there' : 'Get started'}
       asideTitle={
         step === 'auth'
           ? 'First gate is on us.'
           : step === 'kind'
-            ? 'Personal or for the team?'
+            ? 'Personal or business?'
             : 'Name your first place.'
       }
       asideBody={
@@ -220,8 +219,8 @@ export default function Signup() {
           {/* ── Step 1: auth ───────────────────────────────────────────── */}
           {step === 'auth' && (
             <>
-              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">Create your account</h1>
-              <p className="mt-2 text-sm text-ink/60">
+              <h1 className="font-display-tight text-2xl sm:text-3xl text-ink">Create your account</h1>
+              <p className="mt-1 text-sm text-ink/60">
                 {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. No credit card.'}
               </p>
 
@@ -230,13 +229,13 @@ export default function Signup() {
                   <a
                     href={googleStartUrl}
                     onClick={rememberPendingWhatsAppPhone}
-                    className="mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+                    className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
                   >
                     <GoogleMark />
                     <span className="text-sm font-medium">Continue with Google</span>
                   </a>
 
-                  <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
+                  <div className="my-3 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
                     <span className="flex-1 h-px bg-ink/12" />
                     or
                     <span className="flex-1 h-px bg-ink/12" />
@@ -307,14 +306,14 @@ export default function Signup() {
                 type="button"
                 variant="ink"
                 size="lg"
-                className="w-full mt-6"
+                className="w-full mt-3"
                 onClick={gotoNext}
                 disabled={!canAdvanceFromAuth || submitting}
               >
                 {submitting ? 'Creating account…' : isInviteSignup ? 'Create account and accept invite' : 'Continue →'}
               </Button>
 
-              <p className="mt-5 text-sm text-ink/60">
+              <p className="mt-2 text-sm text-ink/60">
                 Already with us?{' '}
                 <Link to="/login" className="underline underline-offset-4 decoration-terracotta">
                   Sign in
@@ -327,12 +326,12 @@ export default function Signup() {
           {/* ── Step 2: account kind ───────────────────────────────────── */}
           {step === 'kind' && (
             <>
-              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">What is this for?</h1>
-              <p className="mt-2 text-sm text-ink/60">
+              <h1 className="font-display-tight text-2xl sm:text-3xl text-ink">What is this for?</h1>
+              <p className="mt-1.5 text-sm text-ink/60">
                 We tailor the dashboard a little. You can switch later.
               </p>
 
-              <div className="mt-6 grid grid-cols-1 gap-3">
+              <div className="mt-5 grid grid-cols-1 gap-3">
                 <KindCard
                   selected={kind === 'personal'}
                   onClick={() => setKind('personal')}
@@ -364,7 +363,7 @@ export default function Signup() {
 
               {errorMsg && <p className="mt-4 text-sm text-terracotta-deep">{errorMsg}</p>}
 
-              <div className="mt-7 flex items-center gap-3">
+              <div className="mt-5 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={gotoBack}
@@ -388,12 +387,12 @@ export default function Signup() {
           {/* ── Step 3: first location ─────────────────────────────────── */}
           {step === 'location' && (
             <form onSubmit={onFinalSubmit}>
-              <h1 className="font-display-tight text-3xl sm:text-4xl text-ink">Your first location</h1>
-              <p className="mt-2 text-sm text-ink/60">
+              <h1 className="font-display-tight text-2xl sm:text-3xl text-ink">Your first location</h1>
+              <p className="mt-1.5 text-sm text-ink/60">
                 Each location has its own gates, members and billing. You can add more after.
               </p>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-5 space-y-3">
                 <Field
                   label="Location name"
                   value={locationName}
@@ -455,7 +454,7 @@ export default function Signup() {
                 </p>
               )}
 
-              <div className="mt-7 flex items-center gap-3">
+              <div className="mt-5 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={gotoBack}
@@ -486,13 +485,13 @@ export default function Signup() {
 function Stepper({ current }: { current: Step }) {
   const idx = STEPS.findIndex((s) => s.key === current);
   return (
-    <ol className="mb-8 flex items-center gap-3">
+    <ol className="mb-2 flex items-center gap-2">
       {STEPS.map((s, i) => {
         const state = i < idx ? 'done' : i === idx ? 'active' : 'upcoming';
         return (
-          <li key={s.key} className="flex items-center gap-3 flex-1">
+          <li key={s.key} className="flex items-center gap-2 flex-1">
             <span
-              className={`flex-none grid place-items-center h-8 w-8 rounded-full text-xs font-medium ${
+              className={`flex-none grid place-items-center h-7 w-7 rounded-full text-xs font-medium ${
                 state === 'done'
                   ? 'bg-terracotta text-paper'
                   : state === 'active'
@@ -501,7 +500,7 @@ function Stepper({ current }: { current: Step }) {
               }`}
             >
               {state === 'done' ? (
-                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5"><path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
+                <svg viewBox="0 0 16 16" className="h-3 w-3"><path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
               ) : (
                 i + 1
               )}

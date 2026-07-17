@@ -39,25 +39,27 @@ export default function ForgotPassword() {
       <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em] text-ink">
         Reset your password
       </h1>
-      <p className="mt-3 text-[15px] text-ink/65 leading-relaxed">
-        Enter the email you signed up with — we&rsquo;ll email you a reset link.
-      </p>
+      {!sent && (
+        <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+          Enter the email you signed up with — we&rsquo;ll email you a reset link.
+        </p>
+      )}
 
       {sent ? (
-        <div className="mt-8 space-y-4">
-          <div className="rounded-xl bg-moss/10 border border-moss/30 px-4 py-3 text-sm text-ink/85">
-            <p className="font-medium">Check your inbox.</p>
-            <p className="mt-1 text-ink/70">
+        <div className="mt-5 sm:mt-6 space-y-3 sm:space-y-4">
+          <div className="rounded-xl bg-signal/[0.08] border border-signal/25 px-5 py-4 text-sm text-ink/85">
+            <p className="font-medium text-ink">Check your inbox.</p>
+            <p className="mt-1.5 leading-relaxed text-ink/70">
               If <span className="font-medium text-ink">{email}</span> is on file, the reset link is
-              on its way. The link expires in one hour.
+              on its way. It expires in one hour — check your spam folder too.
             </p>
           </div>
           <Button variant="outline" size="lg" className="w-full" onClick={() => setSent(false)}>
-            Send another
+            Try a different address
           </Button>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+        <form onSubmit={onSubmit} className="mt-5 sm:mt-6 space-y-3 sm:space-y-4" noValidate>
           <Field
             label="Email"
             type="email"
@@ -76,7 +78,7 @@ export default function ForgotPassword() {
         </form>
       )}
 
-      <p className="mt-6 text-sm text-ink/60">
+      <p className="mt-5 sm:mt-6 text-sm text-ink/60">
         Remembered it?{' '}
         <Link to="/login" className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink">
           Sign in

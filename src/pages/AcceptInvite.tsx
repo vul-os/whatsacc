@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
@@ -80,7 +81,6 @@ export default function AcceptInvite() {
 
   return (
     <AuthLayout
-      asideOrder="last"
       asideKicker="Team up"
       asideTitle="One step away from joining."
       asideBody={
@@ -90,40 +90,49 @@ export default function AcceptInvite() {
         </p>
       }
     >
-      <h1 className="font-display-tight text-3xl sm:text-4xl">Accept invitation</h1>
+      <h1 className="font-display-tight text-[34px] sm:text-[40px] leading-[1.02] tracking-[-0.02em] text-ink">
+        Accept invitation
+      </h1>
 
       {status === 'no-token' && (
         <>
-          <p className="mt-4 text-sm text-ink/70">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             This link doesn't carry an invitation token. Ask the sender to forward you the
             original email.
           </p>
-          <Link
-            to="/login"
-            className="mt-6 inline-block underline underline-offset-4 decoration-terracotta text-sm"
-          >
-            Or sign in to your account →
-          </Link>
+          <p className="mt-5 sm:mt-6 text-sm text-ink/60">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink"
+            >
+              Sign in
+            </Link>
+            .
+          </p>
         </>
       )}
 
       {status === 'needs-auth' && (
         <>
-          <p className="mt-4 text-sm text-ink/70">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             Sign in or create an account first — your invitation will be applied automatically
             once you're authenticated.
           </p>
           <Button
             variant="ink"
             size="lg"
-            className="mt-6 w-full"
+            className="mt-5 sm:mt-7 w-full"
             onClick={() => navigate('/signup')}
           >
             Create account
           </Button>
-          <p className="mt-3 text-sm text-ink/65">
+          <p className="mt-5 sm:mt-6 text-sm text-ink/60">
             Already have an account?{' '}
-            <Link to="/login" className="underline underline-offset-4 decoration-terracotta">
+            <Link
+              to="/login"
+              className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink"
+            >
               Sign in
             </Link>
             .
@@ -133,55 +142,55 @@ export default function AcceptInvite() {
 
       {status === 'idle' && (
         <>
-          <p className="mt-4 text-sm text-ink/70">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             You've been invited to join the team. Confirm your details below to accept and start
             opening gates.
           </p>
-          <div className="mt-6 space-y-4">
-            <div className="p-4 rounded-2xl bg-paper-cool border border-ink/10">
-              <p className="text-xs font-medium text-ink/45 uppercase tracking-wider mb-3">
-                WhatsApp Access (Recommended)
-              </p>
-              <label className="block">
-                <span className="text-sm font-medium text-ink/85 block mb-1.5">Phone number</span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+27..."
-                  className="w-full h-11 rounded-xl bg-paper border border-ink/15 px-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-ink"
-                />
-                <p className="mt-2 text-[11px] text-ink/50 leading-relaxed">
-                  Enter your number in E.164 format (e.g. +27821234567) to open gates via text.
-                </p>
-              </label>
-            </div>
-
+          <div className="mt-5 sm:mt-7 space-y-4">
+            <Field
+              label="WhatsApp phone number"
+              type="tel"
+              value={phone}
+              onChange={setPhone}
+              placeholder="+27..."
+              hint="Optional — enter in E.164 format to open gates via text"
+            />
             <Button
               variant="ink"
               size="lg"
               className="w-full"
               onClick={handleAccept}
             >
-              Accept and Join team
+              Accept and join team
             </Button>
           </div>
         </>
       )}
 
       {status === 'accepting' && (
-        <p className="mt-4 text-sm text-ink/70">Accepting your invitation…</p>
+        <>
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
+            Accepting your invitation…
+          </p>
+          <div className="mt-5 sm:mt-6 flex items-center gap-3">
+            <span
+              className="h-4 w-4 rounded-full border-2 border-ink/20 border-t-ink animate-spin shrink-0"
+              aria-hidden
+            />
+            <p className="text-sm text-ink/70">Just a moment…</p>
+          </div>
+        </>
       )}
 
       {status === 'success' && (
         <>
-          <p className="mt-4 text-sm text-ink/70">
+          <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
             You're in. Taking you to the dashboard…
           </p>
           <Button
             variant="ink"
             size="lg"
-            className="mt-6 w-full"
+            className="mt-5 sm:mt-7 w-full"
             onClick={() => navigate('/app', { replace: true })}
           >
             Go to dashboard
@@ -191,13 +200,17 @@ export default function AcceptInvite() {
 
       {status === 'error' && (
         <>
-          <p className="mt-4 text-sm text-terracotta-deep">{errorMsg}</p>
-          <Link
-            to="/app"
-            className="mt-6 inline-block underline underline-offset-4 decoration-terracotta text-sm"
-          >
-            Continue to dashboard →
-          </Link>
+          <p className="mt-2 sm:mt-3 text-[15px] text-terracotta-deep leading-relaxed">
+            {errorMsg}
+          </p>
+          <p className="mt-5 sm:mt-6 text-sm text-ink/60">
+            <Link
+              to="/app"
+              className="underline underline-offset-4 decoration-terracotta text-ink/85 hover:text-ink"
+            >
+              Continue to dashboard →
+            </Link>
+          </p>
         </>
       )}
     </AuthLayout>

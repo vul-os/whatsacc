@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "build:dev": "tsc -b && vite build --mode dev",
     "build:main": "tsc -b && vite build --mode main",
+    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
+    "deploy:main": "npm run build:main && firebase deploy --only hosting:main",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
