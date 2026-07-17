@@ -1,0 +1,269 @@
+# whatsacc architecture
+
+> **Texts that open gates.** A decentralized access-control system where a chat message —
+> WhatsApp, Slack, Discord — opens a physical gate, door or barrier.
+
+whatsacc has no cloud center. It is a network of independent **gateways**: anyone can run
+one, whatsacc runs the flagship. Every line of code is MIT-licensed, including billing.
+The only private thing about the hosted gateway at [whatsacc.com](https://whatsacc.com)
+is its `.env`.
+
+---
+
+## 1. The system at a glance
+
+```mermaid
+flowchart LR
+    subgraph people [" "]
+        R["🧍 Resident"]
+        A["🛡️ Admin / staff"]
+    end
+
+    subgraph channels ["Chat channels"]
+        WA["WhatsApp<br/>(Meta Cloud API)"]
+        DC["Discord bot"]
+        SL["Slack bot"]
+    end
+
+    subgraph gw ["GATEWAY — one Go binary · SQLite"]
+        CH["Channel seam"]
+        RE["Rules engine<br/>time windows · geofence · quotas"]
+        PORTAL["Management portal<br/>(embedded Svelte build)"]
+        HUB["Device hub<br/>signed commands · Ed25519"]
+        BILL["Billing (optional)<br/>tiers · Paystack seam"]
+        AUD[("Audit log<br/>SQLite")]
+    end
+
+    subgraph site ["At the gate"]
+        C["Controller<br/>Wi-Fi / GSM 4G"]
+        G["🚧 Gate / door / barrier"]
+    end
+
+    APP["📱 whatsacc app<br/>Tauri · Svelte"]
+
+    R -- "“open”" --> WA & DC & SL
+    WA & DC & SL --> CH
+    CH --> RE
+    A -- HTTPS --> PORTAL
+    APP -- HTTPS --> PORTAL
+    RE --> HUB
+    RE --> AUD
+    HUB -- "outbound wss ⇦ dial-out" --- C
+    C -- relay closes --> G
+    APP -. "emergency: LAN / BLE<br/>offline-verified grant" .-> C
+```
+
+Everything server-side is **one binary**. The gateway receives channel webhooks, runs the
+rules, serves the portal and the app's API, holds the audit log, and pushes signed open
+commands to controllers. Controllers dial **out** to the gateway, so they work behind
+NAT and on CGNAT'd 4G SIMs with zero inbound ports.
+
+---
+
+## 2. Components
+
+| Component      | What it is                                                                | Runs on                              | Stack                          |
+| -------------- | ------------------------------------------------------------------------- | ------------------------------------ | ------------------------------ |
+| **gateway**    | The entire server: channels, rules, portal, API, device hub, billing, audit | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
+| **controller** | The unit wired to the gate relay; verifies signatures, drives the motor    | Pi-class board at the gate, Wi-Fi or GSM | Go agent (+ vendor firmware)  |
+| **app**        | Admin console + **emergency access** for residents                         | Desktop, iOS, Android                | Svelte 5 · Tauri v2            |
+| **web**        | whatsacc.com — landing, docs, downloads. Static.                           | Any static host                      | Svelte (static build)          |
+| **proto**      | The versioned wire contracts (see §7)                                      | —                                    | Markdown + schemas             |
+
+### Repo layout
+
+```
+whatsacc/
+├── gateway/      # Go: the whole product server
+│   └── migrations/   # SQLite schema, clean folded baseline
+├── controller/   # gate device agent + reference wiring
+├── app/          # Svelte 5 + Tauri v2 (also builds gateway's embedded portal)
+├── web/          # whatsacc.com — landing + docs (static)
+├── proto/        # pairing · signed commands · grants · tunnel contracts
+└── docs/         # operator guides: run a gateway, BYO WhatsApp number
+```
+
+---
+
+## 3. The three access paths
+
+People reach the gate in three ways, ranked by how people actually behave:
+
+### 3a. Chat — the primary path
+
+Chat is the product. The gateway exposes a **channel seam**: a small interface that
+resolves a sender to an identity, turns a message into an intent, and sends replies.
+
+| Channel      | Identity            | Transport             | Friction to self-host        |
+| ------------ | ------------------- | --------------------- | ---------------------------- |
+| **WhatsApp** | phone number        | Meta Cloud API webhook | High — needs a verified WABA |
+| **Discord**  | user id             | bot gateway / webhook  | Minutes — bot token          |
+| **Slack**    | member id           | Events API             | Minutes — app manifest       |
+
+Memberships are keyed on `(channel, external_id)`, not phone-number-only, so one person
+can be reachable on several channels.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor R as Resident
+    participant M as Meta Cloud API
+    participant GW as Gateway
+    participant C as Controller
+    R->>M: "open" (WhatsApp)
+    M->>GW: webhook (signed)
+    GW->>GW: resolve (channel, sender) → memberships
+    GW->>GW: rules: location · access point · time window · quota
+    alt one access point
+        GW->>C: signed open command (nonce · expiry)
+        C->>C: verify gateway signature (pinned key)
+        C-->>GW: ack + result
+        GW->>M: "✅ Gate opened — Main entrance"
+        M->>R: reply in thread
+    else several access points
+        GW->>M: "Which gate? 1️⃣ Main 2️⃣ Pedestrian 3️⃣ Parking"
+        M->>R: numbered list
+    end
+```
+
+### 3b. The app — emergency access + admin
+
+The Tauri app is deliberately **not** the daily driver. It exists for two jobs: the
+admin console, and opening the gate **when everything else is down**.
+
+The gateway periodically issues each app user an **offline-verifiable grant** — a
+short-lived signed statement of their rights (locations, access points, expiry) bound to
+the app's own keypair. Near the gate, the app finds the controller directly (mDNS on the
+same LAN, or BLE) and proves itself with a challenge-response. No internet, no gateway,
+no Meta involved.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant APP as App (holds grant, signed earlier by gateway)
+    participant C as Controller (pins gateway public key)
+    Note over APP,C: Internet is down. Discovery via mDNS / BLE.
+    APP->>C: open request + grant
+    C->>APP: random nonce
+    APP->>C: sig(app_key, grant ‖ nonce)
+    C->>C: verify grant sig (gateway key) · expiry · rights · nonce sig (app key)
+    C-->>APP: ✅ opening
+    Note over C: queues audit event, uploads when back online
+```
+
+Grants are refreshed whenever the app opens with connectivity, so revocation converges
+within the grant TTL — and the normal path is online anyway.
+
+### 3c. Web portal — the fallback
+
+Unlimited access through the gateway's web portal, always. Quota warnings in chat
+("you have 5 opens left…") point here.
+
+---
+
+## 4. Hosted vs. self-hosted — the WABA insight
+
+Webhooks are easy; **the WhatsApp number is hard**. A WhatsApp channel needs a verified
+Meta Business + WABA + phone number. That asymmetry is the entire hosted business model:
+
+```mermaid
+flowchart TB
+    subgraph hosted ["whatsacc.com — the flagship gateway (we run it)"]
+        H["Gateway binary<br/>+ our WABA & number<br/>+ our Paystack keys in .env"]
+        T1["Free tier<br/>1 location · 1 controller · capped opens"]
+        T2["Paid tiers<br/>more locations · unlimited opens"]
+        H --- T1 & T2
+    end
+
+    subgraph self ["Your gateway (same MIT binary)"]
+        S["Gateway binary<br/>+ YOUR WABA / Discord / Slack<br/>+ billing off — or YOUR keys"]
+    end
+
+    subgraph reach ["Reachability (self-host, pick one)"]
+        direct["Public VPS / IP — nothing needed"]
+        vr["vulos-relay tunnel driver<br/>(one config line)"]
+        byo["cloudflared / frp / your own"]
+    end
+
+    S --- reach
+```
+
+- **Hosted**: residents text *whatsacc's* number; one WABA serves every tenant; the
+  gateway routes by sender → memberships. A complex never touches Meta. Tiers monetize
+  Meta onboarding, hosting and uptime — not secret code.
+- **Self-hosted**: same binary, bring your own channel credentials and a public URL.
+  Billing code ships in the binary behind a flag, so a third party can run their **own
+  paid gateway** with their own tiers and their own Paystack/Stripe keys.
+
+The gateway core is transport-agnostic — it binds a listener, full stop. Tunnels
+compose at the HTTP layer, so independence from any one provider (including vulos-relay)
+is structural, not a promise.
+
+---
+
+## 5. What "decentralized" means here
+
+Not federation. Not P2P. **Many independent gateways, each a full authority** over its
+own tenants, numbers, devices and audit log — with zero coordination between them.
+
+- The app asks "which gateway?" on first run (flagship pre-filled).
+- A controller pairs with exactly one gateway and **pins its signing key** — a hostile
+  network, DNS hijack, or malicious tunnel cannot forge an open.
+- Nothing in the system is special about the flagship except that we run it well.
+
+## 6. Security model
+
+| Layer            | Mechanism                                                                  |
+| ---------------- | -------------------------------------------------------------------------- |
+| Command integrity | Ed25519-signed commands: nonce + expiry, controller pins gateway key at pairing |
+| Pairing          | Claim-token flow (admin creates claim → device redeems → keys exchanged)    |
+| Emergency grants | Short-TTL signed capability bound to app keypair; nonce challenge-response  |
+| Channel ingress  | Webhook signature verification per channel (Meta HMAC, Slack signing secret…) |
+| Tenancy          | App-layer org scoping in SQLite (replaces Postgres RLS)                     |
+| Transport        | TLS terminated by the gateway itself — tunnels (incl. relay) stay content-blind via SNI passthrough where supported |
+| Audit            | Append-only event log: every open, denial, pairing, config change           |
+
+## 7. The contracts that must not break (`proto/`)
+
+Deployed hardware is forever. These wire contracts are versioned from day one because
+they are painful to retrofit:
+
+1. **Pairing** — claim token redemption, key exchange, gateway-key pinning
+2. **Signed commands** — open/close/query, nonce + expiry semantics
+3. **Offline grants** — grant format, challenge-response, revocation semantics
+4. **Controller events** — upstream direction: button pressed, gate held open, tamper
+5. **Tunnel** — how a gateway attaches to a reachability provider
+
+Binaries can churn; these can only be extended.
+
+## 8. Feature roadmap
+
+Per-location **settings toggles, off by default**:
+
+- **Nearly free** (the audit log already has the data): time & attendance reports,
+  who's-on-site / evacuation list, open notifications.
+- **Half-built already**: visitor passes (one-time PIN/QR via chat or link — extends
+  `temp_access`), recurring access windows (cleaner, Tuesdays 08:00–12:00).
+- **Needs controller I/O** (protocol supports now, ship later): gate-held-open alerts,
+  visitor button → "someone at the gate, reply OPEN", lockdown mode.
+- **Non-goals for v1**: license-plate recognition, multi-party approval, occupancy caps.
+
+## 9. Tech decisions (and what we migrated away from)
+
+| Decision              | Choice                         | Why                                                                 |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------- |
+| Gateway language      | **Go** (was Deno/TS)           | Single small static binary, ARM-friendly, `go:embed` portal        |
+| Database              | **SQLite** (was Neon Postgres + RLS) | Zero-dependency self-hosting; one file to back up; RLS existed for shared-cloud tenancy we no longer have |
+| Frontend              | **Svelte 5** (was React 19)    | One codebase → embedded portal + Tauri desktop/mobile; small output |
+| Apps                  | **Tauri v2**                   | Desktop + iOS + Android from the Svelte codebase                    |
+| Billing               | **In the gateway, MIT, flagged off** | Paid third-party gateways are a feature; Paystack is the reference `BillingProvider` |
+| License               | **MIT, everything**            | The moat is running the best flagship, not hiding code              |
+
+## 10. Migration path from the current codebase
+
+The Deno/Hono backend (~2.9k lines of routes) is the **spec**: auth, locations, access
+rules, devices/pairing, WhatsApp flows and billing port to Go nearly mechanically. The
+18 Postgres migrations fold into a clean SQLite baseline. The React landing/docs carry
+their brand (Fraunces/Inter/JetBrains Mono, ink-on-paper, arch motif) into the Svelte
+`web/` and `app/`. The Deno test suite's cases (unit, integration, security, contract)
+are ported alongside the routes they cover.
