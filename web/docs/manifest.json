@@ -72,11 +72,6 @@
       "file": "channels.md"
     },
     {
-      "id": "billing",
-      "title": "Billing & tiers",
-      "file": "billing.md"
-    },
-    {
       "id": "controllers",
       "title": "Controllers",
       "file": "controllers.md"
@@ -125,8 +120,7 @@
       "title": "Run a gateway",
       "pages": [
         "self-host",
-        "channels",
-        "billing"
+        "channels"
       ]
     },
     {

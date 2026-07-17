@@ -19,8 +19,8 @@ of the flagship: residents text *whatsacc's* number, and the gateway routes by s
 
 ## The five steps
 
-1. **Create an account** at the [portal](https://whatsacc.com/portal). The free tier is
-   real — one location, one controller, a monthly cap on opens, no credit card.
+1. **Create an account** at the [portal](https://whatsacc.com/portal). The flagship is
+   free — no card, no plans; sign up and you're in.
 2. **Name your location** during onboarding — house, complex, building or other. Give it
    a name residents will recognise, and optionally drop a map pin: that pin anchors the
    geofence if you enable it later.
@@ -39,7 +39,7 @@ Members are people whose chat identity can text the gate. An identity is a
 `(channel, external id)` pair — a WhatsApp phone number, a Slack member id — so one
 person can be reachable on more than one channel.
 
-- **Owner** — the account holder. Billing and danger-zone settings.
+- **Owner** — the account holder. Account and danger-zone settings.
 - **Admin** — manages devices, members and policies for assigned locations.
 - **Member** — can open what they've been given. Can't change settings.
 - **Guest** — like a member, but time-bound. Contractors and weekend visitors live under
@@ -61,4 +61,3 @@ the reply is a numbered picker — they answer `1`, `2` or `3`.
 - [Linking WhatsApp](linking-whatsapp.md) — how numbers, identities and the flagship
   number fit together (and what changes when you self-host).
 - [Controllers](controllers.md) — wiring and pairing.
-- [Billing & tiers](billing.md) — what the free tier caps, what Pro adds.

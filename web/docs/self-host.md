@@ -1,11 +1,14 @@
 # Run a gateway
 
 The gateway is the entire server side of whatsacc: channels, rules, portal, API, device
-hub, audit log and (optional) billing — one Go binary with one SQLite file. This chapter
-takes you from nothing to a reachable gateway with a channel attached.
+hub and audit log — one Go binary with one SQLite file. This chapter takes you from
+nothing to a reachable gateway with a channel attached.
 
-Everything here is MIT-licensed. A self-hosted gateway is not a demo tier: it is the
-same binary the flagship runs, with every feature and no caps.
+Everything here is MIT-licensed and free. A self-hosted gateway is not a demo: it is the
+same binary the flagship runs, with every feature and no caps — and no billing code in
+the binary, so there is nothing to configure and nothing to pay us. Your costs are your
+own: a VPS or a Pi, and Meta's per-conversation fees if you bring your own WhatsApp
+number (Meta bills you directly).
 
 ## Install
 
@@ -51,7 +54,6 @@ ones:
 | `WACC_PUBLIC_URL` | The URL the world reaches you at. Used for webhooks, invite links, the app. |
 | `WACC_DATA_DIR` | Where `whatsacc.db` and keys live. Back this directory up. |
 | `WACC_CHANNEL_*` | Per-channel credentials — see [Chat channels](channels.md). |
-| `WACC_BILLING_ENABLED` | Off by default. See [Billing & tiers](billing.md). |
 
 ## Reachability
 

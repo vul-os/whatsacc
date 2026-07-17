@@ -379,32 +379,8 @@ p{margin:0}
 @media(min-width:900px){.shots-grid{grid-template-columns:1fr 1fr 1fr}}
 .shots-grid figure{margin:0}
 
-/* pricing */
-.plans{display:grid;gap:16px;align-items:start}
-@media(min-width:900px){.plans{grid-template-columns:repeat(3,1fr)}}
-.plan{position:relative;border-radius:24px;border:1px solid var(--paper-edge);background:var(--paper-cool);padding:36px 32px;display:flex;flex-direction:column}
-.plan-hot{background:var(--band);color:var(--band-text);border-color:var(--band)}
-@media(min-width:900px){.plan-hot{transform:translateY(-16px);padding-top:44px;padding-bottom:44px}}
-.plan-flag{position:absolute;top:-12px;left:30px;display:inline-flex;background:var(--terracotta);color:#fafaf8;border-radius:999px;padding:4px 13px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase}
-.plan-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-.plan h3{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:28px}
-.plan .p-cap{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);text-align:right}
-.plan-hot .p-cap{color:rgba(250,250,248,.55)}
-.plan .price{margin-top:22px;display:flex;align-items:baseline;gap:8px}
-.plan .price .amt{font-family:var(--font-display);font-variation-settings:"SOFT" 100;font-feature-settings:"lnum";font-size:52px;line-height:1}
-.plan .price .per{font-size:14px;color:var(--ink-faint)}
-.plan-hot .price .per{color:rgba(250,250,248,.55)}
-.plan .blurb{margin-top:18px;font-size:14.5px;line-height:1.65;color:var(--ink-faint)}
-.plan-hot .blurb{color:rgba(250,250,248,.72)}
-.plan ul{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px}
-.plan ul li{display:flex;gap:12px;font-size:13.5px;color:var(--ink-soft)}
-.plan-hot ul li{color:rgba(250,250,248,.85)}
-.plan ul li::before{content:"";flex:none;margin-top:9px;width:12px;height:4px;background:var(--terracotta)}
-.plan-hot ul li::before{background:var(--terracotta-soft)}
-.plan .btn{margin-top:30px;justify-content:center}
-.plan-hot .btn{background:var(--band-text);color:#141210}
-.plan-hot .btn:hover{background:var(--terracotta);color:#fafaf8}
-.fx-note{margin-top:36px;text-align:center;font-size:13px;color:var(--ink-faint);max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.7}
+/* free — no billing */
+.free-note{margin-top:36px;text-align:center;font-size:13px;color:var(--ink-faint);max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.7}
 
 /* faq */
 .faq{max-width:820px}
@@ -450,7 +426,7 @@ p{margin:0}
       <nav class="nav" aria-label="Primary">
         <a href="#how">How it works</a>
         <a href="#selfhost">Self-host</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#free">Free</a>
         <a href="docs/">Docs</a>
         <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
         <a class="nav-cta" href="https://whatsacc.com/portal">Get started</a>
@@ -473,7 +449,7 @@ p{margin:0}
     <nav class="mobile-nav" id="mobileNav" aria-label="Mobile">
       <a href="#how">How it works</a>
       <a href="#selfhost">Self-host</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#free">Free</a>
       <a href="docs/">Docs</a>
       <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
       <a href="https://whatsacc.com/portal">Get started</a>
@@ -815,10 +791,11 @@ p{margin:0}
             cloudflared and frp work too. Controllers always dial out, so they never need a port.</span></div>
           </li>
           <li>
-            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
-            <div><b>Billing included — honestly</b>
-            <span>The tiering and Paystack code ships in the binary, MIT, behind a flag that's off by default.
-            Run a free gateway for your street — or a paid one with your own keys and your own tiers. We mean it.</span></div>
+            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg></span>
+            <div><b>Nothing to pay us</b>
+            <span>There is no billing code in the binary — nothing to configure, nothing to pay us.
+            Your gateway's costs are your own: your box, your channel credentials, and Meta's
+            conversation fees on your own number.</span></div>
           </li>
         </ul>
         <span class="mit-badge"><i aria-hidden="true"></i>MIT licensed &middot; every line</span>
@@ -980,71 +957,57 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
   </div>
 </section>
 
-<!-- ————————————————— pricing ————————————————— -->
-<section class="section" id="pricing">
+<!-- ————————————————— free ————————————————— -->
+<section class="section" id="free">
   <div class="wrap">
     <div class="section-head reveal">
       <div>
-        <span class="eyebrow kicker">Pricing</span>
-        <h2 class="display-tight">Pay for the flagship,<br>or <em>pay nobody</em>.</h2>
+        <span class="eyebrow kicker">What it costs</span>
+        <h2 class="display-tight">Free.<br><em>All of it.</em></h2>
       </div>
       <p class="lede">
-        The hosted tiers monetize the hard parts — Meta onboarding, our WhatsApp number,
-        hosting and uptime. Never secret code. Self-hosting is free because there's nothing
-        to withhold.
+        whatsacc has no billing system. No tiers, no wallet, no card — not on the
+        flagship, not in the binary. The code is MIT; the moat is running it well.
       </p>
     </div>
 
-    <div class="plans">
-      <div class="plan reveal">
-        <div class="plan-top"><h3>Free</h3><span class="p-cap">hosted flagship</span></div>
-        <div class="price"><span class="amt">R0</span><span class="per">/ month</span></div>
-        <p class="blurb">A single house on the flagship gateway. Try it on your own gate
-        first — most people do.</p>
-        <ul>
-          <li>1 location &middot; 1 controller</li>
-          <li>Capped opens per month</li>
-          <li>Texts go to our WhatsApp number</li>
-          <li>Audit log &middot; 30 days</li>
-        </ul>
-        <a class="btn btn-outline" href="https://whatsacc.com/portal">Start free</a>
-      </div>
+    <div class="chips reveal" style="margin-bottom:40px" aria-label="What free means here">
+      <span class="chip">MIT &middot; every line</span>
+      <span class="chip">No tiers</span>
+      <span class="chip">No wallet</span>
+      <span class="chip">No card</span>
+    </div>
 
-      <div class="plan plan-hot reveal">
-        <span class="plan-flag">most chosen</span>
-        <div class="plan-top"><h3>Pro</h3><span class="p-cap">hosted flagship</span></div>
-        <div class="price"><span class="amt">R190</span><span class="per">/ month · ≈ $10*</span></div>
-        <p class="blurb">For complexes, buildings and property managers running real volume
-        through the flagship.</p>
-        <ul>
-          <li>More locations &middot; more controllers</li>
-          <li>Unlimited opens</li>
-          <li>Geofence, time windows, roles</li>
-          <li>Full audit retention &middot; CSV export</li>
-          <li>Priority support</li>
-        </ul>
-        <a class="btn" href="https://whatsacc.com/portal">Choose Pro</a>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 7 4 12l4.5 5M15.5 7 20 12l-4.5 5"/></svg></span>
+        <h3>The code</h3>
+        <p>Every line is MIT — gateway, portal, app, controller agent. There is no paid
+        edition and no billing module; there's nothing to unlock.</p>
       </div>
-
-      <div class="plan reveal">
-        <div class="plan-top"><h3>Self-host</h3><span class="p-cap">your gateway</span></div>
-        <div class="price"><span class="amt">R0</span><span class="per">forever</span></div>
-        <p class="blurb">The same MIT binary we run — bring your own number, bot token
-        and URL. Nothing is held back.</p>
-        <ul>
-          <li>Every feature, no caps</li>
-          <li>Your WABA / Discord / Slack</li>
-          <li>Your SQLite file, your audit log</li>
-          <li>Billing flag off — or on, with <i>your</i> keys</li>
-        </ul>
-        <a class="btn btn-outline" href="docs/#/self-host">Read the guide</a>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-4-.9L3 20l1.2-5.2a8 8 0 0 1-.7-3.3A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3Z"/></svg></span>
+        <h3>The hosted flagship</h3>
+        <p>Your gate on whatsacc.com, residents texting our WhatsApp number. We carry the
+        Meta onboarding and the hosting — you never see a checkout.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span>
+        <h3>Self-hosting</h3>
+        <p>The same binary, forever. Bring your own Slack app or Meta number — Meta bills
+        you directly for your own WhatsApp conversations; we bill you nothing.</p>
       </div>
     </div>
 
-    <p class="fx-note">
-      * Placeholder launch pricing, billed in South African rand via Paystack. The dollar figure
-      is an approximation and drifts with the exchange rate. Final tiers land with gateway&nbsp;1.0.
+    <p class="free-note">
+      No asterisks: there is no billing code in the gateway — nothing to configure,
+      nothing to pay us. Your only costs are the ones you'd have anyway: your hardware,
+      and Meta's per-conversation fees if you bring your own number.
     </p>
+    <div class="cta-row" style="justify-content:center;margin-top:26px">
+      <a class="btn btn-ink" href="https://whatsacc.com/portal">Start free</a>
+      <a class="btn btn-outline" href="docs/#/self-host">Run your own</a>
+    </div>
   </div>
 </section>
 
@@ -1076,14 +1039,16 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
         <summary>Why is WhatsApp harder to self-host than Slack?<span class="plus">+</span></summary>
         <p class="a">WhatsApp requires a verified Meta business account and phone number (a WABA)
         before you can receive webhooks. Slack needs an app manifest and a signing secret — minutes
-        (Discord, when it lands, will be a bot token). That asymmetry is the honest core of our
-        business: the hosted flagship absorbs the WABA friction, and you pay for that, not for code.</p>
+        (Discord, when it lands, will be a bot token). That asymmetry is exactly why the hosted
+        flagship exists: it absorbs the WABA friction for you, free. Self-hosters deal with Meta
+        directly and pay Meta — not us — for their own conversations.</p>
       </details>
       <details>
-        <summary>Is the billing code really open source?<span class="plus">+</span></summary>
-        <p class="a">Yes — MIT, in the same binary, behind a flag that ships off. If you want to run
-        a paid gateway for your neighbourhood with your own Paystack or Stripe keys and your own
-        tiers, that's a supported feature, not a loophole.</p>
+        <summary>Really free? What's the catch?<span class="plus">+</span></summary>
+        <p class="a">There isn't one. whatsacc has no billing system — nothing in the binary or the
+        flagship collects money from anyone. The code is MIT and the hosted flagship is free. If you
+        self-host with your own WhatsApp number, Meta bills you directly for your own conversations —
+        that's between you and Meta, and Slack costs nothing at all.</p>
       </details>
       <details>
         <summary>What hardware does it work with?<span class="plus">+</span></summary>
@@ -1134,7 +1099,7 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
           <h4>Product</h4>
           <ul>
             <li><a href="#how">How it works</a></li>
-            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#free">Free</a></li>
             <li><a href="docs/#/security">Security</a></li>
             <li><a href="https://whatsacc.com/portal">Portal</a></li>
           </ul>

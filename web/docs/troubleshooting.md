@@ -23,8 +23,9 @@ window` is a time-window rule. If it says *opened* and nothing moved, it's a wir
 controller issue — see below.
 
 **"You have 0 opens left this month."**
-Free-tier chat cap reached. The web portal keeps working (it is never capped), or
-upgrade under **Billing**.
+An admin set a per-member open quota on your membership (an access rule, like time
+windows). The web portal keeps working (it is never quota-limited), or ask an admin to
+raise the quota under **Members**.
 
 ## Webhooks (self-host)
 

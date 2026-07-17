@@ -72,8 +72,9 @@ Track progress on [GitHub](https://github.com/vul-os/whatsacc).
   *hey gate*, 👍.
 - One access point → the gate just opens.
 - Several access points → the reply is a numbered picker; the member answers `1`/`2`/`3`.
-- Quota warnings ("you have 5 opens left this month") link to the web portal, which is
-  never capped.
+- Quota warnings ("you have 5 opens left this month") appear when an admin has set a
+  per-member open quota as an access rule; they link to the web portal, which is never
+  quota-limited.
 
 ## Writing a new channel
 

@@ -5,7 +5,8 @@ message — WhatsApp or Slack today, Discord soon — opens a physical gate, doo
 
 There is no cloud center. whatsacc is a network of independent **gateways**. Anyone can
 run one; whatsacc runs the flagship at whatsacc.com. Every line of code is MIT-licensed,
-including the billing code. The only private thing about the hosted gateway is its `.env`.
+and everything is free — there is no billing system anywhere in whatsacc. The only
+private thing about the hosted gateway is its `.env`.
 
 ## The pieces
 
@@ -30,10 +31,11 @@ including the billing code. The only private thing about the hosted gateway is i
 Both run the **same binary**.
 
 - **The flagship** (whatsacc.com): residents text *our* WhatsApp number; we carry the
-  Meta business verification, hosting and uptime. Free and paid tiers. Start with
+  Meta business verification, hosting and uptime. Free — no card, no plans. Start with
   [Getting started](getting-started.md).
 - **Your own gateway**: bring your own channel credentials and a public URL — a VPS, a
-  vulos-relay tunnel, or cloudflared. Start with [Run a gateway](self-host.md).
+  vulos-relay tunnel, or cloudflared. Also free; Meta bills you directly for your own
+  WhatsApp conversations. Start with [Run a gateway](self-host.md).
 
 ## Where to go next
 

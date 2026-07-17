@@ -7,8 +7,8 @@ repository's `ARCHITECTURE.md`.
 
 whatsacc has no central service that everything depends on. It is a network of
 independent **gateways**: anyone can run one, whatsacc runs the flagship. Every line of
-code is MIT-licensed, including billing. The only private thing about the hosted
-gateway at whatsacc.com is its `.env`.
+code is MIT-licensed and everything is free — there is no billing system. The only
+private thing about the hosted gateway at whatsacc.com is its `.env`.
 
 "Decentralized" here means neither federation nor P2P. It means **many independent
 gateways, each a full authority** over its own tenants, numbers, devices and audit log,
@@ -25,7 +25,7 @@ resident ── "open" ──► WhatsApp / Slack (Discord soon)
         ┌──────────── GATEWAY — one Go binary · SQLite ────────────┐
         │  channel seam → rules engine → device hub → audit log    │
         │  (time windows · geofence · quotas)   (Ed25519 signing)  │
-        │  embedded portal + app API + optional billing            │
+        │  embedded portal + app API                               │
         └───────────────────────┬──────────────────────────────────┘
               outbound wss ⇦ dial-out (no inbound ports at the gate)
                               │
@@ -43,7 +43,7 @@ directly to the controller over LAN/BLE with an offline-verifiable grant
 
 | Component | What it is | Runs on | Stack |
 | --- | --- | --- | --- |
-| **gateway** | The entire server: channels, rules, portal, API, device hub, billing, audit | Any VPS / Pi / server with a public URL | Go · SQLite · embedded portal |
+| **gateway** | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · embedded portal |
 | **controller** | The unit wired to the gate relay; verifies signatures, drives the motor | Pi-class board, Wi-Fi or GSM | Go agent |
 | **app** | Admin console + emergency access | Desktop, iOS, Android | Svelte 5 · Tauri v2 |
 | **web** | whatsacc.com — landing, docs, downloads | Any static host | Static |
@@ -59,10 +59,18 @@ directly to the controller over LAN/BLE with an offline-verifiable grant
 ## Hosted vs. self-hosted — the WABA insight
 
 Webhooks are easy; **the WhatsApp number is hard**. A WhatsApp channel needs a verified
-Meta Business + WABA + phone number. That asymmetry is the entire hosted business model:
-the flagship's tiers monetize Meta onboarding, hosting and uptime — not secret code. A
-self-hosted gateway is the same binary with your own credentials, and the billing code
-ships MIT behind a flag so third parties can run their own paid gateways.
+Meta Business + WABA + phone number. That asymmetry is why the flagship exists: it
+absorbs Meta onboarding, hosting and uptime so a household never has to. A self-hosted
+gateway is the same binary with your own credentials — and Meta bills you directly, in
+your own Meta account, for the conversations on your own number.
+
+There is no billing system anywhere in whatsacc, so the honest question is who pays the
+flagship's Meta conversation fees. Today: we do — the flagship is free, and its costs
+are absorbed as the cost of running the reference gateway well. If that edge ever needs
+funding, the direction is not subscriptions but postage in the DMTAP sense: small
+prepaid, signed vouchers bought in advance and redeemed once per use at the expensive
+edge, so heavy senders carry their own Meta costs and everyone else stays free. That is
+a direction, not a shipped feature — nothing in the binary implements it today.
 
 The gateway core is transport-agnostic — it binds a listener, full stop. Tunnels
 (vulos-relay, cloudflared, frp) compose at the HTTP layer, so independence from any one
@@ -88,5 +96,5 @@ Binaries can churn; these can only be extended.
 | Database | SQLite | Zero-dependency self-hosting; one file to back up |
 | Frontend | Svelte 5 | One codebase → embedded portal + Tauri apps; small output |
 | Apps | Tauri v2 | Desktop + iOS + Android from one codebase |
-| Billing | In the gateway, MIT, flagged off | Paid third-party gateways are a feature |
+| Billing | None — no billing code at all | Everything is free; self-hosters pay their own providers directly |
 | License | MIT, everything | The moat is running the best flagship, not hiding code |

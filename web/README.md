@@ -11,4 +11,4 @@ fonts are vendored in `fonts/`, the markdown renderer in `docs/vendor/`.
   hash routes like `docs/#/self-host`). Theme persists via localStorage `whatsacc.theme`.
 - `screenshots/` + `screenshots/dark/` — PNGs land here from `npm run screenshotter`
   (portal-dashboard, portal-locations, portal-analytics, app-emergency, landing-hero,
-  docs, pricing). The landing degrades gracefully if any are missing.
+  docs). The landing degrades gracefully if any are missing.

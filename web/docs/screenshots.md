@@ -46,11 +46,8 @@ the controller over LAN or Bluetooth and opens with its offline-verified grant.
 
 ## The website
 
-The landing page and pricing, for the curious:
+The landing page, for the curious:
 
 ![Landing hero](../screenshots/landing-hero.png)
 
-![Pricing](../screenshots/pricing.png)
-
-[Landing dark](../screenshots/dark/landing-hero.png) ·
-[Pricing dark](../screenshots/dark/pricing.png)
+[Landing dark](../screenshots/dark/landing-hero.png)

@@ -39,9 +39,11 @@ setup. This is the high-friction channel — budget an afternoon and some patien
    number id go in your gateway's `.env`. The gateway verifies every incoming webhook
    with Meta's HMAC signature; unsigned or mis-signed payloads are dropped.
 
-If that list made you tired: that asymmetry is the whole hosted business model, honestly
-stated. Slack takes minutes — see [Chat channels](channels.md) — and many self-hosters
-run Slack-first, WhatsApp never.
+If that list made you tired: that asymmetry is exactly what the flagship absorbs for
+you, free. One more honest note for those who push through: Meta charges per-conversation
+fees on your WABA and bills you directly — those costs are between you and Meta, never
+routed through whatsacc. Slack takes minutes — see [Chat channels](channels.md) — and
+many self-hosters run Slack-first, WhatsApp never.
 
 ## Which number should residents see?
 

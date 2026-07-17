@@ -11,7 +11,6 @@ be added, nothing can be removed or change meaning within a major version.
 | Signed commands | [commands.md](commands.md) | gateway → controller |
 | Offline grants | [grants.md](grants.md) | gateway → app → controller |
 | Controller events | [events.md](events.md) | controller → gateway |
-| Tunnel attach | [tunnel.md](tunnel.md) | gateway → reachability provider |
 
 Status: **v0 draft** — implemented against the Go gateway port. v1 freezes when the
 first third-party controller firmware ships.

@@ -25,9 +25,10 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 There is **no cloud center**. whatsacc is a decentralized network of independent
 **gateways**: a gateway is one MIT-licensed Go binary (SQLite inside, management portal
 embedded) that anyone can run — a VPS, a Pi in the guardhouse, anywhere with a public
-URL. whatsacc runs the flagship hosted gateway at [whatsacc.com](https://whatsacc.com) —
-free, no tiers, no wallet, no card. The same binary lets **you** run your own with your
-own WhatsApp number and Slack workspace; there is **no billing system** anywhere in it.
+URL. There is **no hosted service and no billing system** — whatsacc.com is the project
+site, not a cloud. You bring your own WhatsApp number or Slack workspace; Meta bills you
+directly for your own conversations. Operators who want to charge their residents solve
+that outside the system.
 
 ```mermaid
 flowchart LR
@@ -78,7 +79,7 @@ npm run screenshotter   # boots the app with mocked data → web/screenshots/{,d
 | Directory     | What                                                             | Status |
 | ------------- | ---------------------------------------------------------------- | ------ |
 | `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 12-chapter docs, self-contained, light/dark | ✅ |
-| `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events, tunnel | ✅ v0 draft |
+| `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events | ✅ v0 draft |
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Current portal + marketing — React 19 · Vite · light/dark        | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
@@ -125,12 +126,11 @@ offline emergency access, security model, API reference, troubleshooting. Served
 ## Part of the Vulos suite
 
 whatsacc is a standalone open-source product in the [Vulos](https://vulos.org) suite —
-sovereign software you can run yourself. It composes with
-[vulos-relay](https://vulos.org/products/relay) for one-line reachability when your
-gateway lives behind NAT, but never requires it: any tunnel (cloudflared, frp) or a
-plain public IP works.
+sovereign software you can run yourself. Reachability stays simple: a public IP with
+built-in ACME, or any tunnel you already trust (cloudflared, frp) beside the binary.
+On a LAN with Slack Socket Mode, no public URL is needed at all.
 
 ## License
 
-[MIT](LICENSE) — all of it: gateway, portal, app, controller agent. No billing system,
-no paid features. The moat is running the best flagship, not hiding code.
+[MIT](LICENSE) — all of it: gateway, portal, app, controller agent. No cloud, no
+billing system, no paid features. Just the system.

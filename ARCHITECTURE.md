@@ -3,11 +3,12 @@
 > **Texts that open gates.** A decentralized access-control system where a chat message —
 > WhatsApp, Slack, Discord — opens a physical gate, door or barrier.
 
-whatsacc has no cloud center. It is a network of independent **gateways**: anyone can run
-one, whatsacc runs the flagship. Every line of code is MIT-licensed. There is **no
-billing system** — nothing in the binary charges anyone anything.
-The only private thing about the hosted gateway at [whatsacc.com](https://whatsacc.com)
-is its `.env`.
+whatsacc has no cloud. It is just the **system**: a gateway you run, controllers at
+your gates, an app in your pocket — every line MIT-licensed, nothing hosted by us.
+[whatsacc.com](https://whatsacc.com) is the project site (docs + downloads), not a
+service. There is **no billing system** — nothing in the binary charges anyone
+anything; operators who want to charge their residents solve that themselves, outside
+the system. Usage tracking (opens, audit, analytics) is a product feature and stays.
 
 ---
 
@@ -79,7 +80,7 @@ whatsacc/
 ├── controller/   # gate device agent + reference wiring
 ├── app/          # Svelte 5 + Tauri v2 (also builds gateway's embedded portal)
 ├── web/          # whatsacc.com — landing + docs (static)
-├── proto/        # pairing · signed commands · grants · tunnel contracts
+├── proto/        # pairing · signed commands · grants · events contracts
 └── docs/         # operator guides: run a gateway, BYO WhatsApp number
 ```
 
@@ -161,47 +162,25 @@ Unlimited access through the gateway's web portal, always. Quota warnings in cha
 
 ---
 
-## 4. Hosted vs. self-hosted — the WABA insight
+## 4. Running a gateway — the WABA insight, reachability, and money
 
 Webhooks are easy; **the WhatsApp number is hard**. A WhatsApp channel needs a verified
-Meta Business + WABA + phone number. That asymmetry is the entire hosted business model:
+Meta Business + WABA + phone number. Every gateway operator brings their own — whatsacc
+is never in the loop, and Meta bills the operator directly for their own conversations.
 
-```mermaid
-flowchart TB
-    subgraph hosted ["whatsacc.com — the flagship gateway (we run it)"]
-        H["Gateway binary<br/>+ our WABA & number"]
-        T1["Free for everyone<br/>no tiers · no wallet · no card"]
-        H --- T1
-    end
+**Reachability is kept deliberately simple.** The gateway binds a listener and serves
+HTTPS, full stop — no tunnel protocol, no relay dependency, no driver framework:
 
-    subgraph self ["Your gateway (same MIT binary)"]
-        S["Gateway binary<br/>+ YOUR WABA / Slack / Discord<br/>you pay Meta directly"]
-    end
+1. **Direct** (default) — a VPS or any public IP; the binary does ACME itself.
+2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel — run beside
+   the binary, forwarding to its port. Documented, not implemented.
+3. **Zero-infrastructure mode** — Slack Socket Mode and Discord's bot gateway are
+   *outbound* connections, and controllers dial out too. A gateway on a LAN Pi with no
+   public URL at all still does Slack + Discord + LAN portal + controllers. Only
+   WhatsApp (Meta webhooks) and remote app access need a public URL.
 
-    subgraph reach ["Reachability (self-host, pick one)"]
-        direct["Public VPS / IP — nothing needed"]
-        vr["vulos-relay tunnel driver<br/>(one config line)"]
-        byo["cloudflared / frp / your own"]
-    end
-
-    S --- reach
-```
-
-- **Hosted**: residents text *whatsacc's* number; one WABA serves every tenant; the
-  gateway routes by sender → memberships. A complex never touches Meta. Tiers monetize
-  Meta onboarding, hosting and uptime — not secret code.
-- **Self-hosted**: same binary, bring your own channel credentials and a public URL.
-  There is no billing code to configure — the binary has none.
-
-**Funding the expensive edge, honestly.** The one real marginal cost in the system is
-Meta's per-conversation fee on a hosted gateway. Today the flagship absorbs it. If that
-ever needs funding at scale, the direction is **DMTAP-style postage** — prepaid signed
-vouchers redeemed per use at the edge, with an issuer-side ledger (see DMTAP §9.5) —
-a shared Vulos primitive, not a subscription billing stack bolted into this product.
-
-The gateway core is transport-agnostic — it binds a listener, full stop. Tunnels
-compose at the HTTP layer, so independence from any one provider (including vulos-relay)
-is structural, not a promise.
+**Money is out of scope.** There is no billing code anywhere in the system. An operator
+who wants to charge their residents does it however they like — outside whatsacc.
 
 ---
 
@@ -210,10 +189,9 @@ is structural, not a promise.
 Not federation. Not P2P. **Many independent gateways, each a full authority** over its
 own tenants, numbers, devices and audit log — with zero coordination between them.
 
-- The app asks "which gateway?" on first run (flagship pre-filled).
+- The app asks "which gateway?" on first run.
 - A controller pairs with exactly one gateway and **pins its signing key** — a hostile
   network, DNS hijack, or malicious tunnel cannot forge an open.
-- Nothing in the system is special about the flagship except that we run it well.
 
 ## 6. Security model
 
@@ -224,7 +202,7 @@ own tenants, numbers, devices and audit log — with zero coordination between t
 | Emergency grants | Short-TTL signed capability bound to app keypair; nonce challenge-response  |
 | Channel ingress  | Webhook signature verification per channel (Meta HMAC, Slack signing secret…) |
 | Tenancy          | App-layer org scoping in SQLite (replaces Postgres RLS)                     |
-| Transport        | TLS terminated by the gateway itself — tunnels (incl. relay) stay content-blind via SNI passthrough where supported |
+| Transport        | TLS terminated by the gateway itself — any tunnel in front only ever sees ciphertext when run in passthrough mode |
 | Audit            | Append-only event log: every open, denial, pairing, config change           |
 
 ## 7. The contracts that must not break (`proto/`)
@@ -236,7 +214,6 @@ they are painful to retrofit:
 2. **Signed commands** — open/close/query, nonce + expiry semantics
 3. **Offline grants** — grant format, challenge-response, revocation semantics
 4. **Controller events** — upstream direction: button pressed, gate held open, tamper
-5. **Tunnel** — how a gateway attaches to a reachability provider
 
 Binaries can churn; these can only be extended.
 
@@ -260,8 +237,8 @@ Per-location **settings toggles, off by default**:
 | Database              | **SQLite** (was Neon Postgres + RLS) | Zero-dependency self-hosting; one file to back up; RLS existed for shared-cloud tenancy we no longer have |
 | Frontend              | **Svelte 5** (was React 19)    | One codebase → embedded portal + Tauri desktop/mobile; small output |
 | Apps                  | **Tauri v2**                   | Desktop + iOS + Android from the Svelte codebase                    |
-| Billing               | **None**                       | No Paystack, no tiers, no wallet; edge costs absorbed — DMTAP postage is the future path if ever needed |
-| License               | **MIT, everything**            | The moat is running the best flagship, not hiding code              |
+| Billing               | **None**                       | Out of scope by design — operators charge their residents outside the system if they want to |
+| License               | **MIT, everything**            | The whole system is open — there is nothing else                    |
 
 ## 10. Migration path from the current codebase
 
