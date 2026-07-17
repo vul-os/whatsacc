@@ -3,7 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/cn';
-import { APP_NAV_ITEMS } from './items';
+import { ADMIN_NAV_ITEM, APP_NAV_ITEMS } from './items';
 import { useAuth } from '@/lib/auth';
 
 export function MobileNavDrawer({
@@ -80,6 +80,29 @@ export function MobileNavDrawer({
               {it.label}
             </NavLink>
           ))}
+
+          {user?.is_platform_admin && (
+            <>
+              <p className="px-3 mt-4 mb-1 text-[10px] uppercase tracking-[0.22em] text-ink/40">
+                Operator
+              </p>
+              <NavLink
+                to={ADMIN_NAV_ITEM.to}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors',
+                    isActive
+                      ? 'bg-ink text-paper'
+                      : 'text-ink/75 hover:bg-ink/5 hover:text-ink',
+                  )
+                }
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden />
+                {ADMIN_NAV_ITEM.label}
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div className="p-3 border-t border-ink/10">

@@ -1,0 +1,36 @@
+{
+  "user": {
+    "id": "usr_01hyx3f2m8q9vk4t7n2r5w8e1a",
+    "email": "thandi@silveroaks.co.za",
+    "status": "active",
+    "email_verified_at": "{{now-120d}}",
+    "is_platform_admin": true,
+    "has_password": true
+  },
+  "profile": {
+    "id": "prof_01hyx3f2m8q9vk4t7n2r5w8e1b",
+    "display_name": "Thandi Nkosi",
+    "avatar_url": null,
+    "locale": "en-ZA",
+    "avatar_cdn_url": null,
+    "avatar_source": null,
+    "slack_user_id": null,
+    "slack_handle": null
+  },
+  "accounts": [
+    {
+      "account_id": "acct_silveroaks",
+      "name": "Silver Oaks Estate",
+      "role": "owner",
+      "status": "active"
+    }
+  ],
+  "phones": [
+    {
+      "id": "ph_01hyx3f2m8q9vk4t7n2r5w8e1c",
+      "phone_e164": "+27821234567",
+      "verified_at": "{{now-120d}}",
+      "is_primary": true
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "entries": [
+    {
+      "id": "au_001", "ts": "{{now-4m}}", "command": "open", "source": "whatsapp", "success": true, "error": null,
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks", "location_name": "Silver Oaks Estate",
+      "access_point_id": "ap_maingate", "access_point_name": "Main gate",
+      "user_id": "usr_sipho", "user_email": "sipho.dlamini@gmail.com"
+    },
+    {
+      "id": "au_002", "ts": "{{now-9m}}", "command": "open", "source": "whatsapp", "success": false, "error": "rate_limited",
+      "account_id": "acct_waterfall", "account_name": "Waterfall Country Village",
+      "location_id": "loc_waterfall", "location_name": "Waterfall Country Village",
+      "access_point_id": "ap_wf_main", "access_point_name": "Entrance boom",
+      "user_id": "usr_johan", "user_email": "johan.pretorius@waterfallcv.co.za"
+    },
+    {
+      "id": "au_003", "ts": "{{now-16m}}", "command": "open", "source": "web", "success": true, "error": null,
+      "account_id": "acct_melrose", "account_name": "Melrose Arch Offices",
+      "location_id": "loc_melrose", "location_name": "Melrose Arch Offices",
+      "access_point_id": "ap_ma_lobby", "access_point_name": "Lobby door",
+      "user_id": "usr_bongani", "user_email": "bongani.zulu@melrosearch.co.za"
+    },
+    {
+      "id": "au_004", "ts": "{{now-24m}}", "command": "open", "source": "whatsapp", "success": false, "error": "account_suspended",
+      "account_id": "acct_campsbay", "account_name": "Camps Bay Villa",
+      "location_id": "loc_campsbay", "location_name": "Camps Bay Villa",
+      "access_point_id": "ap_cb_gate", "access_point_name": "Front gate",
+      "user_id": "usr_marike", "user_email": "marike.swart@outlook.com"
+    },
+    {
+      "id": "au_005", "ts": "{{now-31m}}", "command": "close", "source": "api", "success": true, "error": null,
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks", "location_name": "Silver Oaks Estate",
+      "access_point_id": "ap_parking", "access_point_name": "Parking barrier",
+      "user_id": "usr_thandi", "user_email": "thandi@silveroaks.co.za"
+    },
+    {
+      "id": "au_006", "ts": "{{now-47m}}", "command": "open", "source": "whatsapp", "success": false, "error": "quota_exceeded",
+      "account_id": "acct_umhlanga", "account_name": "Umhlanga Ridge Offices",
+      "location_id": "loc_umhlanga", "location_name": "Umhlanga Ridge Offices",
+      "access_point_id": "ap_ur_lobby", "access_point_name": "Lobby door",
+      "user_id": "usr_naledi", "user_email": "naledi.khumalo@ridgeoffices.co.za"
+    },
+    {
+      "id": "au_007", "ts": "{{now-58m}}", "command": "open", "source": "slack", "success": true, "error": null,
+      "account_id": "acct_melrose", "account_name": "Melrose Arch Offices",
+      "location_id": "loc_melrose", "location_name": "Melrose Arch Offices",
+      "access_point_id": "ap_ma_parking", "access_point_name": "Parking boom",
+      "user_id": "usr_bongani", "user_email": "bongani.zulu@melrosearch.co.za"
+    },
+    {
+      "id": "au_008", "ts": "{{now-70m}}", "command": "open", "source": "whatsapp", "success": true, "error": null,
+      "account_id": "acct_protea", "account_name": "12 Protea Lane",
+      "location_id": "loc_protea", "location_name": "12 Protea Lane",
+      "access_point_id": "ap_pl_gate", "access_point_name": "Front gate",
+      "user_id": "usr_pieter", "user_email": "pieter.botha@proteamail.co.za"
+    }
+  ],
+  "total": 1187,
+  "limit": 50,
+  "offset": 0,
+  "kind": "all"
+}

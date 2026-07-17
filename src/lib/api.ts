@@ -427,7 +427,72 @@ export const api = {
 
   accountInsights: (accountId: string) =>
     apiFetch<AccountInsights>(`/analytics/accounts/${accountId}/insights`),
+
+  // Instance admin (gateway operator) — everything under /admin is gated by
+  // users.is_platform_admin except the one-time claim endpoints.
+  adminClaimState: () => apiFetch<AdminClaimState>('/admin/claim'),
+
+  adminClaim: (token: string) =>
+    apiFetch<{ ok: boolean; user_id: string; is_platform_admin: boolean }>('/admin/claim', {
+      method: 'POST',
+      body: { token },
+    }),
+
+  adminOverview: () => apiFetch<AdminOverview>('/admin/overview'),
+
+  adminAccounts: (q: AdminListQuery = {}) =>
+    apiFetch<AdminAccountsResponse>(`/admin/accounts${adminListQs(q)}`),
+
+  adminAccount: (id: string) => apiFetch<AdminAccountDetail>(`/admin/accounts/${id}`),
+
+  adminAccountSetStatus: (id: string, status: 'active' | 'suspended') =>
+    apiFetch<{ account: AdminAccountDetail['account'] }>(`/admin/accounts/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    }),
+
+  adminUsers: (q: AdminListQuery = {}) =>
+    apiFetch<AdminUsersResponse>(`/admin/users${adminListQs(q)}`),
+
+  adminUserSetStatus: (id: string, status: 'active' | 'disabled') =>
+    apiFetch<{ user: AdminUserSummary }>(`/admin/users/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    }),
+
+  adminUserSetPlatformAdmin: (id: string, grant: boolean) =>
+    apiFetch<{ user: AdminUserSummary }>(`/admin/users/${id}/platform-admin`, {
+      method: 'POST',
+      body: { grant },
+    }),
+
+  adminLimits: () => apiFetch<AdminLimitsResponse>('/admin/limits'),
+
+  // Partial patch; null clears an override (falls back to env/default).
+  adminLimitsUpdate: (patch: AdminLimitsPatch) =>
+    apiFetch<AdminLimitsResponse>('/admin/limits', { method: 'PATCH', body: patch }),
+
+  adminAudit: (q: { limit?: number; offset?: number; kind?: AdminAuditKind } = {}) => {
+    const qs = new URLSearchParams();
+    if (q.limit !== undefined) qs.set('limit', String(q.limit));
+    if (q.offset !== undefined) qs.set('offset', String(q.offset));
+    if (q.kind) qs.set('kind', q.kind);
+    const s = qs.toString();
+    return apiFetch<AdminAuditResponse>(`/admin/audit${s ? `?${s}` : ''}`);
+  },
+
+  adminAuditActions: (q: { limit?: number; offset?: number } = {}) =>
+    apiFetch<AdminAuditActionsResponse>(`/admin/audit/actions${adminListQs(q)}`),
 };
+
+function adminListQs(q: AdminListQuery): string {
+  const qs = new URLSearchParams();
+  if (q.query) qs.set('query', q.query);
+  if (q.limit !== undefined) qs.set('limit', String(q.limit));
+  if (q.offset !== undefined) qs.set('offset', String(q.offset));
+  const s = qs.toString();
+  return s ? `?${s}` : '';
+}
 
 export type LocationRow = {
   id: string;
@@ -614,6 +679,186 @@ export type MaintenanceEvent = {
   next_due_movement_m: number | null;
   next_due_at: string | null;
   created_at: string;
+};
+
+// ── Instance admin (gateway operator) ───────────────────────────────────────
+
+export type AdminListQuery = { query?: string; limit?: number; offset?: number };
+
+export type AdminClaimState = {
+  /** true once any platform admin exists (or a claim was ever redeemed). */
+  claimed: boolean;
+  /** true when ADMIN_CLAIM_TOKEN is configured and the claim is still open. */
+  claimable: boolean;
+};
+
+export type AdminOverview = {
+  totals: {
+    users: number;
+    accounts: number;
+    locations: number;
+    devices: number;
+    access_points: number;
+  };
+  opens: { today: number; last_7d: number };
+  denials_today: {
+    total: number;
+    rate_limited: number;
+    quota_exceeded: number;
+    account_suspended: number;
+    other: number;
+  };
+  recent_signups: Array<{
+    id: string;
+    email: string;
+    display_name: string | null;
+    status: string;
+    is_platform_admin: boolean;
+    created_at: string;
+  }>;
+};
+
+export type AdminAccountRow = {
+  id: string;
+  name: string;
+  status: 'active' | 'suspended' | string;
+  country_code: string;
+  created_at: string;
+  member_count: number;
+  location_count: number;
+  opens_7d: number;
+};
+
+export type AdminAccountsResponse = {
+  accounts: AdminAccountRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type AdminAccessLogEntry = {
+  id: string;
+  ts: string;
+  command: string | null;
+  source: string | null;
+  success: boolean;
+  error: string | null;
+  account_id: string | null;
+  account_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  access_point_id: string | null;
+  access_point_name: string | null;
+  user_id: string | null;
+  user_email: string | null;
+};
+
+export type AdminAccountDetail = {
+  account: {
+    id: string;
+    name: string;
+    status: 'active' | 'suspended' | string;
+    country_code: string;
+    created_at: string;
+    updated_at: string;
+  };
+  members: Array<{
+    user_id: string;
+    email: string;
+    display_name: string | null;
+    role: string;
+    status: string;
+    joined_at: string;
+  }>;
+  locations: Array<{
+    id: string;
+    name: string;
+    type: string;
+    slug: string | null;
+    status: string;
+    created_at: string;
+  }>;
+  recent_access_logs: AdminAccessLogEntry[];
+};
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  status: 'active' | 'disabled' | string;
+  is_platform_admin: boolean;
+  created_at: string;
+  display_name: string | null;
+  accounts: Array<{ account_id: string; name: string; role: string }>;
+  last_access_at: string | null;
+};
+
+export type AdminUsersResponse = {
+  users: AdminUserRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+/** Shape returned by user-mutating admin endpoints. */
+export type AdminUserSummary = {
+  id: string;
+  email: string;
+  status: string;
+  is_platform_admin: boolean;
+};
+
+export type AdminLimitField =
+  | 'open_cooldown_s'
+  | 'opens_per_hour'
+  | 'chat_msgs_per_min'
+  | 'account_opens_per_hour';
+
+export type AdminLimitValues = Record<AdminLimitField, number>;
+
+export type AdminLimitsResponse = {
+  defaults: AdminLimitValues;
+  env: AdminLimitValues;
+  overrides: Record<AdminLimitField, number | null>;
+  effective: AdminLimitValues;
+};
+
+export type AdminLimitsPatch = Partial<Record<AdminLimitField, number | null>>;
+
+export type AdminAuditKind =
+  | 'all'
+  | 'denied'
+  | 'success'
+  | 'open'
+  | 'close'
+  | 'rate_limited'
+  | 'quota_exceeded'
+  | 'account_suspended';
+
+export type AdminAuditResponse = {
+  entries: AdminAccessLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  kind: AdminAuditKind;
+};
+
+export type AdminAuditActionRow = {
+  id: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_kind: string | null;
+  target_id: string | null;
+  allowed: boolean;
+  detail: unknown;
+  created_at: string;
+};
+
+export type AdminAuditActionsResponse = {
+  actions: AdminAuditActionRow[];
+  total: number;
+  limit: number;
+  offset: number;
 };
 
 export type MaintenanceCreateInput = {

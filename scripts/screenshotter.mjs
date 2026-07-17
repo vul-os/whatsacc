@@ -47,9 +47,11 @@ function loadFixture(name) {
 // ---------------------------------------------------------------------------
 // Mock API: method + pathname regex -> fixture body
 // ---------------------------------------------------------------------------
-function buildMockRoutes() {
+function buildMockRoutes({ admin = false } = {}) {
   return [
-    { method: 'GET', re: /^\/auth\/me$/, body: () => loadFixture('me.json') },
+    // The admin context serves a /me with is_platform_admin=true so the
+    // "Instance admin" nav item + /app/admin console render.
+    { method: 'GET', re: /^\/auth\/me$/, body: () => loadFixture(admin ? 'me-admin.json' : 'me.json') },
     {
       method: 'POST',
       re: /^\/auth\/refresh$/,
@@ -86,6 +88,16 @@ function buildMockRoutes() {
     { method: 'GET', re: /^\/reference\/countries$/, body: () => JSON.stringify({ countries: [
       { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}' },
     ] }) },
+    // Instance-admin console (operator-only; the admin context's me fixture
+    // carries is_platform_admin=true so the route guard lets these render).
+    { method: 'GET', re: /^\/admin\/claim$/, body: () => JSON.stringify({ claimed: true, claimable: false }) },
+    { method: 'GET', re: /^\/admin\/overview$/, body: () => loadFixture('admin-overview.json') },
+    { method: 'GET', re: /^\/admin\/accounts$/, body: () => loadFixture('admin-accounts.json') },
+    { method: 'GET', re: /^\/admin\/accounts\/[^/]+$/, body: () => loadFixture('admin-account-detail.json') },
+    { method: 'GET', re: /^\/admin\/users$/, body: () => loadFixture('admin-users.json') },
+    { method: 'GET', re: /^\/admin\/limits$/, body: () => loadFixture('admin-limits.json') },
+    { method: 'GET', re: /^\/admin\/audit$/, body: () => loadFixture('admin-audit.json') },
+    { method: 'GET', re: /^\/admin\/audit\/actions$/, body: () => loadFixture('admin-audit-actions.json') },
   ];
 }
 
@@ -93,10 +105,10 @@ function buildMockRoutes() {
 // Vite origin via VITE_API_BASE_URL, so these prefixes distinguish API calls from
 // Vite asset requests on the same origin.
 const API_PREFIX_RE =
-  /^\/(auth|accounts|access|analytics|devices|locations|phones|reference|whatsapp)(\/|$)/;
+  /^\/(admin|auth|accounts|access|analytics|devices|locations|phones|reference|whatsapp)(\/|$)/;
 
-async function installApiMocks(context) {
-  const routes = buildMockRoutes();
+async function installApiMocks(context, opts = {}) {
+  const routes = buildMockRoutes(opts);
   await context.route(
     (url) => API_PREFIX_RE.test(url.pathname),
     async (route) => {
@@ -322,6 +334,13 @@ async function main() {
         scrollTo: '[data-shot="location-limits"]',
       },
     ];
+    // Operator console — captured in a separate context whose /auth/me mock
+    // grants is_platform_admin (the admin nav item + route guard key off it).
+    const adminShots = [
+      // NB: stat-card kickers are CSS-uppercased (innerText follows
+      // text-transform), so assert on the untransformed signups heading.
+      { path: '/app/admin', file: 'portal-admin.png', expectText: 'Recent signups' },
+    ];
     const mobileShots = [
       // No Tauri app exists yet: the tap-to-open gate view at phone size is the
       // closest real "app" surface, standing in for the emergency/open flow.
@@ -332,6 +351,12 @@ async function main() {
       {
         label: 'desktop 1440x900@2x',
         shots: desktopShots,
+        options: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
+      },
+      {
+        label: 'desktop admin 1440x900@2x',
+        shots: adminShots,
+        admin: true,
         options: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
       },
       {
@@ -351,7 +376,7 @@ async function main() {
     const written = [];
     for (const scheme of ['light', 'dark']) {
       if (scheme === 'dark' && !APP_HAS_DARK_MODE) break;
-      for (const { label, shots, options } of contexts) {
+      for (const { label, shots, options, admin } of contexts) {
         console.log(`Capturing ${label} (${scheme}) ...`);
         const context = await browser.newContext({
           ...options,
@@ -362,7 +387,7 @@ async function main() {
         });
         await context.addInitScript(AUTH_SEED);
         await context.addInitScript(`window.localStorage.setItem('whatsacc.theme', '${scheme}');`);
-        await installApiMocks(context);
+        await installApiMocks(context, { admin: Boolean(admin) });
         const page = await context.newPage();
         page.on('pageerror', (err) => console.warn(`  [pageerror] ${err.message}`));
         const outDir = scheme === 'dark' ? OUT_DARK : OUT_LIGHT;

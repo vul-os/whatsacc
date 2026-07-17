@@ -1,0 +1,52 @@
+{
+  "account": {
+    "id": "acct_silveroaks",
+    "name": "Silver Oaks Estate",
+    "status": "active",
+    "country_code": "ZA",
+    "created_at": "{{now-120d}}",
+    "updated_at": "{{now-2d}}"
+  },
+  "members": [
+    { "user_id": "usr_thandi", "email": "thandi@silveroaks.co.za", "display_name": "Thandi Nkosi", "role": "owner", "status": "active", "joined_at": "{{now-120d}}" },
+    { "user_id": "usr_sipho", "email": "sipho.dlamini@gmail.com", "display_name": "Sipho Dlamini", "role": "admin", "status": "active", "joined_at": "{{now-118d}}" },
+    { "user_id": "usr_annelie", "email": "annelie.vdmerwe@icloud.com", "display_name": "Annelie van der Merwe", "role": "member", "status": "active", "joined_at": "{{now-96d}}" },
+    { "user_id": "usr_kagiso", "email": "kagiso.m@outlook.com", "display_name": "Kagiso Mothibi", "role": "member", "status": "active", "joined_at": "{{now-88d}}" },
+    { "user_id": "usr_lerato", "email": "lerato.mokoena@gmail.com", "display_name": "Lerato Mokoena", "role": "member", "status": "active", "joined_at": "{{now-61d}}" },
+    { "user_id": "usr_guard", "email": "guardhouse@silveroaks.co.za", "display_name": "Guard house", "role": "viewer", "status": "invited", "joined_at": "{{now-9d}}" }
+  ],
+  "locations": [
+    { "id": "loc_silveroaks", "name": "Silver Oaks Estate", "type": "complex", "slug": "silver-oaks", "status": "active", "created_at": "{{now-120d}}" },
+    { "id": "loc_silveroaks_club", "name": "Clubhouse", "type": "building", "slug": "silver-oaks-club", "status": "active", "created_at": "{{now-100d}}" }
+  ],
+  "recent_access_logs": [
+    {
+      "id": "al_101", "ts": "{{now-4m}}", "command": "open", "source": "whatsapp", "success": true, "error": null,
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks", "location_name": "Silver Oaks Estate",
+      "access_point_id": "ap_maingate", "access_point_name": "Main gate",
+      "user_id": "usr_sipho", "user_email": "sipho.dlamini@gmail.com"
+    },
+    {
+      "id": "al_102", "ts": "{{now-19m}}", "command": "open", "source": "web", "success": true, "error": null,
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks", "location_name": "Silver Oaks Estate",
+      "access_point_id": "ap_parking", "access_point_name": "Parking barrier",
+      "user_id": "usr_thandi", "user_email": "thandi@silveroaks.co.za"
+    },
+    {
+      "id": "al_103", "ts": "{{now-27m}}", "command": "open", "source": "whatsapp", "success": false, "error": "rate_limited",
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks", "location_name": "Silver Oaks Estate",
+      "access_point_id": "ap_maingate", "access_point_name": "Main gate",
+      "user_id": "usr_kagiso", "user_email": "kagiso.m@outlook.com"
+    },
+    {
+      "id": "al_104", "ts": "{{now-42m}}", "command": "close", "source": "web", "success": true, "error": null,
+      "account_id": "acct_silveroaks", "account_name": "Silver Oaks Estate",
+      "location_id": "loc_silveroaks_club", "location_name": "Clubhouse",
+      "access_point_id": "ap_club", "access_point_name": "Clubhouse door",
+      "user_id": "usr_kagiso", "user_email": "kagiso.m@outlook.com"
+    }
+  ]
+}

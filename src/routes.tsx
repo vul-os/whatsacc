@@ -62,6 +62,18 @@ const routes: RouteObject[] = [
       { path: 'analytics', element: wrap(() => import('@/pages/app/Analytics')), errorElement },
       { path: 'grants', element: wrap(() => import('@/pages/app/Grants')), errorElement },
       { path: 'settings', element: wrap(() => import('@/pages/app/Settings')), errorElement },
+      {
+        path: 'admin',
+        element: wrap(() => import('@/pages/app/admin/AdminLayout')),
+        errorElement,
+        children: [
+          { index: true, element: wrap(() => import('@/pages/app/admin/AdminOverview')), errorElement },
+          { path: 'accounts', element: wrap(() => import('@/pages/app/admin/AdminAccounts')), errorElement },
+          { path: 'users', element: wrap(() => import('@/pages/app/admin/AdminUsers')), errorElement },
+          { path: 'limits', element: wrap(() => import('@/pages/app/admin/AdminLimits')), errorElement },
+          { path: 'audit', element: wrap(() => import('@/pages/app/admin/AdminAudit')), errorElement },
+        ],
+      },
     ],
   },
 ];

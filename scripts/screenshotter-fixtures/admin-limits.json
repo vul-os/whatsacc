@@ -1,0 +1,26 @@
+{
+  "defaults": {
+    "open_cooldown_s": 10,
+    "opens_per_hour": 30,
+    "chat_msgs_per_min": 10,
+    "account_opens_per_hour": 500
+  },
+  "env": {
+    "open_cooldown_s": 10,
+    "opens_per_hour": 30,
+    "chat_msgs_per_min": 10,
+    "account_opens_per_hour": 500
+  },
+  "overrides": {
+    "open_cooldown_s": 5,
+    "opens_per_hour": null,
+    "chat_msgs_per_min": null,
+    "account_opens_per_hour": 800
+  },
+  "effective": {
+    "open_cooldown_s": 5,
+    "opens_per_hour": 30,
+    "chat_msgs_per_min": 10,
+    "account_opens_per_hour": 800
+  }
+}

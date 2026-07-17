@@ -1,0 +1,83 @@
+{
+  "totals": {
+    "users": 212,
+    "accounts": 9,
+    "locations": 14,
+    "devices": 11,
+    "access_points": 19
+  },
+  "opens": { "today": 128, "last_7d": 1043 },
+  "denials_today": {
+    "total": 9,
+    "rate_limited": 5,
+    "quota_exceeded": 2,
+    "account_suspended": 1,
+    "other": 1
+  },
+  "recent_signups": [
+    {
+      "id": "usr_zanele",
+      "email": "zanele.mabaso@gmail.com",
+      "display_name": "Zanele Mabaso",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-38m}}"
+    },
+    {
+      "id": "usr_johan",
+      "email": "johan.pretorius@waterfallcv.co.za",
+      "display_name": "Johan Pretorius",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-3h}}"
+    },
+    {
+      "id": "usr_ayesha",
+      "email": "ayesha.moosa@icloud.com",
+      "display_name": "Ayesha Moosa",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-7h}}"
+    },
+    {
+      "id": "usr_bongani",
+      "email": "bongani.zulu@melrosearch.co.za",
+      "display_name": "Bongani Zulu",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-1d}}"
+    },
+    {
+      "id": "usr_marike",
+      "email": "marike.swart@outlook.com",
+      "display_name": "Marike Swart",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-1d}}"
+    },
+    {
+      "id": "usr_tshepo",
+      "email": "tshepo.molefe@gmail.com",
+      "display_name": "Tshepo Molefe",
+      "status": "disabled",
+      "is_platform_admin": false,
+      "created_at": "{{now-2d}}"
+    },
+    {
+      "id": "usr_naledi",
+      "email": "naledi.khumalo@ridgeoffices.co.za",
+      "display_name": "Naledi Khumalo",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-3d}}"
+    },
+    {
+      "id": "usr_thandi",
+      "email": "thandi@silveroaks.co.za",
+      "display_name": "Thandi Nkosi",
+      "status": "active",
+      "is_platform_admin": true,
+      "created_at": "{{now-120d}}"
+    }
+  ]
+}

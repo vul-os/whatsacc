@@ -19,6 +19,8 @@ export type SessionUser = {
   has_verified_phone: boolean;
   has_slack_identity: boolean;
   has_password: boolean;
+  /** Instance operator — unlocks the /app/admin console. */
+  is_platform_admin: boolean;
   slack_user_id: string | null;
   slack_handle: string | null;
 };
@@ -57,7 +59,7 @@ const ACTIVE_ACCOUNT_KEY = 'whatsacc.activeAccount';
 // Cached /me response for instant rehydration on refresh. Bumping the version
 // invalidates older shapes (e.g. when SessionUser gains/loses a field) so
 // stale caches don't mis-render the UI on the next deploy.
-const ME_CACHE_KEY = 'whatsacc.me.v4';
+const ME_CACHE_KEY = 'whatsacc.me.v5';
 
 type CachedMe = { user: SessionUser; accounts: SessionAccount[] };
 
@@ -96,6 +98,7 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
       avatar_source: me.profile?.avatar_source ?? null,
       has_verified_phone: me.phones.some((p) => p.verified_at !== null),
       has_password: me.user.has_password,
+      is_platform_admin: me.user.is_platform_admin,
       has_slack_identity: Boolean(me.profile?.slack_user_id || me.profile?.slack_handle),
       slack_user_id: me.profile?.slack_user_id ?? null,
       slack_handle: me.profile?.slack_handle ?? null,

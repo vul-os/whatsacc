@@ -1,0 +1,62 @@
+{
+  "actions": [
+    {
+      "id": "aa_001",
+      "actor_user_id": "usr_thandi",
+      "actor_email": "thandi@silveroaks.co.za",
+      "action": "limits_update",
+      "target_kind": "instance",
+      "target_id": "rate_limits",
+      "allowed": true,
+      "detail": { "patch": { "account_opens_per_hour": 800 } },
+      "created_at": "{{now-2h}}"
+    },
+    {
+      "id": "aa_002",
+      "actor_user_id": "usr_thandi",
+      "actor_email": "thandi@silveroaks.co.za",
+      "action": "account_status",
+      "target_kind": "account",
+      "target_id": "acct_campsbay",
+      "allowed": true,
+      "detail": { "status": "suspended" },
+      "created_at": "{{now-1d}}"
+    },
+    {
+      "id": "aa_003",
+      "actor_user_id": "usr_tshepo",
+      "actor_email": "tshepo.molefe@gmail.com",
+      "action": "admin_access_denied",
+      "target_kind": "route",
+      "target_id": "/admin/overview",
+      "allowed": false,
+      "detail": { "method": "GET", "path": "/admin/overview" },
+      "created_at": "{{now-2d}}"
+    },
+    {
+      "id": "aa_004",
+      "actor_user_id": "usr_thandi",
+      "actor_email": "thandi@silveroaks.co.za",
+      "action": "user_status",
+      "target_kind": "user",
+      "target_id": "usr_tshepo",
+      "allowed": true,
+      "detail": { "status": "disabled", "email": "tshepo.molefe@gmail.com" },
+      "created_at": "{{now-2d}}"
+    },
+    {
+      "id": "aa_005",
+      "actor_user_id": "usr_thandi",
+      "actor_email": "thandi@silveroaks.co.za",
+      "action": "admin_claim",
+      "target_kind": "user",
+      "target_id": "usr_thandi",
+      "allowed": true,
+      "detail": { "email": "thandi@silveroaks.co.za" },
+      "created_at": "{{now-120d}}"
+    }
+  ],
+  "total": 5,
+  "limit": 50,
+  "offset": 0
+}

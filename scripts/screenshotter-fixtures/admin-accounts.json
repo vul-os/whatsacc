@@ -1,0 +1,97 @@
+{
+  "accounts": [
+    {
+      "id": "acct_silveroaks",
+      "name": "Silver Oaks Estate",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-120d}}",
+      "member_count": 148,
+      "location_count": 4,
+      "opens_7d": 512
+    },
+    {
+      "id": "acct_waterfall",
+      "name": "Waterfall Country Village",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-96d}}",
+      "member_count": 31,
+      "location_count": 2,
+      "opens_7d": 204
+    },
+    {
+      "id": "acct_melrose",
+      "name": "Melrose Arch Offices",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-74d}}",
+      "member_count": 18,
+      "location_count": 3,
+      "opens_7d": 156
+    },
+    {
+      "id": "acct_umhlanga",
+      "name": "Umhlanga Ridge Offices",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-61d}}",
+      "member_count": 36,
+      "location_count": 2,
+      "opens_7d": 98
+    },
+    {
+      "id": "acct_protea",
+      "name": "12 Protea Lane",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-52d}}",
+      "member_count": 4,
+      "location_count": 1,
+      "opens_7d": 41
+    },
+    {
+      "id": "acct_campsbay",
+      "name": "Camps Bay Villa",
+      "status": "suspended",
+      "country_code": "ZA",
+      "created_at": "{{now-44d}}",
+      "member_count": 6,
+      "location_count": 1,
+      "opens_7d": 0
+    },
+    {
+      "id": "acct_bergview",
+      "name": "Bergview Cottage",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-30d}}",
+      "member_count": 5,
+      "location_count": 1,
+      "opens_7d": 18
+    },
+    {
+      "id": "acct_khayelitsha",
+      "name": "Khayelitsha Community Hall",
+      "status": "active",
+      "country_code": "ZA",
+      "created_at": "{{now-12d}}",
+      "member_count": 9,
+      "location_count": 1,
+      "opens_7d": 12
+    },
+    {
+      "id": "acct_gaborone",
+      "name": "Phakalane Golf Estate",
+      "status": "active",
+      "country_code": "BW",
+      "created_at": "{{now-6d}}",
+      "member_count": 3,
+      "location_count": 1,
+      "opens_7d": 2
+    }
+  ],
+  "total": 9,
+  "limit": 25,
+  "offset": 0
+}

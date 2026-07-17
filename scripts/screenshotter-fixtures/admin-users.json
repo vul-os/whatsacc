@@ -1,0 +1,80 @@
+{
+  "users": [
+    {
+      "id": "usr_zanele",
+      "email": "zanele.mabaso@gmail.com",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-38m}}",
+      "display_name": "Zanele Mabaso",
+      "accounts": [{ "account_id": "acct_waterfall", "name": "Waterfall Country Village", "role": "member" }],
+      "last_access_at": "{{now-12m}}"
+    },
+    {
+      "id": "usr_johan",
+      "email": "johan.pretorius@waterfallcv.co.za",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-3h}}",
+      "display_name": "Johan Pretorius",
+      "accounts": [{ "account_id": "acct_waterfall", "name": "Waterfall Country Village", "role": "owner" }],
+      "last_access_at": "{{now-1h}}"
+    },
+    {
+      "id": "usr_thandi",
+      "email": "thandi@silveroaks.co.za",
+      "status": "active",
+      "is_platform_admin": true,
+      "created_at": "{{now-120d}}",
+      "display_name": "Thandi Nkosi",
+      "accounts": [{ "account_id": "acct_silveroaks", "name": "Silver Oaks Estate", "role": "owner" }],
+      "last_access_at": "{{now-19m}}"
+    },
+    {
+      "id": "usr_sipho",
+      "email": "sipho.dlamini@gmail.com",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-118d}}",
+      "display_name": "Sipho Dlamini",
+      "accounts": [{ "account_id": "acct_silveroaks", "name": "Silver Oaks Estate", "role": "admin" }],
+      "last_access_at": "{{now-4m}}"
+    },
+    {
+      "id": "usr_bongani",
+      "email": "bongani.zulu@melrosearch.co.za",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-1d}}",
+      "display_name": "Bongani Zulu",
+      "accounts": [
+        { "account_id": "acct_melrose", "name": "Melrose Arch Offices", "role": "owner" },
+        { "account_id": "acct_umhlanga", "name": "Umhlanga Ridge Offices", "role": "member" }
+      ],
+      "last_access_at": "{{now-5h}}"
+    },
+    {
+      "id": "usr_tshepo",
+      "email": "tshepo.molefe@gmail.com",
+      "status": "disabled",
+      "is_platform_admin": false,
+      "created_at": "{{now-2d}}",
+      "display_name": "Tshepo Molefe",
+      "accounts": [],
+      "last_access_at": "{{now-2d}}"
+    },
+    {
+      "id": "usr_naledi",
+      "email": "naledi.khumalo@ridgeoffices.co.za",
+      "status": "active",
+      "is_platform_admin": false,
+      "created_at": "{{now-3d}}",
+      "display_name": "Naledi Khumalo",
+      "accounts": [{ "account_id": "acct_umhlanga", "name": "Umhlanga Ridge Offices", "role": "viewer" }],
+      "last_access_at": null
+    }
+  ],
+  "total": 212,
+  "limit": 25,
+  "offset": 0
+}

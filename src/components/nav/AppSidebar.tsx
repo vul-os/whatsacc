@@ -1,9 +1,11 @@
 import { Link, NavLink } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { cn } from '@/lib/cn';
-import { APP_NAV_ITEMS } from './items';
+import { useAuth } from '@/lib/auth';
+import { ADMIN_NAV_ITEM, APP_NAV_ITEMS } from './items';
 
 export function AppSidebar() {
+  const { user } = useAuth();
   return (
     <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-ink/10 bg-paper-cool/60 px-4 py-6 sticky top-0 h-screen">
       <Link to="/" className="flex items-center gap-2 px-2 mb-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
@@ -32,6 +34,26 @@ export function AppSidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {user?.is_platform_admin && (
+        <div className="mt-6 pt-4 border-t border-ink/10">
+          <p className="px-3 mb-1 text-[10px] uppercase tracking-[0.22em] text-ink/40">Operator</p>
+          <NavLink
+            to={ADMIN_NAV_ITEM.to}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+                isActive
+                  ? 'bg-ink text-paper'
+                  : 'text-ink/70 hover:bg-ink/5 hover:text-ink',
+              )
+            }
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden />
+            {ADMIN_NAV_ITEM.label}
+          </NavLink>
+        </div>
+      )}
     </aside>
   );
 }
