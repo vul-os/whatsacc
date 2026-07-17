@@ -43,6 +43,24 @@ trustees can read it.
 
 [Dark variant](../screenshots/dark/security.png)
 
+### Usage & limits
+
+An access point's quota panel: today's opens against the location cap, per-member
+usage, and the admin's inline editor for the two daily quotas.
+
+![The usage and limits panel](../screenshots/portal-limits.png)
+
+[Dark variant](../screenshots/dark/portal-limits.png)
+
+### The instance-admin console
+
+The gateway operator's view: instance totals, opens, and the denial breakdown —
+rate-limited, quota, suspended — with accounts, users, limits and audit a tab away.
+
+![The instance-admin overview](../screenshots/portal-admin.png)
+
+[Dark variant](../screenshots/dark/portal-admin.png)
+
 ## The app
 
 ### Emergency access
