@@ -15,6 +15,7 @@ import { whatsappRoutes } from './routes/whatsapp.ts';
 import { telegramRoutes } from './routes/telegram.ts';
 import { slackRoutes } from './routes/slack.ts';
 import { analyticsRoutes } from './routes/analytics.ts';
+import { adminRoutes } from './routes/admin.ts';
 
 export function createApp() {
   const app = new Hono<AppEnv>();
@@ -68,6 +69,7 @@ export function createApp() {
   app.route('/devices', devicesRoutes);
   app.route('/phones', phonesRoutes);
   app.route('/analytics', analyticsRoutes);
+  app.route('/admin', adminRoutes);
   app.route('/', whatsappRoutes); // mounts /webhooks/whatsapp at root
   app.route('/', telegramRoutes); // mounts /webhooks/telegram at root
   app.route('/', slackRoutes); // mounts /webhooks/slack at root

@@ -365,6 +365,10 @@ function authRouter() {
       if (!user || !user.password_hash) throw Unauthorized('invalid_credentials');
       const ok = await verifyPassword(password, user.password_hash);
       if (!ok) throw Unauthorized('invalid_credentials');
+      // Operator-disabled users get a distinct code so clients can explain.
+      if (user.status === 'disabled') {
+        throw Unauthorized('user_disabled', 'This user has been disabled by the instance operator');
+      }
       if (user.status !== 'active') throw Forbidden('account_not_active', `status=${user.status}`);
       return await issueTokens(tx, user, { userAgent: ua, ip });
     });

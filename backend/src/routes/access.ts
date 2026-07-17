@@ -75,7 +75,11 @@ const maintenanceSchema = z
 
 export type LogAccessResult =
   | { allowed: true }
-  | { allowed: false; reason: 'rate_limited' | 'quota_exceeded'; retry_after_s: number };
+  | {
+      allowed: false;
+      reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended';
+      retry_after_s: number;
+    };
 
 /**
  * The single choke point for gate commands. Every open path (portal, API,
@@ -104,13 +108,31 @@ export async function logAccess(
   const apRows = await tx<{
     location_id: string;
     account_id: string;
+    account_status: string;
   }[]>`
-    select ap.location_id, l.account_id
-    from access_points ap join locations l on l.id = ap.location_id
+    select ap.location_id, l.account_id, a.status as account_status
+    from access_points ap
+    join locations l on l.id = ap.location_id
+    join accounts a on a.id = l.account_id
     where ap.id = ${args.access_point_id}
   `;
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
+
+  // Suspended account: every open is denied with a distinct, auditable
+  // reason — regardless of channel, membership, or grants. 'close' stays
+  // allowed (safe direction), and members can still log in to see the state.
+  if (args.command === 'open' && ap.account_status === 'suspended') {
+    await tx`
+      insert into access_logs
+        (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
+      values
+        (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
+         ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null},
+         false, 'account_suspended')
+    `;
+    return { allowed: false, reason: 'account_suspended', retry_after_s: 0 };
+  }
 
   // 'close' is never limited — closing a gate is the safe direction.
   let degradedNote: string | null = null;
@@ -489,6 +511,12 @@ function accessRouter() {
       });
     });
     if (!verdict.allowed) {
+      if (verdict.reason === 'account_suspended') {
+        throw Forbidden(
+          'account_suspended',
+          'This account has been suspended by the gateway operator.',
+        );
+      }
       throw TooManyRequests(
         verdict.reason,
         verdict.retry_after_s,

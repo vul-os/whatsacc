@@ -110,6 +110,19 @@ export async function seedLocationWithAccessPoint(
   );
 }
 
+/**
+ * Promote a user to platform admin directly (bypasses the claim flow — for
+ * tests that need an operator without exercising /admin/claim).
+ */
+export async function makePlatformAdmin(userId: string): Promise<void> {
+  await withRLS(
+    { user_id: '', account_id: null, is_platform_admin: true },
+    async (tx) => {
+      await tx`update users set is_platform_admin = true, updated_at = now() where id = ${userId}`;
+    },
+  );
+}
+
 export async function rawSqlAdmin<T extends Record<string, unknown> = Record<string, unknown>>(
   fn: (tx: typeof getSql extends () => infer S ? S : never) => Promise<T[]>,
 ): Promise<T[]> {

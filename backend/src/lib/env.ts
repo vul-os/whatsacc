@@ -38,6 +38,10 @@ export interface Env {
   RATE_OPENS_PER_HOUR?: string;
   RATE_CHAT_MSGS_PER_MIN?: string;
   RATE_ACCOUNT_OPENS_PER_HOUR?: string;
+  // One-time instance-admin claim token (first-run bootstrap). Set by the
+  // operator's deploy; redeemable exactly once via POST /admin/claim while
+  // NO platform admin exists yet. Useless once the instance is claimed.
+  ADMIN_CLAIM_TOKEN?: string;
   // Local-dev port (unused on Workers — we listen on platform-managed port)
   PORT?: number;
 }
@@ -76,6 +80,7 @@ function buildEnv(raw: RawEnv): Env {
     RATE_OPENS_PER_HOUR: raw['RATE_OPENS_PER_HOUR'],
     RATE_CHAT_MSGS_PER_MIN: raw['RATE_CHAT_MSGS_PER_MIN'],
     RATE_ACCOUNT_OPENS_PER_HOUR: raw['RATE_ACCOUNT_OPENS_PER_HOUR'],
+    ADMIN_CLAIM_TOKEN: raw['ADMIN_CLAIM_TOKEN'],
     PORT: raw['PORT'] ? Number(raw['PORT']) : undefined,
   };
 }

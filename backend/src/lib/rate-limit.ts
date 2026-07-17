@@ -97,6 +97,86 @@ export function getRateLimitConfig(): RateLimitConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Runtime overrides (instance_settings, set by the instance admin)
+// ---------------------------------------------------------------------------
+// The gateway operator can override the env-configured limits at runtime via
+// PATCH /admin/limits. Overrides persist in the internal instance_settings
+// table under key 'rate_limits' as a PARTIAL object, e.g. {"opens_per_hour":1}.
+// Resolution order per field: db override > env var > built-in default.
+
+/** External (snake_case) override field → internal config key. */
+export const RATE_LIMIT_OVERRIDE_FIELDS = {
+  open_cooldown_s: 'openCooldownS',
+  opens_per_hour: 'opensPerHour',
+  chat_msgs_per_min: 'chatMsgsPerMin',
+  account_opens_per_hour: 'accountOpensPerHour',
+} as const;
+
+export type RateLimitOverrideField = keyof typeof RATE_LIMIT_OVERRIDE_FIELDS;
+
+/** Partial set of overridden values, keyed by external field name. */
+export type RateLimitOverrides = Partial<Record<RateLimitOverrideField, number>>;
+
+export const INSTANCE_RATE_LIMITS_KEY = 'rate_limits';
+
+/**
+ * Parse the stored jsonb override object defensively: only non-negative
+ * integers are accepted; anything else (missing key, garbage, negatives,
+ * floats) is ignored so a corrupted settings row can never wedge the limiter.
+ */
+export function parseStoredOverrides(raw: unknown): RateLimitOverrides {
+  const out: RateLimitOverrides = {};
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  const obj = raw as Record<string, unknown>;
+  for (const field of Object.keys(RATE_LIMIT_OVERRIDE_FIELDS) as RateLimitOverrideField[]) {
+    const v = obj[field];
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 0) out[field] = v;
+  }
+  return out;
+}
+
+/** Apply overrides on top of the env/default config. db > env > default. */
+export function mergeRateLimitConfig(
+  base: RateLimitConfig,
+  overrides: RateLimitOverrides,
+): RateLimitConfig {
+  const cfg = { ...base };
+  for (const [field, key] of Object.entries(RATE_LIMIT_OVERRIDE_FIELDS) as [
+    RateLimitOverrideField,
+    keyof RateLimitConfig,
+  ][]) {
+    const v = overrides[field];
+    if (v !== undefined) cfg[key] = v;
+  }
+  return cfg;
+}
+
+/** Read the persisted override object (empty when none / unreadable). */
+export async function readRateLimitOverrides(tx: TxSql): Promise<RateLimitOverrides> {
+  const rows = await tx<{ v: unknown }[]>`
+    select app.instance_setting_get(${INSTANCE_RATE_LIMITS_KEY}) as v
+  `;
+  return parseStoredOverrides(rows[0]?.v ?? null);
+}
+
+/**
+ * Effective config for enforcement: db override > env > default.
+ * FAILURE MODE: if the settings read errors (e.g. migration not applied),
+ * fall back to the env config — never block on the settings store. The read
+ * runs in a savepoint so a failure can't poison the caller's transaction.
+ */
+export async function resolveRateLimitConfig(tx: TxSql): Promise<RateLimitConfig> {
+  const envCfg = getRateLimitConfig();
+  try {
+    const overrides = await tx.savepoint(async (stx) => await readRateLimitOverrides(stx));
+    return mergeRateLimitConfig(envCfg, overrides);
+  } catch (err) {
+    console.error('rate_limit_overrides_read_failed', err);
+    return envCfg;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Window math (pure, unit-tested)
 // ---------------------------------------------------------------------------
 
@@ -201,7 +281,8 @@ export async function checkAndConsumeOpenLimits(
   tx: TxSql,
   input: OpenLimitInput,
 ): Promise<OpenLimitDecision> {
-  const cfg = getRateLimitConfig();
+  // db override > env > default (see resolveRateLimitConfig).
+  const cfg = await resolveRateLimitConfig(tx);
   const now = input.now ?? new Date();
   const subject = openSubject(input);
   const hourStart = fixedWindowStart(now, HOUR_S);
@@ -350,7 +431,7 @@ export async function noteChatMessage(
   subject: string,
   now: Date = new Date(),
 ): Promise<{ quiet: boolean }> {
-  const cfg = getRateLimitConfig();
+  const cfg = await resolveRateLimitConfig(tx);
   try {
     const count = await tx.savepoint(
       async (stx) => await bump(stx, 'chat_1m', subject, fixedWindowStart(now, MINUTE_S)),
@@ -367,9 +448,12 @@ export async function noteChatMessage(
 // ---------------------------------------------------------------------------
 
 export function chatDenialMessage(denial: {
-  reason: 'rate_limited' | 'quota_exceeded';
+  reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended';
   retry_after_s: number;
 }): string {
+  if (denial.reason === 'account_suspended') {
+    return 'This account has been suspended by the gateway operator — the gate cannot be opened. Contact your operator for help.';
+  }
   if (denial.reason === 'quota_exceeded') {
     const base = getEnv().APP_PUBLIC_URL.replace(/\/$/, '');
     return `Daily limit reached for this location — contact your admin. The web portal: ${base}/app`;
