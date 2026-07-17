@@ -1,15 +1,11 @@
 import { Link } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
-import { getCountry } from '@/lib/billing/data';
-
-const za = getCountry('ZA');
 
 const cols = [
   {
     head: 'Product',
     links: [
       { to: '/', label: 'Overview' },
-      { to: '/pricing', label: 'Pricing' },
       { to: '/security', label: 'Security' },
     ],
   },
@@ -50,7 +46,7 @@ export function Footer() {
               there&rsquo;s a gate that needs opening.
             </p>
             <p className="mt-5 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-paper/55">
-              <span aria-hidden className="text-base leading-none">{za?.flag}</span>
+              <span aria-hidden className="text-base leading-none">🇿🇦</span>
               <span>Made in South Africa</span>
             </p>
           </div>

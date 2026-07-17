@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { MobileNavDrawer } from './MobileNavDrawer';
-import { CurrencySelector } from './CurrencySelector';
 import { AccountSwitcher } from './AccountSwitcher';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -48,7 +47,6 @@ export function AppTopBar() {
             its own detail page at /app/access-points/:id.
           */}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
-            <CurrencySelector className="hidden sm:inline-block" />
             <ThemeToggle variant="default" />
             {user && <AccountSwitcher />}
           </div>

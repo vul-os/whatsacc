@@ -132,23 +132,6 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
   return payload as T;
 }
 
-async function apiBlob(path: string): Promise<Blob> {
-  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
-  const request = async () => {
-    const h = new Headers();
-    const access = tokenStore.access;
-    if (access) h.set('Authorization', `Bearer ${access}`);
-    return await fetch(url, { headers: h });
-  };
-  let res = await request();
-  if (res.status === 401 && tokenStore.refresh) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) res = await request();
-  }
-  if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => `http_${res.status}`));
-  return await res.blob();
-}
-
 // Typed surface ------------------------------------------------------------
 
 export type AuthTokens = {
@@ -187,7 +170,6 @@ export type MeResponse = {
   accounts: Array<{
     account_id: string;
     name: string;
-    billing_type: string;
     role: string;
     status: string;
   }>;
@@ -197,8 +179,6 @@ export type CountryRef = {
   code: string;
   name: string;
   flag: string;
-  currency_code: string;
-  msg_cost_zar: number;
 };
 
 export const api = {
@@ -213,7 +193,6 @@ export const api = {
     location_name?: string;
     country_code: string;
     account_type: 'personal' | 'business';
-    referral_slug?: string;
     invite_token?: string;
   }) => apiFetch<AuthTokens & { id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
 
@@ -264,40 +243,8 @@ export const api = {
 
   googleStartUrl: () => `${API_BASE_URL}/auth/google/start`,
 
-  accountBilling: (accountId: string) =>
-    apiFetch<AccountBilling>(`/billing/accounts/${accountId}/billing`),
-
   accountUpdate: (accountId: string, body: { name?: string }) =>
     apiFetch<void>(`/accounts/${accountId}`, { method: 'PATCH', body }),
-
-  walletTopup: (body: { account_id: string; amount_cents: number; callback_path?: string }) =>
-    apiFetch<TopupResponse>('/billing/wallet/topup', { method: 'POST', body }),
-
-  walletVerify: (reference: string) =>
-    apiFetch<WalletVerifyResponse>(
-      `/billing/wallet/verify?reference=${encodeURIComponent(reference)}`,
-    ),
-
-  changePlan: (accountId: string, plan_code: string) =>
-    apiFetch<{ plan_code: string; price_cents: number }>(
-      `/billing/accounts/${accountId}/plan`,
-      { method: 'POST', body: { plan_code } },
-    ),
-
-  subscriptionCheckout: (accountId: string, plan_code: string) =>
-    apiFetch<TopupResponse>(
-      `/billing/accounts/${accountId}/subscription-checkout`,
-      { method: 'POST', body: { plan_code } },
-    ),
-
-  invoices: (accountId: string) =>
-    apiFetch<{ invoices: InvoiceSummary[] }>(`/billing/accounts/${accountId}/invoices`),
-
-  invoicePdfUrl: (id: string) =>
-    `${API_BASE_URL}/billing/invoices/${encodeURIComponent(id)}.pdf`,
-
-  invoicePdf: (id: string) =>
-    apiBlob(`/billing/invoices/${encodeURIComponent(id)}.pdf`),
 
   accessPoints: (accountId?: string) => {
     const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
@@ -325,32 +272,6 @@ export const api = {
       method: 'POST',
       body,
     }),
-
-  referralResolve: (slug: string) =>
-    apiFetch<ReferralResolve>(`/referrals/resolve/${encodeURIComponent(slug)}`),
-
-  referralMe: () => apiFetch<ReferralMe>('/referrals/me'),
-
-  referralUpdateSlug: (slug: string) =>
-    apiFetch<{ slug: string }>('/referrals/slug', { method: 'PUT', body: { slug } }),
-
-  kycGet: () =>
-    apiFetch<{ kyc: KycProfile | null; complete: boolean }>('/referrals/kyc'),
-
-  kycPut: (body: Partial<KycProfile>) =>
-    apiFetch<{ kyc: KycProfile | null; complete: boolean }>('/referrals/kyc', {
-      method: 'PUT',
-      body,
-    }),
-
-  payoutRequest: (amount_zar_cents: number) =>
-    apiFetch<{ id: string }>('/referrals/payouts', {
-      method: 'POST',
-      body: { amount_zar_cents },
-    }),
-
-  payoutCancel: (id: string) =>
-    apiFetch<void>(`/referrals/payouts/${id}/cancel`, { method: 'POST' }),
 
   grants: (q: { account_id?: string; phone_e164?: string; status?: 'active' | 'revoked' } = {}) => {
     const qs = new URLSearchParams();
@@ -463,14 +384,6 @@ export const api = {
 
   accountInsights: (accountId: string) =>
     apiFetch<AccountInsights>(`/analytics/accounts/${accountId}/insights`),
-
-  tiers: (opts: { country?: string; region?: string } = {}) => {
-    const qs = new URLSearchParams();
-    if (opts.country) qs.set('country', opts.country);
-    if (opts.region) qs.set('region', opts.region);
-    const s = qs.toString();
-    return apiFetch<BillingTiersResponse>(`/billing/tiers${s ? `?${s}` : ''}`);
-  },
 };
 
 export type LocationRow = {
@@ -582,65 +495,6 @@ export type GrantCreateInput = {
   notes?: string;
 };
 
-export type ReferralResolve = {
-  slug: string;
-  display_name: string;
-  avatar_url: string | null;
-};
-
-export type KycProfile = {
-  user_id: string;
-  full_name: string | null;
-  contact_email: string | null;
-  cellphone: string | null;
-  id_kind: 'za_id' | 'passport' | null;
-  id_number: string | null;
-  bank_name: string | null;
-  bank_branch_code: string | null;
-  bank_account_number: string | null;
-  bank_account_holder: string | null;
-  bank_account_type: 'cheque' | 'savings' | 'transmission' | null;
-  verified_at: string | null;
-};
-
-export type ReferralEarning = {
-  id: string;
-  amount_zar_cents: number;
-  source_kind: string;
-  rate_bps: number;
-  created_at: string;
-  referee_email_masked: string;
-};
-
-export type PayoutRow = {
-  id: string;
-  amount_zar_cents: number;
-  status: 'pending' | 'approved' | 'paid' | 'rejected' | 'cancelled';
-  requested_at: string;
-  processed_at: string | null;
-  notes: string | null;
-};
-
-export type ReferralMe = {
-  slug: string | null;
-  slug_updated_at: string | null;
-  referred_by_user_id: string | null;
-  balance: {
-    earned_cents: number;
-    paid_out_cents: number;
-    pending_cents: number;
-    available_cents: number;
-  };
-  counts: {
-    referees_total: number;
-    referees_active_30d: number;
-  };
-  recent_earnings: ReferralEarning[];
-  payouts: PayoutRow[];
-  kyc_status: { complete: boolean; verified_at: string | null };
-  min_payout_cents: number;
-};
-
 export type AccessPointDetail = {
   id: string;
   location_id: string;
@@ -691,82 +545,4 @@ export type MaintenanceCreateInput = {
   next_due_movement_m?: number;
   next_due_at?: string;
   next_due_in_days?: number;
-};
-
-export type AccountBilling = {
-  subscription: {
-    plan_code: string;
-    status: string;
-    current_period_start: string | null;
-    current_period_end: string | null;
-  } | null;
-  wallet: { balance_cents: number; currency: string } | null;
-  payment_method: {
-    card_last4: string | null;
-    card_brand: string | null;
-    has_authorization: boolean;
-  } | null;
-  recent_intents: Array<{
-    id: string;
-    amount_cents: number;
-    currency: string;
-    status: 'pending' | 'succeeded' | 'failed' | 'abandoned';
-    created_at: string;
-    completed_at: string | null;
-    provider_reference: string;
-    invoice_id: string | null;
-  }>;
-};
-
-export type InvoiceSummary = {
-  id: string;
-  number: string;
-  kind: string;
-  currency: string;
-  subtotal_cents: number;
-  vat_rate_bps: number;
-  vat_cents: number;
-  total_cents: number;
-  status: string;
-  issued_at: string;
-  paid_at: string | null;
-};
-
-export type TopupResponse = {
-  intent_id: string;
-  reference: string;
-  authorization_url: string;
-  access_code: string;
-};
-
-export type WalletVerifyResponse = {
-  status: 'succeeded' | 'failed' | 'abandoned';
-  intent_id: string;
-  account_id: string;
-  amount_cents: number;
-  currency: string;
-  already_credited: boolean;
-  plan_activated: string | null;
-};
-
-export type BillingTier = {
-  code: string;
-  name: string;
-  price: number;
-  currency: string;
-  included_opens: number;
-  included_residents: number;
-  included_devices: number;
-  included_locations: number;
-  web_portal: boolean;
-  blurb: string;
-};
-
-export type BillingTiersResponse = {
-  region: string;
-  region_name: string;
-  currency: string;
-  countries: readonly string[];
-  payg_open_price: number;
-  tiers: BillingTier[];
 };

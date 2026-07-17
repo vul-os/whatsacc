@@ -5,7 +5,6 @@ import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api, type CountryRef } from '@/lib/api';
-import { clearReferral, getReferral } from '@/lib/referral';
 
 const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
 export const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
@@ -65,11 +64,7 @@ export default function Signup() {
     }
   }, [searchParams]);
 
-  const referral = useMemo(() => getReferral(), []);
-  const googleStartUrl = useMemo(() => {
-    if (!referral?.slug) return api.googleStartUrl();
-    return `${api.googleStartUrl()}?ref=${encodeURIComponent(referral.slug)}`;
-  }, [referral]);
+  const googleStartUrl = api.googleStartUrl();
 
   function rememberPendingWhatsAppPhone() {
     if (!pendingWhatsAppPhone) return;
@@ -83,9 +78,7 @@ export default function Signup() {
       .then((r) => !cancelled && setCountries(r.countries))
       .catch(() => {
         if (!cancelled) {
-          setCountries([
-            { code: 'ZA', name: 'South Africa', flag: '🇿🇦', currency_code: 'ZAR', msg_cost_zar: 0.148 },
-          ]);
+          setCountries([{ code: 'ZA', name: 'South Africa', flag: '🇿🇦' }]);
         }
       });
     return () => {
@@ -115,10 +108,8 @@ export default function Signup() {
         location_name: isInviteSignup ? undefined : (locationName.trim() || placeholderForKind).trim(),
         country_code: country,
         account_type: kind,
-        referral_slug: referral?.slug,
         invite_token: pendingInviteToken ?? undefined,
       });
-      clearReferral();
       if (pendingInviteToken) {
         try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch {/**/}
         navigate('/app', { replace: true });
@@ -195,9 +186,9 @@ export default function Signup() {
           {step === 'auth' &&
             "The free signup is real. Three quick steps and you'll be ready to pair a device."}
           {step === 'kind' &&
-            "It's only for billing copy and dashboard hints — you can change it later in settings."}
+            "It's only for dashboard hints — you can change it later in settings."}
           {step === 'location' &&
-            'Each location is its own world: members, billing, gates. You can add more after you sign up.'}
+            'Each location is its own world: members, gates, devices. You can add more after you sign up.'}
         </p>
       }
     >
@@ -243,13 +234,6 @@ export default function Signup() {
                 </>
               )}
 
-              {referral && (
-                <p className="mt-4 px-3 py-2 rounded-xl bg-moss/10 border border-moss/30 text-sm text-ink/80">
-                  You were invited by{' '}
-                  <span className="font-medium">{referral.displayName ?? referral.slug}</span>.
-                </p>
-              )}
-
               {pendingWhatsAppPhone && !isInviteSignup && (
                 <p className="mt-4 px-3 py-2 rounded-xl bg-terracotta/10 border border-terracotta/25 text-sm text-ink/80">
                   After signup, you can connect{' '}
@@ -257,7 +241,7 @@ export default function Signup() {
                 </p>
               )}
 
-              <div className={`${isInviteSignup || referral || pendingWhatsAppPhone ? 'mt-6' : 'mt-0'} space-y-3`}>
+              <div className={`${isInviteSignup || pendingWhatsAppPhone ? 'mt-6' : 'mt-0'} space-y-3`}>
                 <Field
                   label="Your name"
                   value={name}
@@ -349,7 +333,7 @@ export default function Signup() {
                   selected={kind === 'business'}
                   onClick={() => setKind('business')}
                   title="Business"
-                  body="A complex, an office, a property you manage. Multiple gates, members, billing."
+                  body="A complex, an office, a property you manage. Multiple gates, members, roles."
                   icon={
                     <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="6" width="18" height="14" rx="1.5" />
@@ -389,7 +373,7 @@ export default function Signup() {
             <form onSubmit={onFinalSubmit}>
               <h1 className="font-display-tight text-2xl sm:text-3xl text-ink">Your first location</h1>
               <p className="mt-1.5 text-sm text-ink/60">
-                Each location has its own gates, members and billing. You can add more after.
+                Each location has its own gates, members and devices. You can add more after.
               </p>
 
               <div className="mt-5 space-y-3">

@@ -81,7 +81,7 @@ export function CreateLocationModal({
     ? 'Give your place a name and confirm its address before you dive in.'
     : mode === 'current-account'
       ? 'Name and verify the address of this location.'
-      : 'A house, complex, building, or other site. Each location has its own members and billing.';
+      : 'A house, complex, building, or other site. Each location has its own members and devices.';
   const submitLabel = submitting
     ? 'Saving…'
     : forced || mode === 'current-account'

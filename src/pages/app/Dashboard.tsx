@@ -5,12 +5,9 @@ import { Card } from '@/components/ui/Card';
 import { AccessPointAction } from '@/components/access/AccessPointAction';
 import { CreateAccessPointModal } from '@/components/access/CreateAccessPointModal';
 import { useAuth } from '@/lib/auth';
-import { useFormatZar } from '@/lib/billing/currency';
-import { QuotaBanner } from '@/components/billing/QuotaBanner';
 import {
   api,
   type AccessPointDetail,
-  type AccountBilling,
   type AccountSummary,
   type LocationRow,
 } from '@/lib/api';
@@ -43,9 +40,7 @@ function greetForHour(h: number): string {
 
 export default function Dashboard() {
   const { user, currentAccount } = useAuth();
-  const formatZar = useFormatZar();
   const [summary, setSummary] = useState<AccountSummary | null>(null);
-  const [billing, setBilling] = useState<AccountBilling | null>(null);
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [accessPoints, setAccessPoints] = useState<AccessPointDetail[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -66,14 +61,12 @@ export default function Dashboard() {
     if (!currentAccount) return;
     setDataLoaded(false);
     try {
-      const [s, b, l, ap] = await Promise.all([
+      const [s, l, ap] = await Promise.all([
         api.accountSummary(currentAccount.id),
-        api.accountBilling(currentAccount.id).catch(() => null),
         api.locationsList(currentAccount.id),
         api.accessPoints(currentAccount.id).catch(() => ({ access_points: [] })),
       ]);
       setSummary(s);
-      setBilling(b);
       setLocations(l.locations);
       setAccessPoints(ap.access_points);
     } catch (err) {
@@ -137,15 +130,13 @@ export default function Dashboard() {
           )}
         </header>
 
-        {currentAccount?.id && <QuotaBanner accountId={currentAccount.id} />}
-
         {error && (
           <Card className="border-terracotta/40 p-4">
             <p className="text-sm text-terracotta-deep">{error}</p>
           </Card>
         )}
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
           <Card className="bg-ink text-paper p-4 sm:p-5">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-paper/55">Opens today</p>
             <p className="font-display text-3xl sm:text-4xl mt-1.5 sm:mt-2 leading-none tabular-nums">
@@ -155,17 +146,6 @@ export default function Dashboard() {
               {summary ? trendDelta(summary.opens_today, summary.opens_yesterday) : ''}
             </p>
           </Card>
-          <Link to="/app/billing" className="block">
-            <Card className="p-4 sm:p-5 h-full hover:border-ink/30 transition-colors">
-              <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/55">Wallet</p>
-              <p className="font-display text-3xl sm:text-4xl mt-1.5 sm:mt-2 leading-none tabular-nums">
-                {billing?.wallet ? formatZar(billing.wallet.balance_cents / 100) : formatZar(0)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-ink/55 mt-1 sm:mt-1.5 truncate">
-                {billing?.subscription ? `Plan: ${billing.subscription.plan_code}` : 'Top up →'}
-              </p>
-            </Card>
-          </Link>
           <Card className="p-4 sm:p-5">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/55">Locations</p>
             <p className="font-display text-3xl sm:text-4xl mt-1.5 sm:mt-2 leading-none tabular-nums">

@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { LinkButton } from '@/components/ui/Button';
-import { CurrencySelector } from '@/components/nav/CurrencySelector';
 import { ThemeToggle } from '@/components/nav/ThemeToggle';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
 
 const links = [
-  { to: '/pricing', label: 'Pricing' },
   { to: '/security', label: 'Security' },
   { to: '/docs', label: 'Docs' },
 ];
@@ -78,7 +76,6 @@ export function TopNav() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           <ThemeToggle variant="landing" />
-          <CurrencySelector className="hidden sm:inline-block" />
           <LinkButton
             to={signedIn ? '/app' : '/signup'}
             variant="ink"
@@ -155,13 +152,6 @@ export function TopNav() {
           </ul>
 
           <div className="mt-8">
-            <p className="mb-2 text-[11px] uppercase tracking-[0.22em] text-ink/45">
-              Display currency
-            </p>
-            <CurrencySelector variant="block" />
-          </div>
-
-          <div className="mt-6">
             <LinkButton to={signedIn ? '/app' : '/signup'} variant="ink" size="lg" className="w-full">
               {signedIn ? 'Go to dashboard' : 'Get started'}
             </LinkButton>

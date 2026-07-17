@@ -6,7 +6,7 @@ import { HowItWorks } from '@/components/landing/HowItWorks';
 import { BuiltFor } from '@/components/landing/BuiltFor';
 import { Features } from '@/components/landing/Features';
 import { PeekInside } from '@/components/landing/PeekInside';
-import { Pricing } from '@/components/landing/Pricing';
+import { FreeOpen } from '@/components/landing/FreeOpen';
 import { FAQ } from '@/components/landing/FAQ';
 import { Footer } from '@/components/landing/Footer';
 
@@ -21,7 +21,7 @@ export default function Landing() {
       <BuiltFor />
       <Features />
       <PeekInside />
-      <Pricing />
+      <FreeOpen />
       <FAQ />
       <Footer />
     </div>

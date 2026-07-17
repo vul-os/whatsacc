@@ -11,8 +11,8 @@ export default function PermissionsMembers() {
 
       <DocSection heading="The four roles">
         <ul className="list-disc pl-6 space-y-2">
-          <li><strong>Owner</strong> — the account holder. Billing, danger-zone settings, can transfer ownership. Exactly one per account.</li>
-          <li><strong>Admin</strong> — can manage devices, members, and policies for assigned locations. Cannot delete the account or change billing.</li>
+          <li><strong>Owner</strong> — the account holder. Danger-zone settings, can transfer ownership. Exactly one per account.</li>
+          <li><strong>Admin</strong> — can manage devices, members, and policies for assigned locations. Cannot delete the account.</li>
           <li><strong>Member</strong> — can open gates they have access to. Can&rsquo;t change settings.</li>
           <li><strong>Guest</strong> — like a member, but typically time-bound. Perfect for contractors and weekend visitors.</li>
         </ul>

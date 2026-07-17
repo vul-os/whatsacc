@@ -26,7 +26,6 @@ const errorElement = <ChunkLoadBoundary />;
 
 const routes: RouteObject[] = [
   { path: '/', element: wrap(() => import('@/pages/Landing')), errorElement },
-  { path: '/pricing', element: wrap(() => import('@/pages/Pricing')), errorElement },
   { path: '/security', element: wrap(() => import('@/pages/Security')), errorElement },
   { path: '/login', element: wrap(() => import('@/pages/Login')), errorElement },
   { path: '/signup', element: wrap(() => import('@/pages/Signup')), errorElement },
@@ -35,7 +34,6 @@ const routes: RouteObject[] = [
   { path: '/auth/verify-email', element: wrap(() => import('@/pages/VerifyEmail')), errorElement },
   { path: '/auth/callback', element: wrap(() => import('@/pages/AuthCallback')), errorElement },
   { path: '/accept-invite', element: wrap(() => import('@/pages/AcceptInvite')), errorElement },
-  { path: '/r/:slug', element: wrap(() => import('@/pages/ReferralLanding')), errorElement },
   {
     path: '/docs',
     element: wrap(() => import('@/pages/docs/DocsLayout')),
@@ -61,9 +59,7 @@ const routes: RouteObject[] = [
       { path: 'access-points/:id', element: wrap(() => import('@/pages/app/AccessPoint')), errorElement },
       { path: 'devices', element: wrap(() => import('@/pages/app/Devices')), errorElement },
       { path: 'members', element: wrap(() => import('@/pages/app/Members')), errorElement },
-      { path: 'billing', element: wrap(() => import('@/pages/app/Billing')), errorElement },
       { path: 'analytics', element: wrap(() => import('@/pages/app/Analytics')), errorElement },
-      { path: 'referrals', element: wrap(() => import('@/pages/app/Referrals')), errorElement },
       { path: 'grants', element: wrap(() => import('@/pages/app/Grants')), errorElement },
       { path: 'settings', element: wrap(() => import('@/pages/app/Settings')), errorElement },
     ],

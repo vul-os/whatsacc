@@ -26,7 +26,7 @@ Accept: application/json`}</CodeBlock>
           Token prefixes:
         </p>
         <ul className="list-disc pl-6 space-y-1">
-          <li><code>wacc_live_</code> — production traffic, billed.</li>
+          <li><code>wacc_live_</code> — production traffic, opens real gates.</li>
           <li><code>wacc_test_</code> — sandbox, never opens a real gate.</li>
           <li><code>wacc_dev_</code> — device-to-cloud session token, cycles automatically.</li>
         </ul>
@@ -38,17 +38,14 @@ Accept: application/json`}</CodeBlock>
           is human-readable and may change over time.
         </p>
         <CodeBlock lang="json">{`{
-  "error": "card_required",
-  "detail": "No saved card. Use subscription-checkout to add one."
+  "error": "invalid_token",
+  "detail": "Token missing, malformed, or revoked."
 }`}</CodeBlock>
         <p>Common codes you can program against:</p>
         <CodeBlock lang="plain">{`401  invalid_token              token missing, malformed, or revoked
 403  not_account_admin          token doesn't have the required role
-404  intent_not_found           lookup miss for a payment intent / event id
+404  not_found                  lookup miss for an event / resource id
 400  validation_error           shape doesn't match the schema (issues[] included)
-400  already_on_plan            no-op plan switch
-400  card_required              paid plan but no saved card
-400  card_declined              Paystack rejected the charge
 429  rate_limited               cool down + retry; never affects opens
 500  internal_error             page us; the request id is in X-Request-Id`}</CodeBlock>
       </DocSection>

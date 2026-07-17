@@ -6,7 +6,7 @@ export default function LocationsDoc() {
       <DocLead
         kicker="02 · Concepts"
         title="Creating a Location"
-        intro="A Location is the physical place whatsacc protects. Everything else — access points, devices, members, geofences, billing — hangs off it. Most accounts have one; estates have several with nested children."
+        intro="A Location is the physical place whatsacc protects. Everything else — access points, devices, members, geofences — hangs off it. Most accounts have one; estates have several with nested children."
       />
 
       <DocSection heading="The four kinds">
@@ -17,7 +17,7 @@ export default function LocationsDoc() {
           <li><strong>Other</strong> — workshops, warehouses, storage yards, anything else.</li>
         </ul>
         <p className="text-ink/55 text-[14px]">
-          The kind controls UI defaults (icons, billing copy, dashboard hints) but not authorisation.
+          The kind controls UI defaults (icons, dashboard hints) but not authorisation.
           Permissions are always per-location.
         </p>
       </DocSection>

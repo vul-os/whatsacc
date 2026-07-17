@@ -26,7 +26,6 @@ export type SessionUser = {
 export type SessionAccount = {
   id: string;
   name: string;
-  billing_type: string;
   role: string;
 };
 
@@ -47,7 +46,6 @@ type AuthState = {
     location_name?: string;
     country_code: string;
     account_type: 'personal' | 'business';
-    referral_slug?: string;
     invite_token?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -59,7 +57,7 @@ const ACTIVE_ACCOUNT_KEY = 'whatsacc.activeAccount';
 // Cached /me response for instant rehydration on refresh. Bumping the version
 // invalidates older shapes (e.g. when SessionUser gains/loses a field) so
 // stale caches don't mis-render the UI on the next deploy.
-const ME_CACHE_KEY = 'whatsacc.me.v3';
+const ME_CACHE_KEY = 'whatsacc.me.v4';
 
 type CachedMe = { user: SessionUser; accounts: SessionAccount[] };
 
@@ -105,7 +103,6 @@ function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccoun
     accounts: me.accounts.map((a) => ({
       id: a.account_id,
       name: a.name,
-      billing_type: a.billing_type,
       role: a.role,
     })),
   };
@@ -197,7 +194,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       location_name?: string;
       country_code: string;
       account_type: 'personal' | 'business';
-      referral_slug?: string;
       invite_token?: string;
     }) => {
       setError(null);

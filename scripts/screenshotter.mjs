@@ -63,14 +63,13 @@ function buildMockRoutes() {
     },
     { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/summary$/, body: () => loadFixture('summary.json') },
     { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/insights$/, body: () => loadFixture('insights.json') },
-    { method: 'GET', re: /^\/billing\/accounts\/[^/]+\/billing$/, body: () => loadFixture('billing.json') },
     { method: 'GET', re: /^\/locations\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
     { method: 'GET', re: /^\/accounts\/[^/]+\/members$/, body: () => loadFixture('members.json') },
     { method: 'GET', re: /^\/access\/access-points$/, body: () => loadFixture('access-points.json') },
     { method: 'GET', re: /^\/access\/access-points\/[^/]+$/, body: () => loadFixture('access-points.json'), pick: 'first-access-point' },
     { method: 'GET', re: /^\/access\/grants(\?.*)?$/, body: () => loadFixture('grants.json') },
     { method: 'GET', re: /^\/reference\/countries$/, body: () => JSON.stringify({ countries: [
-      { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}', currency_code: 'ZAR', msg_cost_zar: 0.55 },
+      { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}' },
     ] }) },
   ];
 }
@@ -79,7 +78,7 @@ function buildMockRoutes() {
 // Vite origin via VITE_API_BASE_URL, so these prefixes distinguish API calls from
 // Vite asset requests on the same origin.
 const API_PREFIX_RE =
-  /^\/(auth|accounts|access|analytics|billing|devices|locations|phones|reference|referrals|whatsapp)(\/|$)/;
+  /^\/(auth|accounts|access|analytics|devices|locations|phones|reference|whatsapp)(\/|$)/;
 
 async function installApiMocks(context) {
   const routes = buildMockRoutes();
@@ -272,7 +271,7 @@ async function main() {
     const desktopShots = [
       { path: '/', file: 'landing-hero.png', settleMs: 1_400, expectText: 'whatsacc' },
       { path: '/docs', file: 'docs.png' },
-      { path: '/pricing', file: 'pricing.png' },
+      { path: '/security', file: 'security.png' },
       { path: '/app', file: 'portal-dashboard.png', expectText: 'Recent activity' },
       { path: '/app/access-points', file: 'portal-locations.png', expectText: 'Main gate' },
       { path: '/app/analytics', file: 'portal-analytics.png', expectText: 'Analytics' },

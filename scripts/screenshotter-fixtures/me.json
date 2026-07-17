@@ -21,7 +21,6 @@
     {
       "account_id": "acct_silveroaks",
       "name": "Silver Oaks Estate",
-      "billing_type": "business",
       "role": "owner",
       "status": "active"
     }

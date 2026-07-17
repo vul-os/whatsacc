@@ -16,7 +16,7 @@ const audiences = [
     tag: 'Property managers',
     blurb:
       'One dashboard across every property. Move tenants in and out with a phone-number invite.',
-    detail: '50 Riebeek + 11 more · multi-tenant billing',
+    detail: '50 Riebeek + 11 more · one dashboard',
   },
   {
     tag: 'Security companies',

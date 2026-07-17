@@ -396,7 +396,7 @@ function LocationsSection() {
     <Card>
       <h2 className="font-display text-2xl">Locations</h2>
       <p className="text-sm text-ink/65 mt-1">
-        Each location has its own access points, members, and billing. Use the account switcher in
+        Each location has its own access points, members, and devices. Use the account switcher in
         the top bar to add a new one.
       </p>
 
@@ -549,7 +549,7 @@ function RenameLocationModal({
     <Modal open onClose={onClose}>
       <h2 className="font-display text-2xl mb-1">Rename location</h2>
       <p className="text-sm text-ink/60 mb-5">
-        Updating the name only changes the label — billing, members, and access points stay attached.
+        Updating the name only changes the label — members, devices, and access points stay attached.
       </p>
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
@@ -632,7 +632,7 @@ function DeleteLocationModal({
       <ul className="text-sm text-ink/70 list-disc pl-5 mb-4 space-y-1">
         <li>{row.access_point_count} access point{row.access_point_count === 1 ? '' : 's'}, paired devices, and grants.</li>
         <li>{row.member_count} member{row.member_count === 1 ? '' : 's'} and their access history.</li>
-        <li>If this is your last location on the account, the wallet, billing, and subscription are dropped too.</li>
+        <li>If this is your last location, the account itself is dropped too.</li>
       </ul>
       <p className="text-sm text-ink/75 mb-4">
         This cannot be undone. Type <span className="font-mono text-ink">{row.name}</span> to confirm.

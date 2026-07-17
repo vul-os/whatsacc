@@ -29,10 +29,10 @@ const features = [
   },
   {
     kicker: 'e',
-    title: 'Wallet billing',
-    body: 'Pay per message in batches. No per-seat surprises when a complex onboards 200 residents over a weekend.',
+    title: 'Free & open source',
+    body: 'MIT-licensed, no meters, no tiers. Use the hosted flagship for free or run the whole gateway on your own box.',
     span: 'md:col-span-4',
-    visual: <WalletVisual />,
+    visual: <OpenSourceVisual />,
   },
   {
     kicker: 'f',
@@ -202,17 +202,21 @@ function PairingVisual() {
   );
 }
 
-function WalletVisual() {
+function OpenSourceVisual() {
   return (
     <svg viewBox="0 0 140 90" className="block w-full max-w-[160px] h-auto" aria-hidden>
       <rect x="6" y="14" width="120" height="68" rx="8" fill="#1a1f36" />
-      <rect x="14" y="26" width="50" height="6" rx="3" fill="#f4ede2" opacity="0.4" />
-      <rect x="14" y="38" width="40" height="3" rx="1.5" fill="#f4ede2" opacity="0.3" />
-      <text x="14" y="72" fontFamily="JetBrains Mono" fontSize="14" fill="#d6624d">
-        $9.00
-      </text>
-      <circle cx="110" cy="34" r="10" fill="#d6624d" />
-      <circle cx="100" cy="34" r="10" fill="#c8a45c" opacity="0.7" />
+      <circle cx="18" cy="26" r="3" fill="#d6624d" />
+      <circle cx="28" cy="26" r="3" fill="#c8a45c" />
+      <circle cx="38" cy="26" r="3" fill="#f4ede2" opacity="0.5" />
+      <g fontFamily="JetBrains Mono" fontSize="10" fill="#f4ede2">
+        <text x="14" y="48" opacity="0.85">
+          git clone whatsacc
+        </text>
+        <text x="14" y="64" fill="#d6624d">
+          LICENSE &middot; MIT
+        </text>
+      </g>
     </svg>
   );
 }

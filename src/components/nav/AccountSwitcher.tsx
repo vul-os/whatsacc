@@ -84,11 +84,7 @@ export function AccountSwitcher() {
                     }`}
                   >
                     <span
-                      className={`flex-none h-8 w-8 rounded-lg grid place-items-center text-[11px] font-medium ${
-                        a.billing_type === 'business'
-                          ? 'bg-terracotta/15 text-terracotta-deep'
-                          : 'bg-moss/15 text-moss'
-                      }`}
+                      className="flex-none h-8 w-8 rounded-lg grid place-items-center text-[11px] font-medium bg-terracotta/15 text-terracotta-deep"
                       aria-hidden
                     >
                       {a.name.split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase() || '·'}
@@ -96,7 +92,7 @@ export function AccountSwitcher() {
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm text-ink truncate">{a.name}</span>
                       <span className="block text-[10px] uppercase tracking-[0.18em] text-ink/50 mt-0.5">
-                        {a.role} · {a.billing_type}
+                        {a.role}
                       </span>
                     </span>
                     {isActive && (

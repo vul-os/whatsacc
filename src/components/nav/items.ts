@@ -6,8 +6,6 @@ export const APP_NAV_ITEMS: NavItem[] = [
   { to: '/app/devices', label: 'Devices' },
   { to: '/app/members', label: 'Members' },
   { to: '/app/grants', label: 'Temp access' },
-  { to: '/app/billing', label: 'Billing' },
   { to: '/app/analytics', label: 'Analytics' },
-  { to: '/app/referrals', label: 'Referrals' },
   { to: '/app/settings', label: 'Settings' },
 ];
