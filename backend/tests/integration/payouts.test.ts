@@ -1,4 +1,4 @@
-import { assertEquals, assertExists } from '@std/assert';
+import { assertEquals, assertExists } from '../helpers/assert.ts';
 import { withRLS } from '@/lib/db.ts';
 import { runMonthlyPayouts } from '@/lib/payouts.ts';
 import { bootTestApp } from '../helpers/app.ts';
@@ -16,7 +16,7 @@ const SECRET = 'sk_test_dummy';
 
 dbTest('cron: pays eligible KYC-complete users above min, skips others', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -79,7 +79,7 @@ dbTest('cron: pays eligible KYC-complete users above min, skips others', async (
 
 dbTest('cron: idempotent — running twice for the same period only pays once', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -107,7 +107,7 @@ dbTest('cron: idempotent — running twice for the same period only pays once', 
 
 dbTest('cron: caches the Paystack recipient code on kyc_profiles after first run', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -142,7 +142,7 @@ dbTest('cron: caches the Paystack recipient code on kyc_profiles after first run
 
 dbTest('cron: marks payout rejected when Paystack transfer fails', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub({
     transfer: () => {
       throw new Error('test_simulated_failure');
@@ -175,7 +175,7 @@ dbTest('cron: marks payout rejected when Paystack transfer fails', async () => {
 
 dbTest('webhook: transfer.success flips approved → paid', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -225,7 +225,7 @@ dbTest('webhook: transfer.success flips approved → paid', async () => {
 
 dbTest('webhook: transfer.failed flips approved → rejected with reason', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();

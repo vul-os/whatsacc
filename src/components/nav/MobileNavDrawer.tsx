@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
+import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/cn';
 import { APP_NAV_ITEMS } from './items';
 import { useAuth } from '@/lib/auth';
@@ -37,7 +38,7 @@ export function MobileNavDrawer({
       />
       <aside className="relative w-72 max-w-[85vw] bg-paper-cool border-r border-ink/10 shadow-xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-ink/10">
-          <Link to="/app" onClick={onClose} className="inline-flex items-center gap-2">
+          <Link to="/" onClick={onClose} className="inline-flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-ink text-paper">
               <ArchMark className="h-5 w-5" />
             </span>
@@ -87,6 +88,10 @@ export function MobileNavDrawer({
               Signed in as <span className="text-ink/80">{user.email}</span>
             </p>
           )}
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-xs text-ink/50">Display theme</span>
+            <ThemeToggle variant="default" />
+          </div>
           <button
             type="button"
             onClick={async () => {

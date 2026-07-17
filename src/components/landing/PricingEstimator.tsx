@@ -282,9 +282,9 @@ export function PricingEstimator() {
     <section className="relative">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 pb-12 md:pb-16">
         <div className="rounded-3xl border border-ink/10 bg-paper-cool overflow-hidden">
-          <div className="grid grid-cols-12 gap-x-8 gap-y-10 p-7 sm:p-10 lg:p-14">
+          <div className="grid grid-cols-12 sm:gap-x-8 gap-y-10 p-7 sm:p-10 lg:p-14">
             {/* Header */}
-            <div className="col-span-12 grid grid-cols-12 gap-x-8 gap-y-3 items-end border-b border-ink/10 pb-8">
+            <div className="col-span-12 grid grid-cols-12 sm:gap-x-8 gap-y-3 items-end border-b border-ink/10 pb-8">
               <div className="col-span-12 lg:col-span-7">
                 <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
                   Estimate
@@ -378,7 +378,7 @@ export function PricingEstimator() {
                     <dt className="text-ink/65">
                       Extra access points
                       <span className="ml-2 text-ink/40">
-                        {Math.max(0, accessPoints - 5)} &times; R 49
+                        {Math.max(0, accessPoints - 5)} &times; {fmt(49, currency)}
                       </span>
                     </dt>
                     <dd className="tabular-nums text-ink/90">

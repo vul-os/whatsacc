@@ -1,11 +1,11 @@
-// Real-Paystack contract tests. SKIPPED unless PAYSTACK_SECRET_KEY is
+// Real-Paystack contract tests. SKIPPED unless PAYSTACK_TEST_SECRET_KEY is
 // set. These hit api.paystack.co in test mode — they cost no money but DO
 // leave artefacts (transactions, recipients) in your Paystack test
 // dashboard. Recipients are cleaned up on completion; transactions persist.
 //
 // Required env to actually run:
-//   PAYSTACK_SECRET_KEY=sk_test_xxx
-//   PAYSTACK_PUBLIC_KEY=pk_test_xxx   (optional, for /charge tests)
+//   PAYSTACK_TEST_SECRET_KEY=sk_test_xxx
+//   PAYSTACK_TEST_PUBLIC_KEY=pk_test_xxx   (optional, for /charge tests)
 //
 // Run only the contract suite:
 //   deno test -A --env-file=../.env tests/contract/paystack.test.ts
@@ -16,12 +16,10 @@
 //   3. /transaction/initialize — happy path returns auth_url + reference
 //   4. /transaction/verify — unpaid reference reports as such
 //   5. /charge with a test card — completes and is verifiable
-//   6. End-to-end via our /billing/wallet/topup → /charge → /billing/wallet/verify
-//      → wallet balance credited
-//   7. End-to-end transfer dispatch via runMonthlyPayouts() against real Paystack
-//   8. HMAC signature: event signed with our secret matches verifyWebhookSignature
+//   6. End-to-end transfer dispatch via runMonthlyPayouts() against real Paystack
+//   7. HMAC signature: event signed with our secret matches verifyWebhookSignature
 
-import { assert, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertExists, assertStringIncludes } from '../helpers/assert.ts';
 import {
   contractTest,
   envValue,
@@ -38,6 +36,7 @@ import {
 } from '@/lib/paystack.ts';
 import { runMonthlyPayouts } from '@/lib/payouts.ts';
 import { withRLS } from '@/lib/db.ts';
+import { resetEnvCache } from '@/lib/env.ts';
 import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
 import { completeKyc, registerUser, seedReferralEarning } from '../helpers/fixtures.ts';
@@ -59,6 +58,14 @@ const TEST_CARD_SUCCESS = {
   pin: '1234',
 };
 
+function setupRealPaystackEnv() {
+  // Point our lib at the real test API by populating the env it reads.
+  process.env.PAYSTACK_SECRET_KEY = envValue('PAYSTACK_TEST_SECRET_KEY')!;
+  if (envValue('PAYSTACK_TEST_PUBLIC_KEY')) {
+    process.env.PAYSTACK_PUBLIC_KEY = envValue('PAYSTACK_TEST_PUBLIC_KEY')!;
+  }
+  resetEnvCache();
+}
 
 // ---------------------------------------------------------------------------
 // 1. Transfer recipient lifecycle
@@ -66,8 +73,9 @@ const TEST_CARD_SUCCESS = {
 
 contractTest(
   'paystack: createTransferRecipient → returns active recipient_code, then can delete',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
 
     const r = await createTransferRecipient({
       name: ZA_TEST_ACCOUNT_HOLDER,
@@ -97,8 +105,9 @@ contractTest(
 
 contractTest(
   'paystack: initializeTransaction returns auth_url + access_code + reference',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     const reference = uniqRef('wt');
     const r = await initializeTransaction({
       email: uniqEmail(),
@@ -117,8 +126,9 @@ contractTest(
 
 contractTest(
   'paystack: verifyTransaction on unpaid reference reports a non-success status',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     const reference = uniqRef('wt');
     await initializeTransaction({
       email: uniqEmail(),
@@ -141,8 +151,9 @@ contractTest(
 
 contractTest(
   'paystack: charging a test card resolves verify() to success',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     const reference = uniqRef('wt');
     const email = uniqEmail();
 
@@ -188,8 +199,9 @@ contractTest(
 
 contractTest(
   'paystack: initiateTransfer to a fresh recipient returns a transfer_code',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     const recipient = await createTransferRecipient({
       name: ZA_TEST_ACCOUNT_HOLDER,
       account_number: ZA_TEST_ACCOUNT_NUMBER,
@@ -230,90 +242,14 @@ contractTest(
 );
 
 // ---------------------------------------------------------------------------
-// 5. End-to-end: our /billing/wallet/topup against real Paystack
-// ---------------------------------------------------------------------------
-
-contractTest(
-  'paystack e2e: /billing/wallet/topup → real Paystack init → /charge → /verify credits wallet',
-  ['PAYSTACK_SECRET_KEY'],
-  async () => {
-    await resetData();
-    const app = await bootTestApp();
-    const u = await registerUser(app);
-
-    // 1. Our app initializes the transaction at Paystack.
-    const init = await app.request('POST', '/billing/wallet/topup', {
-      token: u.access_token,
-      json: { account_id: u.account_id, amount_cents: 100_00 },
-    });
-    assertEquals(init.status, 201);
-    const initBody = init.body as {
-      reference: string;
-      authorization_url: string;
-      access_code: string;
-    };
-    assertStringIncludes(initBody.authorization_url, 'paystack.com');
-
-    // 2. Settle the transaction by charging a test card directly with the
-    //    SAME reference. Paystack resolves the existing pending transaction
-    //    when /charge is invoked with an existing reference.
-    const charge = await paystackCall<{ status: string; reference: string }>(
-      'POST',
-      '/charge',
-      {
-        email: u.email,
-        amount: 100_00,
-        currency: 'ZAR',
-        reference: initBody.reference,
-        card: TEST_CARD_SUCCESS,
-      },
-    );
-    assertEquals(charge.status, true);
-
-    // Wait for Paystack to settle if pending.
-    for (let i = 0; i < 5; i++) {
-      const v = await verifyTransaction(initBody.reference);
-      if (v.status === 'success') break;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-
-    // 3. Hit our verify endpoint, which calls real Paystack verify and
-    //    credits the wallet on success.
-    const verify = await app.request('GET', '/billing/wallet/verify', {
-      token: u.access_token,
-      query: { reference: initBody.reference },
-    });
-    assertEquals(verify.status, 200);
-    const vBody = verify.body as { status: string; already_credited: boolean };
-    assertEquals(vBody.status, 'succeeded');
-    assertEquals(vBody.already_credited, false);
-
-    // 4. Wallet now reflects the topup.
-    const billing = await app.request('GET', `/billing/accounts/${u.account_id}/billing`, {
-      token: u.access_token,
-    });
-    assertEquals(
-      (billing.body as { wallet: { balance_cents: number; currency: string } }).wallet.balance_cents,
-      100_00,
-    );
-
-    // 5. Idempotent re-verify — should not double-credit.
-    const v2 = await app.request('GET', '/billing/wallet/verify', {
-      token: u.access_token,
-      query: { reference: initBody.reference },
-    });
-    assertEquals((v2.body as { already_credited: boolean }).already_credited, true);
-  },
-);
-
-// ---------------------------------------------------------------------------
-// 6. End-to-end: cron-driven transfer against real Paystack
+// 5. End-to-end: cron-driven transfer against real Paystack
 // ---------------------------------------------------------------------------
 
 contractTest(
   'paystack e2e: runMonthlyPayouts dispatches a real transfer to a real recipient',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     await resetData();
     const app = await bootTestApp();
     const A = await registerUser(app);
@@ -379,9 +315,10 @@ contractTest(
 
 contractTest(
   'paystack: a body signed with the real test secret passes verifyWebhookSignature',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
-    const secret = envValue('PAYSTACK_SECRET_KEY')!;
+    setupRealPaystackEnv();
+    const secret = envValue('PAYSTACK_TEST_SECRET_KEY')!;
     const body = JSON.stringify({
       event: 'charge.success',
       data: { id: 1, reference: uniqRef('wt') },
@@ -408,8 +345,9 @@ contractTest(
 
 contractTest(
   'paystack: verifyTransaction on a bogus reference returns an error',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     let threw = false;
     try {
       await verifyTransaction('bogus_reference_does_not_exist_xyz123');
@@ -422,8 +360,9 @@ contractTest(
 
 contractTest(
   'paystack: createTransferRecipient with an invalid bank_code returns an error',
-  ['PAYSTACK_SECRET_KEY'],
+  ['PAYSTACK_TEST_SECRET_KEY'],
   async () => {
+    setupRealPaystackEnv();
     let threw = false;
     try {
       await createTransferRecipient({

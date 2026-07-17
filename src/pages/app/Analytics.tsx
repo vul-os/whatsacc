@@ -1,27 +1,61 @@
+import { useEffect, useState, useCallback } from 'react';
 import { PageHeader } from './AppLayout';
 import { Card, StatBlock } from '@/components/ui/Card';
+import { useAuth } from '@/lib/auth';
+import { api, type AccountInsights } from '@/lib/api';
 
-const days = [
-  ['Mon', 86, 2],
-  ['Tue', 92, 1],
-  ['Wed', 104, 4],
-  ['Thu', 88, 0],
-  ['Fri', 138, 3],
-  ['Sat', 162, 2],
-  ['Sun', 118, 3],
-] as const;
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-const breakdown = [
-  { label: 'Oakridge · Main gate', val: 412 },
-  { label: 'Oakridge · Pedestrian', val: 188 },
-  { label: 'Oakridge · Parking barrier', val: 142 },
-  { label: '50 Riebeek · Lobby', val: 96 },
-  { label: 'House Bertrand · Front gate', val: 64 },
-];
+function dayLabel(iso: string): string {
+  // `iso` is YYYY-MM-DD from Postgres ::date — parse as local midnight.
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return DOW[new Date(y, m - 1, d).getDay()];
+}
 
-const max = Math.max(...days.map((d) => d[1]));
+function weekDelta(curr: number, prev: number): string {
+  if (prev === 0) return curr === 0 ? 'no prior week data' : 'first week of activity';
+  const pct = Math.round(((curr - prev) / prev) * 100);
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct}% week-over-week`;
+}
+
+function deniedRate(denied: number, opens: number): string {
+  const total = denied + opens;
+  if (total === 0) return '0% of attempts';
+  return `${Math.round((denied / total) * 100)}% of attempts`;
+}
 
 export default function Analytics() {
+  const { currentAccount } = useAuth();
+  const [insights, setInsights] = useState<AccountInsights | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!currentAccount) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.accountInsights(currentAccount.id);
+      setInsights(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics.');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentAccount]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const days = insights?.days ?? [];
+  const breakdown = insights?.breakdown ?? [];
+  const totals = insights?.totals;
+  const members = insights?.members;
+
+  const maxBar = Math.max(1, ...days.map((d) => d.opens + d.denied));
+  const maxBreakdown = Math.max(1, ...breakdown.map((b) => b.opens));
+
   return (
     <>
       <PageHeader
@@ -30,11 +64,41 @@ export default function Analytics() {
         description="The shape of your week. Use this when you're sizing up a plan or chasing down anomalies."
       />
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card><StatBlock label="Opens · 7d" value="788" hint="+11% week-over-week" /></Card>
-        <Card><StatBlock label="Denied · 7d" value="15" hint="2% of attempts" /></Card>
-        <Card><StatBlock label="Avg open" value="1.8s" hint="signed → opened" /></Card>
-        <Card><StatBlock label="Active members" value="167" hint="of 193" /></Card>
+      {error && (
+        <Card className="border-terracotta/40 p-4 mb-6">
+          <p className="text-sm text-terracotta-deep">{error}</p>
+        </Card>
+      )}
+
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <Card>
+          <StatBlock
+            label="Opens · 7d"
+            value={loading ? '—' : (totals?.opens_7d ?? 0).toLocaleString()}
+            hint={totals ? weekDelta(totals.opens_7d, totals.opens_prev_7d) : ''}
+          />
+        </Card>
+        <Card>
+          <StatBlock
+            label="Denied · 7d"
+            value={loading ? '—' : (totals?.denied_7d ?? 0).toLocaleString()}
+            hint={totals ? deniedRate(totals.denied_7d, totals.opens_7d) : ''}
+          />
+        </Card>
+        <Card>
+          <StatBlock
+            label="Closes · 7d"
+            value={loading ? '—' : (totals?.closes_7d ?? 0).toLocaleString()}
+            hint="successful close commands"
+          />
+        </Card>
+        <Card>
+          <StatBlock
+            label="Active members"
+            value={loading ? '—' : (members?.active_members_7d ?? 0).toString()}
+            hint={members ? `of ${members.member_count}` : ''}
+          />
+        </Card>
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -53,44 +117,69 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="flex items-end gap-3 h-72 px-2">
-            {days.map(([d, opens, denied]) => (
-              <div key={d} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex-1 flex items-end gap-1">
-                  <span
-                    className="flex-1 bg-ink rounded-t-md"
-                    style={{ height: `${(opens / max) * 100}%` }}
-                  />
-                  <span
-                    className="w-2 bg-terracotta rounded-t-sm self-end"
-                    style={{ height: `${(denied / max) * 100 + 4}%` }}
-                  />
+          {loading ? (
+            <p className="h-60 sm:h-72 flex items-center justify-center text-ink/45 text-sm">
+              Loading…
+            </p>
+          ) : days.every((d) => d.opens === 0 && d.denied === 0) ? (
+            <p className="h-60 sm:h-72 flex items-center justify-center text-ink/55 text-sm text-center px-6">
+              No activity in the last 7 days yet — once gates start opening, this is where the rhythm shows up.
+            </p>
+          ) : (
+            <div className="flex items-end gap-1.5 sm:gap-3 h-60 sm:h-72 px-1 sm:px-2 overflow-hidden">
+              {days.map((d) => (
+                <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="w-full flex-1 flex items-end gap-1">
+                    <span
+                      className="flex-1 bg-ink rounded-t-md"
+                      style={{ height: `${(d.opens / maxBar) * 100}%` }}
+                    />
+                    <span
+                      className="w-2 bg-terracotta rounded-t-sm self-end"
+                      style={{ height: `${(d.denied / maxBar) * 100 + (d.denied > 0 ? 4 : 0)}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-ink/45">
+                    {dayLabel(d.day)}
+                  </span>
+                  <span className="font-display text-sm">{d.opens}</span>
                 </div>
-                <span className="text-[11px] uppercase tracking-[0.18em] text-ink/45">{d}</span>
-                <span className="font-display text-sm">{opens}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         <Card className="lg:col-span-4">
           <h2 className="font-display text-2xl mb-4">By access point</h2>
-          <ul className="space-y-3">
-            {breakdown.map((b) => (
-              <li key={b.label}>
-                <div className="flex items-baseline justify-between mb-1.5 text-sm">
-                  <span className="text-ink/80 truncate pr-3">{b.label}</span>
-                  <span className="font-display tabular-nums">{b.val}</span>
-                </div>
-                <div className="h-1.5 bg-ink/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-ink"
-                    style={{ width: `${(b.val / breakdown[0].val) * 100}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+          {loading ? (
+            <p className="text-ink/45 text-sm py-6">Loading…</p>
+          ) : breakdown.length === 0 ? (
+            <p className="text-ink/55 text-sm py-6">
+              No opens recorded yet — top access points will appear here.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {breakdown.map((b) => {
+                const label = b.location_name && b.access_point_name
+                  ? `${b.location_name} · ${b.access_point_name}`
+                  : (b.access_point_name ?? b.location_name ?? 'Unnamed');
+                return (
+                  <li key={b.access_point_id}>
+                    <div className="flex items-baseline justify-between mb-1.5 text-sm">
+                      <span className="text-ink/80 truncate pr-3">{label}</span>
+                      <span className="font-display tabular-nums">{b.opens}</span>
+                    </div>
+                    <div className="h-1.5 bg-ink/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-ink"
+                        style={{ width: `${(b.opens / maxBreakdown) * 100}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
       </div>
     </>

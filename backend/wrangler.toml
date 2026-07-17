@@ -1,0 +1,46 @@
+name = "whatsacc-backend"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+compatibility_flags = ["nodejs_compat"]
+
+# Default (no --env flag) targets the local dev environment. Real values
+# come from .dev.vars during `wrangler dev`. Production secrets are set
+# per-env via `wrangler secret put` and via the [env.dev] / [env.main] blocks
+# below for non-secret vars.
+
+[vars]
+APP_ENV = "local"
+APP_PUBLIC_URL = "http://localhost:5173"
+
+# Cron triggers:
+#   "0 0 1 * *"        → runMonthlyPayouts  (1st of month, 00:00 UTC)
+#   "0 2,10,18 * * *"  → runSubscriptionRenewals (02/10/18 UTC daily — 3× batched)
+# The Worker's scheduled handler dispatches on event.cron, so order is
+# irrelevant. Keep the strings byte-identical between here and src/index.ts.
+[triggers]
+crons = ["0 0 1 * *", "0 2,10,18 * * *"]
+
+# ── Dev environment (Neon dev branch) ────────────────────────────────────
+# Apply non-secret vars only here. Secrets (DATABASE_URL, JWT_SECRET,
+# PAYSTACK_*, RESEND_API_KEY, GOOGLE_*, WHATSAPP_*) must be set via:
+#   wrangler secret put <NAME> --env=dev
+[env.dev]
+name = "whatsacc-backend-dev"
+
+[env.dev.vars]
+APP_ENV = "dev"
+APP_PUBLIC_URL = "https://whats-acc-dev.web.app"
+
+[env.dev.triggers]
+crons = ["0 0 1 * *", "0 2,10,18 * * *"]
+
+# ── Main (production) environment (Neon production branch) ──────────────
+[env.main]
+name = "whatsacc-backend-main"
+
+[env.main.vars]
+APP_ENV = "main"
+APP_PUBLIC_URL = "https://whatsacc.com"
+
+[env.main.triggers]
+crons = ["0 0 1 * *", "0 2,10,18 * * *"]

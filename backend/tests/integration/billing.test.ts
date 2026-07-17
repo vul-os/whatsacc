@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '../helpers/assert.ts';
 import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
 import { registerUser, signPaystackBody } from '../helpers/fixtures.ts';
@@ -9,7 +9,7 @@ const SECRET = 'sk_test_dummy';
 
 dbTest('billing: topup → init returns authorization_url; verify credits wallet idempotently', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -57,7 +57,7 @@ dbTest('billing: topup → init returns authorization_url; verify credits wallet
 
 dbTest('billing: webhook with valid signature credits wallet on charge.success', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -95,7 +95,7 @@ dbTest('billing: webhook with valid signature credits wallet on charge.success',
 
 dbTest('billing: webhook with bad signature is rejected with 401', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -113,7 +113,7 @@ dbTest('billing: webhook with bad signature is rejected with 401', async () => {
 
 dbTest('billing: webhook is idempotent on duplicate event ids', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -161,7 +161,7 @@ dbTest('billing: account billing endpoint requires authentication', async () => 
 
 dbTest('billing: topup is admin-gated for the target account', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();
@@ -181,7 +181,7 @@ dbTest('billing: topup is admin-gated for the target account', async () => {
 
 dbTest('billing: succeeded topup writes a referral_earning when referrer attribution exists', async () => {
   await resetData();
-  Deno.env.set('PAYSTACK_SECRET_KEY', SECRET);
+  process.env.PAYSTACK_SECRET_KEY = SECRET;
   const stub = installPaystackStub();
   try {
     const app = await bootTestApp();

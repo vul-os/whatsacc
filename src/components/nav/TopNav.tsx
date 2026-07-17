@@ -3,18 +3,20 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ArchMark } from '@/components/illustrations/ArchMark';
 import { LinkButton } from '@/components/ui/Button';
 import { CurrencySelector } from '@/components/nav/CurrencySelector';
+import { ThemeToggle } from '@/components/nav/ThemeToggle';
 import { cn } from '@/lib/cn';
+import { useAuth } from '@/lib/auth';
 
 const links = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/security', label: 'Security' },
   { to: '/docs', label: 'Docs' },
-  { to: '/login', label: 'Login' },
 ];
 
 export function TopNav() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
+  const { signedIn } = useAuth();
 
   // close menu on route change
   useEffect(() => {
@@ -61,23 +63,29 @@ export function TopNav() {
               {l.label}
             </NavLink>
           ))}
+          <NavLink
+            to={signedIn ? '/app' : '/login'}
+            className={({ isActive }) =>
+              cn(
+                'px-3.5 py-2 text-sm rounded-full transition-colors',
+                isActive ? 'text-ink' : 'text-ink/60 hover:text-ink',
+              )
+            }
+          >
+            {signedIn ? 'Dashboard' : 'Login'}
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link
-            to="/app"
-            className="hidden lg:inline-flex text-sm text-ink/60 hover:text-ink px-3 py-2"
-          >
-            Open app
-          </Link>
+          <ThemeToggle variant="landing" />
           <CurrencySelector className="hidden sm:inline-block" />
           <LinkButton
-            to="/signup"
+            to={signedIn ? '/app' : '/signup'}
             variant="ink"
             size="sm"
             className="hidden sm:inline-flex"
           >
-            Get started
+            {signedIn ? 'Go to dashboard' : 'Get started'}
           </LinkButton>
           <button
             type="button"
@@ -137,10 +145,10 @@ export function TopNav() {
             ))}
             <li className="border-b border-ink/10">
               <Link
-                to="/app"
+                to={signedIn ? '/app' : '/login'}
                 className="flex items-center justify-between py-4 font-display text-2xl text-ink/80"
               >
-                <span>Open app</span>
+                <span>{signedIn ? 'Dashboard' : 'Login'}</span>
                 <span aria-hidden className="text-terracotta">&rarr;</span>
               </Link>
             </li>
@@ -154,8 +162,8 @@ export function TopNav() {
           </div>
 
           <div className="mt-6">
-            <LinkButton to="/signup" variant="ink" size="lg" className="w-full">
-              Get started
+            <LinkButton to={signedIn ? '/app' : '/signup'} variant="ink" size="lg" className="w-full">
+              {signedIn ? 'Go to dashboard' : 'Get started'}
             </LinkButton>
           </div>
 

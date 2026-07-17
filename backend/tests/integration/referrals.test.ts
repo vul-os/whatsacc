@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertNotEquals } from '../helpers/assert.ts';
 import { withRLS } from '@/lib/db.ts';
 import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
@@ -251,6 +251,7 @@ dbTest('register: invalid/reserved/own slug does NOT attribute', async () => {
       email: 'self@test.local',
       password: 'Pa55word_test',
       display_name: 'Self',
+      location_name: 'Self HQ',
       country_code: 'ZA',
       referral_slug: u2.referral_slug,
     },

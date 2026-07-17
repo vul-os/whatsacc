@@ -22,6 +22,7 @@ export type RegisterOpts = {
   email?: string;
   password?: string;
   display_name?: string;
+  location_name?: string;
   country_code?: string;
   account_type?: 'personal' | 'business';
   referral_slug?: string;
@@ -32,7 +33,7 @@ export async function registerUser(
   opts: RegisterOpts = {},
 ): Promise<RegisteredUser> {
   userCounter += 1;
-  const email = opts.email ?? `user${userCounter}-${Date.now()}@test.local`;
+  const email = opts.email ?? `user${userCounter}-${Date.now()}@example.com`;
   const password = opts.password ?? 'Pa55word_test';
   const display_name = opts.display_name ?? `Test User ${userCounter}`;
 
@@ -41,6 +42,7 @@ export async function registerUser(
       email,
       password,
       display_name,
+      location_name: opts.location_name ?? `${display_name} HQ`,
       country_code: opts.country_code ?? 'ZA',
       account_type: opts.account_type ?? 'personal',
       referral_slug: opts.referral_slug,

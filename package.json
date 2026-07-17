@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:dev": "tsc -b && vite build --mode dev",
+    "build:main": "tsc -b && vite build --mode main",
+    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
+    "deploy:main": "npm run build:main && firebase deploy --only hosting:main",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "screenshotter": "node scripts/screenshotter.mjs"
@@ -14,6 +18,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
+    "prismjs": "^1.30.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
@@ -22,6 +27,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^25.6.0",
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

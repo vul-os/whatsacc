@@ -3,6 +3,8 @@
 // only point this at a database you don't mind losing data on.
 
 import postgres from 'postgres';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { setDbConnectionString, setSqlForTests, type Sql, type TxSql } from '@/lib/db.ts';
 import { resetEnvCache } from '@/lib/env.ts';
 
 const MIGRATION_NAME_RE = /^(\d{14}[a-z]?)_(.+)\.sql$/;
@@ -16,7 +18,7 @@ export type TestDb = {
 };
 
 export function resolveTestDatabaseUrl(): string | null {
-  const url = (Deno.env.get('DATABASE_URL') ?? '').trim();
+  const url = (process.env.DATABASE_URL ?? '').trim();
   return url || null;
 }
 
@@ -29,9 +31,11 @@ export async function setupTestDb(): Promise<TestDb> {
   }
 
   resetEnvCache();
+  setDbConnectionString(url);
 
   if (!testSql) {
     testSql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
+    setSqlForTests(adaptPostgresSql(testSql));
   }
 
   if (!migrated) {
@@ -69,8 +73,25 @@ export async function teardownTestDb(): Promise<void> {
   if (testSql) {
     await testSql.end({ timeout: 5 });
     testSql = null;
+    setSqlForTests(null);
     migrated = false;
   }
+}
+
+function adaptPostgresSql(pg: ReturnType<typeof postgres>): Sql {
+  const make = (runner: ReturnType<typeof postgres>): TxSql => {
+    const fn = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      return await runner(strings, ...values);
+    }) as TxSql;
+    fn.json = (value: unknown) => runner.json(value) as never;
+    fn.unsafe = (async (raw: string) => await runner.unsafe(raw)) as TxSql['unsafe'];
+    return fn;
+  };
+  const sql = make(pg) as Sql;
+  sql.begin = async <T>(fn: (tx: TxSql) => Promise<T>): Promise<T> => {
+    return await pg.begin(async (tx) => await fn(make(tx as unknown as ReturnType<typeof postgres>)));
+  };
+  return sql;
 }
 
 async function applyAllMigrations(sql: postgres.Sql): Promise<void> {
@@ -79,7 +100,7 @@ async function applyAllMigrations(sql: postgres.Sql): Promise<void> {
       version    text        PRIMARY KEY,
       name       text        NOT NULL,
       checksum   text        NOT NULL,
-      applied_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+      applied_at timestamptz NOT NULL DEFAULT now()
     );
   `);
 
@@ -104,7 +125,7 @@ async function applyAllMigrations(sql: postgres.Sql): Promise<void> {
 async function resolveMigrationsDir(): Promise<string> {
   for (const c of ['migrations', 'backend/migrations']) {
     try {
-      const st = await Deno.stat(c);
+      const st = await stat(c);
       if (st.isDirectory) return c;
     } catch {
       // ignore
@@ -117,11 +138,11 @@ type Migration = { version: string; name: string; body: string; checksum: string
 
 async function loadMigrationFiles(dir: string): Promise<Migration[]> {
   const out: Migration[] = [];
-  for await (const entry of Deno.readDir(dir)) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (!entry.isFile) continue;
     const m = MIGRATION_NAME_RE.exec(entry.name);
     if (!m) continue;
-    const body = await Deno.readTextFile(`${dir}/${entry.name}`);
+    const body = await readFile(`${dir}/${entry.name}`, 'utf8');
     out.push({
       version: m[1]!,
       name: m[2]!,

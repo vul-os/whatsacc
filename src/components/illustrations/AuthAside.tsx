@@ -2,8 +2,7 @@ import type { SVGProps } from 'react';
 
 // Aside artwork for the Login / Signup / Forgot / Reset pages.
 // A keyhole framed by an arch, with a chat-bubble badge sliding through.
-// Same line weight + palette as ArchMark / HeroPortal so it sits in the
-// same family.
+// Same line weight + palette as ArchMark so it sits in the same family.
 export function AuthAside({ className, ...rest }: SVGProps<SVGSVGElement>) {
   return (
     <svg

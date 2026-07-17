@@ -16,9 +16,30 @@ export class ApiError extends Error {
   status: number;
   code: string;
   detail?: string;
-  constructor(status: number, body: ApiErrorBody | string) {
-    const code = typeof body === 'string' ? body : body.error;
-    const detail = typeof body === 'string' ? undefined : body.detail;
+  constructor(status: number, body: ApiErrorBody | any) {
+    let code: string = 'error';
+    let detail: string | undefined = undefined;
+
+    if (typeof body === 'string') {
+      code = body;
+    } else if (body && typeof body === 'object') {
+      // 1. Handle standard { error, detail } shape
+      if (typeof body.error === 'string') {
+        code = body.error;
+        detail = typeof body.detail === 'string' ? body.detail : undefined;
+      } 
+      // 2. Handle Hono/Zod error shape: { success: false, error: { issues: [...], name: 'ZodError' } }
+      else if (body.error && typeof body.error === 'object' && Array.isArray(body.error.issues)) {
+        code = 'validation_error';
+        detail = body.error.issues[0]?.message;
+      }
+      // 3. Fallback for other objects
+      else {
+        code = body.error ? String(body.error) : 'error';
+        detail = body.detail ? String(body.detail) : undefined;
+      }
+    }
+
     super(detail ? `${code}: ${detail}` : code);
     this.status = status;
     this.code = code;
@@ -111,6 +132,23 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
   return payload as T;
 }
 
+async function apiBlob(path: string): Promise<Blob> {
+  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  const request = async () => {
+    const h = new Headers();
+    const access = tokenStore.access;
+    if (access) h.set('Authorization', `Bearer ${access}`);
+    return await fetch(url, { headers: h });
+  };
+  let res = await request();
+  if (res.status === 401 && tokenStore.refresh) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) res = await request();
+  }
+  if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => `http_${res.status}`));
+  return await res.blob();
+}
+
 // Typed surface ------------------------------------------------------------
 
 export type AuthTokens = {
@@ -127,13 +165,25 @@ export type MeResponse = {
     status: string;
     email_verified_at: string | null;
     is_platform_admin: boolean;
+    /** false when the user has only ever signed in via OAuth (no password set). */
+    has_password: boolean;
   };
   profile: {
     id: string;
     display_name: string | null;
     avatar_url: string | null;
+    avatar_cdn_url: string | null;
+    avatar_source: 'google' | 'user' | null;
     locale: string | null;
+    slack_user_id: string | null;
+    slack_handle: string | null;
   } | null;
+  phones: Array<{
+    id: string;
+    phone_e164: string;
+    verified_at: string | null;
+    is_primary: boolean;
+  }>;
   accounts: Array<{
     account_id: string;
     name: string;
@@ -159,10 +209,13 @@ export const api = {
     email: string;
     password: string;
     display_name: string;
+    phone_e164?: string;
+    location_name?: string;
     country_code: string;
     account_type: 'personal' | 'business';
     referral_slug?: string;
-  }) => apiFetch<{ id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
+    invite_token?: string;
+  }) => apiFetch<AuthTokens & { id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
 
   refresh: (refresh_token: string) =>
     apiFetch<AuthTokens>('/auth/refresh', { method: 'POST', body: { refresh_token } }),
@@ -172,6 +225,20 @@ export const api = {
 
   me: () => apiFetch<MeResponse>('/auth/me'),
 
+  phones: () => apiFetch<{ phones: MeResponse['phones'] }>('/phones/me/phones'),
+
+  phoneAdd: (body: { phone_e164: string; is_primary?: boolean }) =>
+    apiFetch<{ id: string }>('/phones/me/phones', { method: 'POST', body }),
+
+  slackUpdate: (body: { slack_user_id?: string; slack_handle?: string }) =>
+    apiFetch<void>('/auth/me/slack', { method: 'PUT', body }),
+
+  profileUpdate: (body: { display_name?: string; avatar_url?: string | null }) =>
+    apiFetch<{ profile: NonNullable<MeResponse['profile']> }>('/auth/me/profile', {
+      method: 'PATCH',
+      body,
+    }),
+
   forgotPassword: (email: string) =>
     apiFetch<void>('/auth/forgot-password', { method: 'POST', body: { email } }),
 
@@ -179,6 +246,12 @@ export const api = {
     apiFetch<void>('/auth/reset-password', {
       method: 'POST',
       body: { token, new_password },
+    }),
+
+  verifyEmail: (token: string) =>
+    apiFetch<void>('/auth/verify-email', {
+      method: 'POST',
+      body: { token },
     }),
 
   updatePassword: (current_password: string, new_password: string) =>
@@ -194,6 +267,9 @@ export const api = {
   accountBilling: (accountId: string) =>
     apiFetch<AccountBilling>(`/billing/accounts/${accountId}/billing`),
 
+  accountUpdate: (accountId: string, body: { name?: string }) =>
+    apiFetch<void>(`/accounts/${accountId}`, { method: 'PATCH', body }),
+
   walletTopup: (body: { account_id: string; amount_cents: number; callback_path?: string }) =>
     apiFetch<TopupResponse>('/billing/wallet/topup', { method: 'POST', body }),
 
@@ -202,10 +278,44 @@ export const api = {
       `/billing/wallet/verify?reference=${encodeURIComponent(reference)}`,
     ),
 
-  accessPoints: () => apiFetch<{ access_points: AccessPointDetail[] }>('/access/access-points'),
+  changePlan: (accountId: string, plan_code: string) =>
+    apiFetch<{ plan_code: string; price_cents: number }>(
+      `/billing/accounts/${accountId}/plan`,
+      { method: 'POST', body: { plan_code } },
+    ),
+
+  subscriptionCheckout: (accountId: string, plan_code: string) =>
+    apiFetch<TopupResponse>(
+      `/billing/accounts/${accountId}/subscription-checkout`,
+      { method: 'POST', body: { plan_code } },
+    ),
+
+  invoices: (accountId: string) =>
+    apiFetch<{ invoices: InvoiceSummary[] }>(`/billing/accounts/${accountId}/invoices`),
+
+  invoicePdfUrl: (id: string) =>
+    `${API_BASE_URL}/billing/invoices/${encodeURIComponent(id)}.pdf`,
+
+  invoicePdf: (id: string) =>
+    apiBlob(`/billing/invoices/${encodeURIComponent(id)}.pdf`),
+
+  accessPoints: (accountId?: string) => {
+    const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
+    return apiFetch<{ access_points: AccessPointDetail[] }>(`/access/access-points${qs}`);
+  },
 
   accessPoint: (id: string) =>
     apiFetch<AccessPointDetail>(`/access/access-points/${id}`),
+
+  accessPointCreate: (body: {
+    location_id: string;
+    name: string;
+    kind: 'gate' | 'door' | 'barrier' | 'other';
+    device_id?: string | null;
+    lat?: number;
+    long?: number;
+  }) =>
+    apiFetch<AccessPointDetail>('/access/access-points', { method: 'POST', body }),
 
   maintenanceList: (id: string) =>
     apiFetch<{ events: MaintenanceEvent[] }>(`/access/access-points/${id}/maintenance`),
@@ -276,10 +386,40 @@ export const api = {
     },
   ) => apiFetch<{ id: string }>(`/locations/accounts/${accountId}/locations`, { method: 'POST', body }),
 
+  // Top-level: each location is its own account+location (no shared org).
+  locationCreateNew: (body: {
+    name: string;
+    type?: 'house' | 'complex' | 'building' | 'other';
+    country_code?: string;
+    address?: Record<string, unknown>;
+    lat?: number;
+    long?: number;
+  }) => apiFetch<{ id: string; account_id: string }>('/locations', { method: 'POST', body }),
+
+  locationDelete: (id: string) =>
+    apiFetch<{ deleted: string; account_dropped: boolean }>(
+      `/locations/${id}`,
+      { method: 'DELETE' },
+    ),
+
+  locationUpdate: (
+    id: string,
+    body: {
+      name?: string;
+      address?: Record<string, unknown>;
+      lat?: number;
+      long?: number;
+      status?: string;
+    },
+  ) => apiFetch<void>(`/locations/${id}`, { method: 'PATCH', body }),
+
   // Devices
-  devicesList: (locationId?: string) => {
-    const qs = locationId ? `?location_id=${encodeURIComponent(locationId)}` : '';
-    return apiFetch<{ devices: DeviceRow[] }>(`/devices${qs}`);
+  devicesList: (filter?: { location_id?: string; account_id?: string }) => {
+    const params = new URLSearchParams();
+    if (filter?.location_id) params.set('location_id', filter.location_id);
+    if (filter?.account_id) params.set('account_id', filter.account_id);
+    const qs = params.toString();
+    return apiFetch<{ devices: DeviceRow[] }>(`/devices${qs ? `?${qs}` : ''}`);
   },
 
   deviceCreate: (body: { location_id: string; label?: string; claim_ttl_seconds?: number }) =>
@@ -292,17 +432,26 @@ export const api = {
   accountMembers: (accountId: string) =>
     apiFetch<{ members: AccountMemberRow[] }>(`/accounts/${accountId}/members`),
 
-  inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer' }) =>
-    apiFetch<{ id: string }>(`/accounts/${accountId}/invites`, { method: 'POST', body }),
+  inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer'; phone_e164: string }) =>
+    apiFetch<{ id: string; accept_url: string; email_sent: boolean; whatsapp_sent: boolean }>(
+      `/accounts/${accountId}/invites`,
+      { method: 'POST', body },
+    ),
+
+  inviteAccept: (token: string, phone_e164?: string) =>
+    apiFetch<{ account_id: string; role: string }>(
+      `/accounts/invites/${encodeURIComponent(token)}/accept`,
+      { method: 'POST', body: { phone_e164 } },
+    ),
 
   // Access ops
-  accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'api' } = {}) =>
+  accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
     apiFetch<{ ok: boolean; command: 'open' }>(`/access/access-points/${id}/open`, {
       method: 'POST',
       body: { source: 'web', ...body },
     }),
 
-  accessClose: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'api' } = {}) =>
+  accessClose: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
     apiFetch<{ ok: boolean; command: 'close' }>(`/access/access-points/${id}/close`, {
       method: 'POST',
       body: { source: 'web', ...body },
@@ -311,6 +460,17 @@ export const api = {
   // Analytics
   accountSummary: (accountId: string) =>
     apiFetch<AccountSummary>(`/analytics/accounts/${accountId}/summary`),
+
+  accountInsights: (accountId: string) =>
+    apiFetch<AccountInsights>(`/analytics/accounts/${accountId}/insights`),
+
+  tiers: (opts: { country?: string; region?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (opts.country) qs.set('country', opts.country);
+    if (opts.region) qs.set('region', opts.region);
+    const s = qs.toString();
+    return apiFetch<BillingTiersResponse>(`/billing/tiers${s ? `?${s}` : ''}`);
+  },
 };
 
 export type LocationRow = {
@@ -370,6 +530,27 @@ export type AccountSummary = {
     location_name: string | null;
     actor_email: string | null;
   }>;
+};
+
+export type AccountInsights = {
+  account_id: string;
+  days: Array<{ day: string; opens: number; denied: number }>;
+  breakdown: Array<{
+    access_point_id: string;
+    access_point_name: string | null;
+    location_name: string | null;
+    opens: number;
+  }>;
+  totals: {
+    opens_7d: number;
+    denied_7d: number;
+    closes_7d: number;
+    opens_prev_7d: number;
+  };
+  members: {
+    member_count: number;
+    active_members_7d: number;
+  };
 };
 
 export type TemporaryAccessGrant = {
@@ -520,6 +701,11 @@ export type AccountBilling = {
     current_period_end: string | null;
   } | null;
   wallet: { balance_cents: number; currency: string } | null;
+  payment_method: {
+    card_last4: string | null;
+    card_brand: string | null;
+    has_authorization: boolean;
+  } | null;
   recent_intents: Array<{
     id: string;
     amount_cents: number;
@@ -528,7 +714,22 @@ export type AccountBilling = {
     created_at: string;
     completed_at: string | null;
     provider_reference: string;
+    invoice_id: string | null;
   }>;
+};
+
+export type InvoiceSummary = {
+  id: string;
+  number: string;
+  kind: string;
+  currency: string;
+  subtotal_cents: number;
+  vat_rate_bps: number;
+  vat_cents: number;
+  total_cents: number;
+  status: string;
+  issued_at: string;
+  paid_at: string | null;
 };
 
 export type TopupResponse = {
@@ -545,4 +746,27 @@ export type WalletVerifyResponse = {
   amount_cents: number;
   currency: string;
   already_credited: boolean;
+  plan_activated: string | null;
+};
+
+export type BillingTier = {
+  code: string;
+  name: string;
+  price: number;
+  currency: string;
+  included_opens: number;
+  included_residents: number;
+  included_devices: number;
+  included_locations: number;
+  web_portal: boolean;
+  blurb: string;
+};
+
+export type BillingTiersResponse = {
+  region: string;
+  region_name: string;
+  currency: string;
+  countries: readonly string[];
+  payg_open_price: number;
+  tiers: BillingTier[];
 };

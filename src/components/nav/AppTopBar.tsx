@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { MobileNavDrawer } from './MobileNavDrawer';
+import { CurrencySelector } from './CurrencySelector';
+import { AccountSwitcher } from './AccountSwitcher';
+import { ThemeToggle } from './ThemeToggle';
 
 export function AppTopBar() {
   const { user } = useAuth();
@@ -39,37 +42,15 @@ export function AppTopBar() {
             <span className="font-display text-lg sm:text-xl capitalize truncate">{title}</span>
           </div>
 
+          {/*
+            No global "open gate" CTA here — it was ambiguous (which gate?).
+            Per-AP quick-action buttons live on the dashboard, and each AP has
+            its own detail page at /app/access-points/:id.
+          */}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
-            <Link
-              to="/app/open"
-              className="group/open relative flex items-center gap-2 sm:gap-2.5 pl-3 pr-4 sm:pr-5 h-9 sm:h-10 rounded-full bg-terracotta text-paper hover:bg-terracotta-deep transition-[background,transform] hover:translate-y-[-1px] shadow-[0_8px_22px_-12px_rgba(214,98,77,0.7)]"
-              aria-label="Open gate"
-            >
-              <span className="relative grid place-items-center h-5 w-5 sm:h-6 sm:w-6">
-                <span className="absolute inset-0 rounded-full bg-paper/20 signal-wave" />
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
-                  <path
-                    d="M6 20 V12 a6 6 0 0 1 12 0 V20 H15 V12 a3 3 0 0 0 -6 0 V20 Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="12" cy="16" r="1.4" fill="currentColor" />
-                </svg>
-              </span>
-              <span className="text-sm font-medium tracking-tight">Open</span>
-              <span className="hidden sm:inline text-sm font-medium tracking-tight">gate</span>
-            </Link>
-
-            {user && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/10">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-paper text-[11px] font-medium">
-                  {user.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
-                </span>
-                <span className="text-sm text-ink/80">{user.name.split(' ')[0]}</span>
-              </div>
-            )}
+            <CurrencySelector className="hidden sm:inline-block" />
+            <ThemeToggle variant="default" />
+            {user && <AccountSwitcher />}
           </div>
         </div>
       </div>

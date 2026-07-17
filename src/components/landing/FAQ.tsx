@@ -31,15 +31,14 @@ export function FAQ() {
   return (
     <section className="relative">
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-2 md:pt-4 pb-20 md:pb-24 lg:pb-32">
-        <div className="grid grid-cols-12 gap-x-8 gap-y-6 mb-10 md:mb-12">
+        <div className="grid grid-cols-12 sm:gap-x-8 gap-y-6 mb-10 md:mb-12">
           <div className="col-span-12 lg:col-span-6">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
+            <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
+              <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
               Common questions
             </span>
-            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-6xl leading-[0.95]">
-              The things
-              <br />
-              <em className="italic">people ask first.</em>
+            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-[56px] leading-[0.96] tracking-[-0.02em]">
+              The things <em className="italic">people ask first.</em>
             </h2>
           </div>
         </div>

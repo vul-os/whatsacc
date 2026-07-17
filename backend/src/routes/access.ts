@@ -6,6 +6,7 @@ import { withUserDb } from '../middleware/rls.ts';
 import { withRLS } from '../lib/db.ts';
 import { BadRequest, Forbidden, NotFound } from '../lib/errors.ts';
 import type { TxSql } from '../lib/db.ts';
+import { sendWhatsAppText, sendWhatsAppInteractive } from '../lib/whatsapp.ts';
 
 const opSchema = z
   .object({
@@ -16,6 +17,17 @@ const opSchema = z
   .strict();
 
 const PHONE_E164 = /^\+[1-9][0-9]{6,14}$/;
+
+const createAccessPointSchema = z
+  .object({
+    location_id: z.string().uuid(),
+    name: z.string().min(1).max(120),
+    kind: z.enum(['gate', 'door', 'barrier', 'other']),
+    device_id: z.string().uuid().nullable().optional(),
+    lat: z.number().optional(),
+    long: z.number().optional(),
+  })
+  .strict();
 
 const grantCreateSchema = z
   .object({
@@ -60,17 +72,23 @@ const maintenanceSchema = z
   })
   .strict();
 
-async function logAccess(
+export const WHATSAPP_ACCESS_PRICE_CENTS = 50;
+
+export type LogAccessResult =
+  | { ok: true; wallet_balance_cents: number | null }
+  | { ok: false; error: string };
+
+export async function logAccess(
   tx: TxSql,
   args: {
-    user_id: string;
+    user_id: string | null;
     access_point_id: string;
     command: 'open' | 'close';
     source: string;
     lat?: number;
     long?: number;
   },
-): Promise<void> {
+): Promise<LogAccessResult> {
   const apRows = await tx<{
     location_id: string;
     account_id: string;
@@ -82,6 +100,44 @@ async function logAccess(
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
 
+  let newBalance: number | null = null;
+  if (args.source === 'whatsapp') {
+    const walletRows = await tx<{ balance_cents: string }[]>`
+      select balance_cents::text as balance_cents
+      from wallets
+      where account_id = ${ap.account_id}
+      for update
+    `;
+    const balance = Number(walletRows[0]?.balance_cents ?? 0);
+    if (balance < WHATSAPP_ACCESS_PRICE_CENTS) {
+      await tx`
+        insert into access_logs
+          (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
+        values
+          (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
+           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, false, 'insufficient_wallet_balance')
+      `;
+      return { ok: false, error: 'insufficient_wallet_balance' };
+    }
+
+    await tx`
+      update wallets
+      set balance_cents = balance_cents - ${WHATSAPP_ACCESS_PRICE_CENTS},
+          updated_at = now()
+      where account_id = ${ap.account_id}
+    `;
+    await tx`
+      insert into wallet_transactions (account_id, delta_cents, reason, reference)
+      values (
+        ${ap.account_id},
+        ${-WHATSAPP_ACCESS_PRICE_CENTS},
+        ${args.command === 'open' ? 'whatsapp_open' : 'whatsapp_close'},
+        ${args.access_point_id}
+      )
+    `;
+    newBalance = balance - WHATSAPP_ACCESS_PRICE_CENTS;
+  }
+
   await tx`
     insert into access_logs
       (access_point_id, location_id, account_id, user_id, command, source, lat, long, success)
@@ -90,6 +146,7 @@ async function logAccess(
        ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, true)
   `;
   // TODO: enqueue device_command and dispatch via Durable Object.
+  return { ok: true, wallet_balance_cents: newBalance };
 }
 
 type AccessPointWithMeter = {
@@ -260,6 +317,12 @@ function accessRouter() {
   app.use('*', requireAuth());
 
   app.get('/access-points', async (c) => {
+    // Optional ?account_id= scopes the listing to one tenant. Without it RLS
+    // would still filter to "any account the user is a member of", which
+    // collapses every location's APs into one view when the user owns
+    // multiple locations. Frontend passes the active account id so the page
+    // shows only the current location's APs.
+    const accountId = c.req.query('account_id') ?? null;
     const rows = await withUserDb(c, async (tx) => {
       return await tx<AccessPointWithMeter[]>`
         select
@@ -268,7 +331,9 @@ function accessRouter() {
           m.last_serviced_at, m.last_service_movement_m,
           m.next_due_movement_m, m.next_due_at
         from access_points ap
+        join locations l on l.id = ap.location_id
         left join access_point_meters m on m.access_point_id = ap.id
+        where ${accountId}::uuid is null or l.account_id = ${accountId}::uuid
         order by ap.created_at asc
       `;
     });
@@ -292,6 +357,44 @@ function accessRouter() {
     });
     if (!row) throw NotFound('access_point_not_found');
     return c.json(shapeAccessPoint(row));
+  });
+
+  app.post('/access-points', zValidator('json', createAccessPointSchema), async (c) => {
+    const body = c.req.valid('json');
+    // RLS enforces admin-of-account-owning-location via the WITH CHECK on
+    // access_points (see migrations/20260505070000_rls.sql). If the user
+    // doesn't own the location's account, the insert raises and Hono converts
+    // it to a 500 — we'd rather give a 403, so we pre-check.
+    const created = await withUserDb(c, async (tx) => {
+      const loc = await tx<{ id: string }[]>`
+        select id from locations where id = ${body.location_id}
+      `;
+      if (!loc[0]) throw NotFound('location_not_found');
+
+      if (body.device_id) {
+        const dev = await tx<{ id: string }[]>`
+          select id from devices where id = ${body.device_id} and location_id = ${body.location_id}
+        `;
+        if (!dev[0]) throw BadRequest('device_not_at_location');
+      }
+
+      const rows = await tx<AccessPointWithMeter[]>`
+        with inserted as (
+          insert into access_points (location_id, name, kind, device_id, lat, long, status)
+          values (${body.location_id}, ${body.name}, ${body.kind},
+                  ${body.device_id ?? null}, ${body.lat ?? null}, ${body.long ?? null}, 'active')
+          returning id, location_id, name, kind, device_id, status
+        )
+        select i.id, i.location_id, i.name, i.kind, i.device_id, i.status,
+               m.movement_m, m.total_opens, m.total_closes, m.last_op_at,
+               m.last_serviced_at, m.last_service_movement_m,
+               m.next_due_movement_m, m.next_due_at
+        from inserted i
+        left join access_point_meters m on m.access_point_id = i.id
+      `;
+      return rows[0]!;
+    });
+    return c.json(shapeAccessPoint(created), 201);
   });
 
   app.get('/access-points/:id/maintenance', async (c) => {
@@ -447,8 +550,8 @@ function accessRouter() {
 
     const grant = await withUserDb(c, async (tx) => {
       // 1. All access points must belong to ONE account that the user admins.
-      const apRows = await tx<{ id: string; account_id: string; admin: boolean }[]>`
-        select ap.id, l.account_id, app.is_account_admin(l.account_id) as admin
+      const apRows = await tx<{ id: string; account_id: string; admin: boolean; name: string }[]>`
+        select ap.id, l.account_id, app.is_account_admin(l.account_id) as admin, ap.name
         from access_points ap
         join locations l on l.id = ap.location_id
         where ap.id = any(${body.access_point_ids}::uuid[])
@@ -493,7 +596,47 @@ function accessRouter() {
                ) as access_point_ids
         from temporary_access_grants g where g.id = ${grantId}
       `;
-      return fullRows[0]!;
+      const grant = fullRows[0]!;
+
+      // 3. Notify the visitor via WhatsApp.
+      const to = grant.phone_e164.startsWith('+') ? grant.phone_e164.slice(1) : grant.phone_e164;
+      const names = apRows.map((r) => r.name).join(', ');
+      const message = `Hello ${grant.visitor_name ?? 'there'}! You've been granted access to: ${names}. This access is valid until ${grant.ends_at.toLocaleString()}. You can open the gate by replying to this message.`;
+
+      if (apRows.length === 1) {
+        await sendWhatsAppInteractive(to, {
+          type: 'button',
+          body: { text: message },
+          action: {
+            buttons: [
+              {
+                type: 'reply',
+                reply: { id: `open_ap:${apRows[0]!.id}`, title: `Open ${apRows[0]!.name}` },
+              },
+            ],
+          },
+        });
+      } else {
+        await sendWhatsAppInteractive(to, {
+          type: 'list',
+          header: { type: 'text', text: 'Access Granted' },
+          body: { text: message },
+          action: {
+            button: 'View Gates',
+            sections: [
+              {
+                title: 'Available Gates',
+                rows: apRows.slice(0, 10).map((r) => ({
+                  id: `open_ap:${r.id}`,
+                  title: r.name,
+                })),
+              },
+            ],
+          },
+        });
+      }
+
+      return grant;
     });
 
     return c.json(shapeGrant(grant), 201);
@@ -520,7 +663,17 @@ function accessRouter() {
                     where t.grant_id = temporary_access_grants.id
                   ) as access_point_ids
       `;
-      return rows[0] ?? null;
+      const grant = rows[0] ?? null;
+
+      if (grant) {
+        const to = grant.phone_e164.startsWith('+') ? grant.phone_e164.slice(1) : grant.phone_e164;
+        await sendWhatsAppText(
+          to,
+          `Your access has been revoked. If you believe this is an error, please contact the administrator.`,
+        );
+      }
+
+      return grant;
     });
     if (!row) throw NotFound('grant_not_revocable');
     return c.json(shapeGrant(row));

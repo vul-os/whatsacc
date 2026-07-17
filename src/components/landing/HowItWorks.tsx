@@ -21,16 +21,15 @@ const steps = [
 export function HowItWorks() {
   return (
     <section className="relative">
-      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24 lg:py-32">
-        <div className="grid grid-cols-12 gap-x-8 gap-y-10 md:gap-y-12">
+      <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-20 md:py-24">
+        <div className="grid grid-cols-12 sm:gap-x-8 gap-y-10 md:gap-y-12">
           <div className="col-span-12 lg:col-span-4">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink/55">
+            <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/55">
+              <span className="h-1 w-1 rounded-full bg-terracotta" aria-hidden />
               How it works
             </span>
-            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-6xl leading-[0.95]">
-              Three moments,
-              <br />
-              <em className="italic text-terracotta">two seconds</em>.
+            <h2 className="mt-4 font-display-tight text-4xl sm:text-5xl lg:text-[56px] leading-[0.96] tracking-[-0.02em]">
+              Three moments, <em className="italic text-terracotta">two seconds</em>.
             </h2>
             <p className="mt-5 max-w-sm text-ink/70 leading-relaxed">
               The whole experience hides behind one familiar place &mdash; a chat thread.
@@ -39,13 +38,13 @@ export function HowItWorks() {
           </div>
 
           <div className="col-span-12 lg:col-span-8">
-            <div className="rounded-3xl bg-paper-warm border border-ink/10 p-4 sm:p-6 lg:p-10">
+            <div className="rounded-2xl bg-paper-warm border border-ink/10 p-4 sm:p-6 lg:p-10">
               <ChatToGate className="w-full h-auto" />
             </div>
           </div>
         </div>
 
-        <ol className="mt-16 md:mt-20 grid grid-cols-1 md:grid-cols-3 gap-y-10 md:gap-x-8">
+        <ol className="mt-14 md:mt-16 grid grid-cols-1 md:grid-cols-3 gap-y-10 md:gap-x-8">
           {steps.map((s, i) => (
             <li key={s.n} className="relative">
               {/* numeral row: numeral · dot · connector */}

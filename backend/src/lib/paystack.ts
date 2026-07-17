@@ -32,6 +32,14 @@ export type PaystackVerifyData = {
   customer?: { customer_code?: string; email?: string };
   metadata?: Record<string, unknown> | null;
   gateway_response?: string;
+  authorization?: {
+    authorization_code?: string;
+    card_type?: string;
+    last4?: string;
+    bank?: string;
+    brand?: string;
+    reusable?: boolean;
+  };
 };
 
 type Envelope<T> = { status: boolean; message: string; data: T };
@@ -165,5 +173,34 @@ export async function initiateTransfer(input: InitiateTransferInput): Promise<Tr
     recipient: input.recipientCode,
     reference: input.reference,
     reason: input.reason ?? 'whatsacc referral payout',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Charge a previously-authorized card. Used by the subscription renewal cron:
+// the account's first wallet topup or first subscription charge captures an
+// authorization_code, which we replay against /transaction/charge_authorization
+// for recurring renewals.
+// ---------------------------------------------------------------------------
+
+export type ChargeAuthorizationInput = {
+  email: string;
+  amountCents: number;
+  authorizationCode: string;
+  reference: string;
+  currency?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export async function chargeAuthorization(
+  input: ChargeAuthorizationInput,
+): Promise<PaystackVerifyData> {
+  return await call<PaystackVerifyData>('POST', '/transaction/charge_authorization', {
+    email: input.email,
+    amount: input.amountCents,
+    authorization_code: input.authorizationCode,
+    reference: input.reference,
+    currency: input.currency ?? 'ZAR',
+    metadata: input.metadata,
   });
 }

@@ -2,6 +2,7 @@
 // fetch-style helper that handles JSON, bearer tokens, and raw bodies.
 
 import { createApp } from '@/app.ts';
+import { setEnv } from '@/lib/env.ts';
 import { setupTestDb } from './db.ts';
 
 const TEST_ORIGIN = 'http://test.local';
@@ -34,13 +35,16 @@ export type TestResponse = {
 };
 
 export async function bootTestApp(): Promise<AppHandle> {
+  // Required env vars for the production code paths to work in tests.
+  if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'test-jwt-secret';
+  if (!process.env.APP_PUBLIC_URL) process.env.APP_PUBLIC_URL = 'http://test.local';
+  // Force APP_ENV=test even when .env sets APP_ENV=local — sendEmail() uses
+  // this flag to skip real Resend calls and avoid burning the daily quota.
+  process.env.APP_ENV = 'test';
+  if (!process.env.PAYSTACK_SECRET_KEY) process.env.PAYSTACK_SECRET_KEY = 'sk_test_dummy';
   // Ensure test DB is migrated and DATABASE_URL is pointed at it.
   await setupTestDb();
-  // Required env vars for the production code paths to work in tests.
-  if (!Deno.env.get('JWT_SECRET')) Deno.env.set('JWT_SECRET', 'test-jwt-secret');
-  if (!Deno.env.get('APP_PUBLIC_URL')) Deno.env.set('APP_PUBLIC_URL', 'http://test.local');
-  if (!Deno.env.get('APP_ENV')) Deno.env.set('APP_ENV', 'test');
-  if (!Deno.env.get('PAYSTACK_SECRET_KEY')) Deno.env.set('PAYSTACK_SECRET_KEY', 'sk_test_dummy');
+  setEnv(process.env as Record<string, string | undefined>);
 
   const app = createApp();
   const fetch = async (req: Request) => await app.fetch(req);

@@ -7,29 +7,22 @@ billing system also working off a scheduler system for susbscription payments, m
 we need invoices, backend must make pdf, our company details must be in .env also if we have vat number charge vat have vat rate in config if vat number not set dont charge relevant
 use logo make it look amazing, it must be available on frontend
 
-exhcange rate api, choose cheap one with generous free tier, connect card to exo if need be, have db tables for it
-landing page, pricing subscriptins etc must link to selected currency, it must all convert to rands because we bill in rands, tell user * its a rough estimate in pricing and on landing have ~ for numbers mentioning price also subscriptions tell user it may be slighly innacurate
-but for rands we know its that number so dont do it for rands
-have tests for this also
 
-we need paystack, test payouts, referrals, normal billing
+we need paystack, test payouts, referrals, normal billingcl
 have tests so that we cant get caught with referals, like if you cancel and come back etc
 
-access points must have order, for whatsapp listing eg 1 2 3.
-
-buy domain on namecheap, whatsacc.com
-resend setup, connect dns settings
-create firebase project, then setup hosting, after that create another site for firebase project for dev
+[x] buy domain on namecheap, whatsacc.com
+[x] resend setup, connect dns settings
+[x] create firebase project, then setup hosting, after that create another site for firebase project for dev
 email templates, logo is in public folder
 login, reset password etc
-setup google oauth, need to go to console.cloud.google.com, ask if you need help
+[x] setup google oauth, need to go to console.cloud.google.com, ask if you need help
 
 test google login, after 30 mins, are you still logged on? do refresh token system work?
 
 improve docs, have a nice docs home page, have a search for docs
 
 light / dark mode with toggle in top bar
-artwork on hero, respond to dark mode, if light then have sun, if dark show moon
 
 imrpove and test analytics
 
@@ -39,7 +32,30 @@ basic api system in backend, allow locations to generate api keys, to be able to
 Also expose api to allow 3rd parties to make devices, with pairing system and signed keys etc for a device.
 keep this secure. have pen tests for this. Then have nice docs with python/go/deno/curl examples, keep within theme
 
-"fold" the migrations, which means, put all the migrations into a few files, example, all billing related ones go into billing.sql etc.
-
 need to test whatsapp system yourself, open and close gate, have multiple acceess points for a location be able to choose, make it easy to use.
 User messages a number if they already know options for location. or they can send a location first but either way they need to send a location and choose access point if theres only 1 access point then only location is needed, when user meesages hi or nothing relevant give them instructuons and list locations they are linked to or tell them they are not linked.
+
+"fold" the migrations, which means, put all the migrations into a few files, example, all billing related ones go into billing.sql etc.
+
+
+// new to-do list
+
+please fix the ui across the whole project the dark mode is not good. pleae ensure it claude themese. i want the sun 
+  turning into moon feature across the whole projects in defferent styls suitable for the page so use can see that transition
+  from any page they choose to change from light to dark. also  style ad text make it preium claude theme premium/corporate  
+
+ payout  and  refferals
+ 
+ authurized urls
+ 
+ ui 
+
+
+bunnycd avater urls cache 
+
+google auth ---avater url updates 
+al typs users must be able change avater or url even if its hosted somehwere else
+same avter system but for locations 
+change password if its a google dont show passwords configs 
+add more docs and syntax highlighting 
+

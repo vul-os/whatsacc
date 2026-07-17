@@ -1,5 +1,6 @@
-import { assert, assertEquals, assertExists, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertExists, assertNotEquals } from '../helpers/assert.ts';
 import { withRLS } from '@/lib/db.ts';
+import { hashToken } from '@/lib/refresh.ts';
 import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
 import { registerUser } from '../helpers/fixtures.ts';
@@ -23,6 +24,7 @@ dbTest('register: creates user, account, slug, and returns 201', async () => {
       email: 'alice@test.local',
       password: 'Pa55word_test',
       display_name: 'Alice',
+      location_name: 'Alice HQ',
       country_code: 'ZA',
       account_type: 'personal',
     },
@@ -60,6 +62,7 @@ dbTest('register: rejects duplicate email with 409', async () => {
       email: 'dupe@test.local',
       password: 'Pa55word_test',
       display_name: 'Other',
+      location_name: 'Other HQ',
       country_code: 'ZA',
     },
   });
@@ -290,4 +293,92 @@ dbTest('forgot + reset: full happy path rotates the password', async () => {
   });
   assertEquals(replay.status, 400);
   assertEquals((replay.body as { error: string }).error, 'token_used');
+});
+
+// ---------------------------------------------------------------------------
+// Email verification flow (sign up → verify → login)
+// ---------------------------------------------------------------------------
+
+async function plantVerifyToken(
+  email: string,
+  expiresAt: Date,
+  plain: string,
+): Promise<{ user_id: string }> {
+  const tokenHash = await hashToken(plain);
+  return await withRLS(
+    { user_id: '', account_id: null, is_platform_admin: true },
+    async (tx) => {
+      const rows = await tx<{ id: string }[]>`select id from users where email = ${email}`;
+      const userId = rows[0]!.id;
+      // Insert a fresh row with a known plaintext-derived hash. Production
+      // already inserted one during /register, but its plaintext is unknowable
+      // — replace the row instead of recreating it to keep the FK simple.
+      await tx`delete from email_verification_tokens where user_id = ${userId}`;
+      await tx`
+        insert into email_verification_tokens (token_hash, user_id, expires_at)
+        values (${tokenHash}, ${userId}, ${expiresAt})
+      `;
+      return { user_id: userId };
+    },
+  );
+}
+
+dbTest(
+  'verify-email: full flow — register starts pending, verify activates, login succeeds',
+  async () => {
+    await resetData();
+    const app = await bootTestApp();
+
+    const email = 'verify-happy@test.local';
+    const password = 'Pa55word_verify';
+    const reg = await app.request('POST', '/auth/register', {
+      json: { email, password, display_name: 'Verifier', location_name: 'Verifier HQ', country_code: 'ZA' },
+    });
+    assertEquals(reg.status, 201);
+
+    // Pre-verify: account is pending and login is forbidden.
+    const blocked = await app.request('POST', '/auth/login', {
+      json: { email, password },
+    });
+    assertEquals(blocked.status, 403);
+    assertEquals((blocked.body as { error: string }).error, 'account_not_active');
+
+    const plain = 'verify-happy-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    await plantVerifyToken(email, new Date(Date.now() + 60 * 60 * 1000), plain);
+
+    const ver = await app.request('POST', '/auth/verify-email', { json: { token: plain } });
+    assertEquals(ver.status, 204);
+
+    // After verifying, login works and /me reports email_verified_at.
+    const login = await app.request('POST', '/auth/login', {
+      json: { email, password },
+    });
+    assertEquals(login.status, 200);
+    const tokens = login.body as { access_token: string };
+    const me = await app.request('GET', '/auth/me', { token: tokens.access_token });
+    assertEquals(me.status, 200);
+    const meBody = me.body as { user: { email_verified_at: string | null; status: string } };
+    assertExists(meBody.user.email_verified_at);
+    assertEquals(meBody.user.status, 'active');
+
+    // Token is single-use — replay fails.
+    const replay = await app.request('POST', '/auth/verify-email', { json: { token: plain } });
+    assertEquals(replay.status, 400);
+    assertEquals((replay.body as { error: string }).error, 'token_used');
+  },
+);
+
+dbTest('verify-email: rejects expired tokens with token_expired', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const email = 'verify-expired@test.local';
+  await app.request('POST', '/auth/register', {
+    json: { email, password: 'Pa55word_test', display_name: 'X', location_name: 'X HQ', country_code: 'ZA' },
+  });
+  const plain = 'verify-expired-token-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  await plantVerifyToken(email, new Date(Date.now() - 60 * 1000), plain);
+
+  const r = await app.request('POST', '/auth/verify-email', { json: { token: plain } });
+  assertEquals(r.status, 400);
+  assertEquals((r.body as { error: string }).error, 'token_expired');
 });

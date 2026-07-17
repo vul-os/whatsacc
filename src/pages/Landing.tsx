@@ -1,5 +1,6 @@
 import { TopNav } from '@/components/nav/TopNav';
 import { Hero } from '@/components/landing/Hero';
+import { TryNow } from '@/components/landing/TryNow';
 import { WhatsAppDemo } from '@/components/landing/WhatsAppDemo';
 import { HowItWorks } from '@/components/landing/HowItWorks';
 import { BuiltFor } from '@/components/landing/BuiltFor';
@@ -14,6 +15,7 @@ export default function Landing() {
     <div className="bg-paper">
       <TopNav />
       <Hero />
+      <TryNow />
       <WhatsAppDemo />
       <HowItWorks />
       <BuiltFor />

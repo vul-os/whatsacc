@@ -1,26 +1,23 @@
 // Helpers for contract tests against real third-party services.
 // Each contract test is skipped unless its required env var is set.
 
+import { test } from 'vitest';
+
 export type ContractEnv =
-  | 'PAYSTACK_SECRET_KEY'
-  | 'PAYSTACK_PUBLIC_KEY'
-  | 'RESEND_API_KEY'
+  | 'PAYSTACK_TEST_SECRET_KEY'
+  | 'PAYSTACK_TEST_PUBLIC_KEY'
+  | 'RESEND_TEST_API_KEY'
   | 'RESEND_TEST_TO_EMAIL';
 
 export function envValue(name: ContractEnv): string | null {
-  const v = (Deno.env.get(name) ?? '').trim();
+  const v = (process.env[name] ?? '').trim();
   return v || null;
 }
 
-/**
- * Refuse to run contract tests against a Paystack LIVE key. Test mode keys
- * start with `sk_test_…`; live keys start with `sk_live_…`. The contract
- * tests create real recipients + dispatch real transfers, so live mode
- * would draw real money.
- */
+/** Contract tests must never run against a live Paystack key. */
 function paystackKeyIsLive(): boolean {
-  const k = envValue('PAYSTACK_SECRET_KEY') ?? '';
-  return k.startsWith('sk_live_');
+  const key = envValue('PAYSTACK_TEST_SECRET_KEY');
+  return key !== null && key.startsWith('sk_live_');
 }
 
 export function contractTest(
@@ -29,19 +26,12 @@ export function contractTest(
   fn: () => Promise<void>,
 ): void {
   const missing = required.filter((k) => !envValue(k));
-  const usesPaystack = required.includes('PAYSTACK_SECRET_KEY');
-  const blockedLive = usesPaystack && paystackKeyIsLive();
-  const ignore = missing.length > 0 || blockedLive;
-  let suffix = '';
-  if (missing.length) suffix = ` [SKIP — missing ${missing.join(', ')}]`;
-  else if (blockedLive) suffix = ' [SKIP — refuses to run against sk_live_ Paystack key]';
-  Deno.test({
-    name: name + suffix,
-    ignore,
-    sanitizeResources: false,
-    sanitizeOps: false,
-    fn,
-  });
+  const blockedLive = required.includes('PAYSTACK_TEST_SECRET_KEY') && paystackKeyIsLive();
+  let title = name;
+  if (missing.length) title = `${name} [SKIP - missing ${missing.join(', ')}]`;
+  else if (blockedLive) title = `${name} [SKIP - refuses to run against sk_live_ Paystack key]`;
+  const runner = missing.length || blockedLive ? test.skip : test;
+  runner(title, fn);
 }
 
 /** Random reference safe for Paystack (max 100 chars, alphanumerics + -=._). */
@@ -50,9 +40,11 @@ export function uniqRef(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${rnd}`;
 }
 
-/** Random unique email so reused signups don't collide on Paystack's side. */
+/** Random unique email so reused signups don't collide on Paystack's side.
+ * Uses example.com (RFC 2606 reserved) instead of .local — Paystack's email
+ * validator rejects .local as an invalid TLD. */
 export function uniqEmail(): string {
-  return `whatsacc-contract-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.local`;
+  return `whatsacc-contract-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
 export async function paystackCall<T>(
@@ -60,8 +52,8 @@ export async function paystackCall<T>(
   path: string,
   body?: unknown,
 ): Promise<{ status: boolean; message: string; data: T }> {
-  const key = envValue('PAYSTACK_SECRET_KEY');
-  if (!key) throw new Error('PAYSTACK_SECRET_KEY required');
+  const key = envValue('PAYSTACK_TEST_SECRET_KEY');
+  if (!key) throw new Error('PAYSTACK_TEST_SECRET_KEY required');
   const res = await fetch(`https://api.paystack.co${path}`, {
     method,
     headers: {

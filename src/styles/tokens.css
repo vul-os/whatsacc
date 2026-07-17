@@ -1,33 +1,76 @@
 /* whatsacc design tokens
-   palette derived from the favicon arch motif:
-   deep navy ink, warm cream paper, terracotta hot accent.
-   supporting tones: muted gold for editorial moments,
-   soft slate for body text, clay for surface variation. */
+   palette: warm neutrals + copper accent, inspired by Claude's premium identity.
+   light: near-black ink on warm white paper.
+   dark: true near-black backgrounds — premium, not brownish. */
 
 :root {
-  --ink: #1a1f36;
-  --ink-soft: #2c3350;
-  --ink-faint: rgba(26, 31, 54, 0.6);
-  --ink-whisper: rgba(26, 31, 54, 0.12);
+  color-scheme: light;
 
-  --paper: #f4ede2;
-  --paper-warm: #ece2d1;
-  --paper-cool: #f8f3ea;
-  --paper-edge: rgba(26, 31, 54, 0.08);
+  --ink: #141210;
+  --ink-soft: #302C28;
+  --ink-faint: rgba(20, 18, 16, 0.55);
+  --ink-whisper: rgba(20, 18, 16, 0.09);
 
-  --terracotta: #d6624d;
-  --terracotta-deep: #b14b39;
-  --terracotta-soft: #e8a293;
+  --paper: #FAFAF8;
+  --paper-warm: #F2EDE6;
+  --paper-cool: #FDFDFC;
+  --paper-edge: rgba(20, 18, 16, 0.07);
 
-  --gold: #c8a45c;
-  --gold-soft: #e3c98a;
+  --terracotta: #C86848;
+  --terracotta-deep: #A24F32;
+  --terracotta-soft: #E8A48A;
 
-  --slate: #6b7188;
-  --moss: #4a6b58;
-  --clay: #cab39a;
+  --gold: #B8914A;
+  --gold-soft: #DEC07A;
 
-  --signal: #2c5f4f; /* successful gate-open green, not whatsapp */
+  --slate: #7C746C;
+  --moss: #5C7258;
+  --clay: #C2A88C;
 
-  --shadow-paper: 0 1px 0 rgba(26, 31, 54, 0.04), 0 12px 32px -16px rgba(26, 31, 54, 0.18);
-  --shadow-deep: 0 24px 48px -24px rgba(26, 31, 54, 0.4);
+  --signal: #3A6E56;
+
+  --shadow-paper: 0 1px 2px rgba(14, 12, 10, 0.04), 0 8px 24px -8px rgba(14, 12, 10, 0.10);
+  --shadow-deep: 0 20px 40px -14px rgba(14, 12, 10, 0.20);
+
+  /* aside surface — used by AuthLayout's branded panel.
+     stays in the "dark surface with light text" family in BOTH modes
+     so it always reads as the editorial counterweight. */
+  --aside-surface: #141210;
+  --aside-ink: #FAFAF8;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ink: #F5EFE6;
+  --ink-soft: #D8CFBF;
+  --ink-faint: rgba(245, 239, 230, 0.55);
+  --ink-whisper: rgba(245, 239, 230, 0.10);
+
+  /* True near-black — not brown-dark. The signature upgrade. */
+  --paper: #0F0E0C;
+  --paper-warm: #181614;
+  --paper-cool: #131210;
+  --paper-edge: rgba(245, 239, 230, 0.08);
+
+  --terracotta: #E0896A;
+  --terracotta-deep: #F0A484;
+  --terracotta-soft: #8A4A38;
+
+  --gold: #D4AE6A;
+  --gold-soft: #8A6E40;
+
+  --slate: #B4A89C;
+  --moss: #8AAA84;
+  --clay: #6E5A48;
+
+  --signal: #88B89C;
+
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 48px -16px rgba(0, 0, 0, 0.55);
+  --shadow-deep: 0 32px 64px -24px rgba(0, 0, 0, 0.80);
+
+  /* aside stays dark in dark mode too — a touch warmer than --paper
+     so the panel feels distinguished from the night sky behind it. */
+  --aside-surface: #1A1714;
+  --aside-ink: #F5EFE6;
 }
