@@ -12,10 +12,13 @@
 //     request, so revocation is immediate and the JWT claim is never trusted
 //     for gating). Denied attempts are audit-logged.
 //   - Cross-tenant reads use the SAME RLS machinery as everything else: the
-//     admin transaction runs with app.is_platform_admin=true, which the
-//     baseline policies already honor. Tenant RLS is never weakened for
-//     normal users; internal tables stay reachable only through the
-//     SECURITY DEFINER app.* helpers (baseline internal-role pattern).
+//     admin transaction carries the admin's user id in app.user_id, and
+//     app.is_platform_admin() DERIVES admin-ness from that user's live users
+//     row (migrations/20260505040000_admin_hardening.sql) — the GUC
+//     app.is_platform_admin is no longer trusted, so forging it grants
+//     nothing. Tenant RLS is never weakened for normal users; internal
+//     tables stay reachable only through the SECURITY DEFINER app.* helpers
+//     (baseline internal-role pattern).
 //   - Claim flow is fail-closed: no ADMIN_CLAIM_TOKEN → nobody can claim;
 //     any admin exists (or the claim was ever redeemed) → the token is dead
 //     forever; token comparison is constant-time.
@@ -74,9 +77,20 @@ const limitsPatchSchema = z
     opens_per_hour: limitValue.optional(),
     chat_msgs_per_min: limitValue.optional(),
     account_opens_per_hour: limitValue.optional(),
+    // 0 for opens_per_hour / account_opens_per_hour blocks EVERY gate on the
+    // instance (a real kill-switch feature) — require this explicit flag so
+    // it can never happen by accident/typo.
+    confirm_kill_switch: z.boolean().optional(),
   })
   .strict()
-  .refine((b) => Object.keys(b).length > 0, { message: 'at least one field is required' });
+  .refine(
+    (b) =>
+      b.open_cooldown_s !== undefined ||
+      b.opens_per_hour !== undefined ||
+      b.chat_msgs_per_min !== undefined ||
+      b.account_opens_per_hour !== undefined,
+    { message: 'at least one limit field is required' },
+  );
 
 const AUDIT_KINDS = [
   'all',
@@ -87,6 +101,7 @@ const AUDIT_KINDS = [
   'rate_limited',
   'quota_exceeded',
   'account_suspended',
+  'user_disabled',
 ] as const;
 
 const auditQuerySchema = z
@@ -104,6 +119,8 @@ const auditQuerySchema = z
 /**
  * Run `fn` with the platform-admin RLS context. Only ever called after the
  * admin gate has verified is_platform_admin against the live users row.
+ * The GUC set here is legacy/informational — app.is_platform_admin() derives
+ * the actual answer from the users row keyed by app.user_id.
  */
 async function withAdminDb<T>(c: Context<AppEnv>, fn: (tx: TxSql) => Promise<T>): Promise<T> {
   const user = getUser(c);
@@ -140,6 +157,26 @@ function adminGate(): MiddlewareHandler<AppEnv> {
     }
     await next();
   };
+}
+
+/**
+ * Escape LIKE/ILIKE wildcards so admin search treats the operator's query as
+ * a literal substring ('%'/'_' in the input cannot wildcard-match). Pair
+ * with an explicit ESCAPE '\' clause on the ILIKE.
+ */
+function likePattern(q: string): string {
+  return `%${q.replace(/([\\%_])/g, '\\$1')}%`;
+}
+
+/**
+ * Serialize admin mutations that guard the "last active platform admin"
+ * invariant (user disable, platform-admin revoke). The check-then-update in
+ * those transactions is a TOCTOU without this: two concurrent revokes of the
+ * two last admins could both pass the count and leave ZERO admins. Same
+ * advisory-xact-lock pattern as app.claim_platform_admin.
+ */
+async function lockAdminMutation(tx: TxSql): Promise<void> {
+  await tx`select pg_advisory_xact_lock(hashtextextended('whatsacc:admin_mutation', 0))`;
 }
 
 type RateLimitExternal = Record<RateLimitOverrideField, number>;
@@ -364,7 +401,7 @@ function adminRouter() {
     const q = c.req.valid('query');
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
-    const pattern = q.query ? `%${q.query}%` : null;
+    const pattern = q.query ? likePattern(q.query) : null;
 
     const data = await withAdminDb(c, async (tx) => {
       const rows = await tx<{
@@ -384,13 +421,13 @@ function adminRouter() {
                  where al.account_id = a.id and al.command = 'open' and al.success = true
                    and al.ts >= date_trunc('day', now()) - interval '6 days')::int as opens_7d
         from accounts a
-        where (${pattern}::text is null or a.name ilike ${pattern}::text)
+        where (${pattern}::text is null or a.name ilike ${pattern}::text escape '\\')
         order by a.created_at desc
         limit ${limit} offset ${offset}
       `;
       const totalRows = await tx<{ total: number }[]>`
         select count(*)::int as total from accounts a
-        where (${pattern}::text is null or a.name ilike ${pattern}::text)
+        where (${pattern}::text is null or a.name ilike ${pattern}::text escape '\\')
       `;
       return { rows, total: Number(totalRows[0]?.total ?? 0) };
     });
@@ -508,7 +545,7 @@ function adminRouter() {
     const q = c.req.valid('query');
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
-    const pattern = q.query ? `%${q.query}%` : null;
+    const pattern = q.query ? likePattern(q.query) : null;
 
     const data = await withAdminDb(c, async (tx) => {
       const rows = await tx<{
@@ -534,13 +571,13 @@ function adminRouter() {
                (select max(al.ts) from access_logs al where al.user_id = u.id) as last_access_at
         from users u
         left join profiles p on p.id = u.id
-        where (${pattern}::text is null or u.email::text ilike ${pattern}::text)
+        where (${pattern}::text is null or u.email::text ilike ${pattern}::text escape '\\')
         order by u.created_at desc
         limit ${limit} offset ${offset}
       `;
       const totalRows = await tx<{ total: number }[]>`
         select count(*)::int as total from users u
-        where (${pattern}::text is null or u.email::text ilike ${pattern}::text)
+        where (${pattern}::text is null or u.email::text ilike ${pattern}::text escape '\\')
       `;
       return { rows, total: Number(totalRows[0]?.total ?? 0) };
     });
@@ -558,6 +595,10 @@ function adminRouter() {
     }
 
     const updated = await withAdminDb(c, async (tx) => {
+      // Serialize with other admin mutations: the last-active-admin check
+      // below is a TOCTOU under concurrency without this lock.
+      await lockAdminMutation(tx);
+
       const targetRows = await tx<{
         id: string;
         email: string;
@@ -624,6 +665,10 @@ function adminRouter() {
     const { grant } = c.req.valid('json');
 
     const updated = await withAdminDb(c, async (tx) => {
+      // Serialize with other admin mutations: two concurrent revokes of the
+      // two last admins must not both pass the last-admin check.
+      await lockAdminMutation(tx);
+
       const targetRows = await tx<{
         id: string;
         email: string;
@@ -685,6 +730,18 @@ function adminRouter() {
   app.patch('/limits', zValidator('json', limitsPatchSchema), async (c) => {
     const me = getUser(c);
     const patch = c.req.valid('json');
+
+    // 0 opens/hour (member or account ceiling) silently bricks every gate on
+    // the instance. It stays a VALID value — the kill switch is a real
+    // feature — but only with an explicit confirmation flag, so a typo or a
+    // sloppy script can never do it by accident.
+    const wantsKillSwitch = patch.opens_per_hour === 0 || patch.account_opens_per_hour === 0;
+    if (wantsKillSwitch && patch.confirm_kill_switch !== true) {
+      throw BadRequest(
+        'kill_switch_confirmation_required',
+        'Setting opens_per_hour or account_opens_per_hour to 0 blocks ALL gate opens — pass confirm_kill_switch: true to proceed.',
+      );
+    }
 
     const payload = await withAdminDb(c, async (tx) => {
       const current = await readRateLimitOverrides(tx);

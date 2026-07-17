@@ -92,10 +92,12 @@ async function linkedLocationsForPhone(tx: TxSql, phoneE164: string): Promise<Li
   return await tx<LinkedLocation[]>`
     select distinct l.id, l.name
     from profile_phone_numbers ppn
+    join users u on u.id = ppn.profile_id
     join account_members am on am.user_id = ppn.profile_id
     join locations l on l.account_id = am.account_id
     where ppn.phone_e164 = ${phoneE164}
       and ppn.verified_at is not null
+      and u.status = 'active'  -- disabled users get no location menus
       and am.status = 'active'
       and l.status = 'active'
     order by l.name asc
@@ -228,12 +230,14 @@ async function pushAccessCommandResult(
     const memberCheck = await tx<{ user_id: string }[]>`
       select am.user_id
       from profile_phone_numbers ppn
+      join users u on u.id = ppn.profile_id
       join account_members am on am.user_id = ppn.profile_id
       join locations l on l.account_id = am.account_id
       join access_points ap on ap.location_id = l.id
       where ppn.phone_e164 = ${phoneE164}
         and ppn.verified_at is not null
         and ap.id = ${accessPointId}::uuid
+        and u.status = 'active'  -- disabled users cannot open via chat
         and am.status = 'active'
       limit 1
     `;

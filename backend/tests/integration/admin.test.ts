@@ -9,7 +9,7 @@ import { withRLS } from '@/lib/db.ts';
 import { chatDenialMessage } from '@/lib/rate-limit.ts';
 import { logAccess } from '@/routes/access.ts';
 import { bootTestApp, type AppHandle } from '../helpers/app.ts';
-import { resetData } from '../helpers/db.ts';
+import { resetData, setupTestDb } from '../helpers/db.ts';
 import {
   makePlatformAdmin,
   registerUser,
@@ -39,15 +39,15 @@ async function openAp(app: AppHandle, u: RegisteredUser, apId: string, source = 
 }
 
 async function adminAuditRows(action?: string) {
-  return await withRLS(
-    { user_id: '', account_id: null, is_platform_admin: true },
-    async (tx) =>
-      await tx<{ action: string; allowed: boolean; actor_user_id: string | null; detail: unknown }[]>`
-        select action, allowed, actor_user_id, detail from admin_audit_log
-        where (${action ?? null}::text is null or action = ${action ?? null}::text)
-        order by created_at asc
-      `,
-  );
+  // Raw superuser handle: admin_audit_log is admin-only under RLS, and
+  // app.is_platform_admin() now derives from the users table — the old
+  // forged-GUC "fake admin" context no longer reads it (by design).
+  const { sql } = await setupTestDb();
+  return await sql<{ action: string; allowed: boolean; actor_user_id: string | null; detail: unknown }[]>`
+    select action, allowed, actor_user_id, detail from admin_audit_log
+    where (${action ?? null}::text is null or action = ${action ?? null}::text)
+    order by created_at asc
+  `;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,6 +520,44 @@ dbTest('protections: cannot disable yourself; cannot disable/revoke the last adm
   assertEquals((disableLast.body as { error: string }).error, 'cannot_disable_last_admin');
 });
 
+dbTest('protections: concurrent revokes of the two last admins leave exactly one admin', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const { sql } = await setupTestDb();
+  const admin1 = await registerUser(app);
+  const admin2 = await registerUser(app);
+  await makePlatformAdmin(admin1.user_id);
+  await makePlatformAdmin(admin2.user_id);
+
+  // TOCTOU probe: without the advisory lock both transactions read "one
+  // other active admin" and both revokes succeed → ZERO admins. With the
+  // lock they serialize: exactly one wins, the loser hits the last-admin
+  // guard (400) — or 403 if its auth re-read races after the winner commits.
+  const [r1, r2] = await Promise.all([
+    app.request('POST', `/admin/users/${admin1.user_id}/platform-admin`, {
+      token: admin2.access_token,
+      json: { grant: false },
+    }),
+    app.request('POST', `/admin/users/${admin2.user_id}/platform-admin`, {
+      token: admin1.access_token,
+      json: { grant: false },
+    }),
+  ]);
+  const statuses = [r1.status, r2.status];
+  assertEquals(statuses.filter((s) => s === 200).length, 1, `exactly one revoke may win, got ${statuses}`);
+  const loser = [r1, r2].find((r) => r.status !== 200)!;
+  assert(loser.status === 400 || loser.status === 403, `loser must be 400/403, got ${loser.status}`);
+  if (loser.status === 400) {
+    assertEquals((loser.body as { error: string }).error, 'cannot_revoke_last_admin');
+  }
+
+  // The invariant the lock protects: the instance never drops to zero admins.
+  const admins = await sql<{ n: number }[]>`
+    select count(*)::int as n from users where is_platform_admin = true
+  `;
+  assertEquals(Number(admins[0]!.n), 1, 'exactly one platform admin must remain');
+});
+
 // ---------------------------------------------------------------------------
 // Runtime rate-limit overrides
 // ---------------------------------------------------------------------------
@@ -605,6 +643,98 @@ dbTest('limits: override persists and the limiter actually uses it (db > env)', 
   // The updates are audited.
   const actions = await adminAuditRows('limits_update');
   assertEquals(actions.length, 2);
+});
+
+dbTest('limits: 0 opens caps require explicit kill-switch confirmation', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const admin = await registerUser(app);
+  await makePlatformAdmin(admin.user_id);
+
+  // 0 without the flag → 400 with a distinct code, nothing persisted.
+  for (const field of ['opens_per_hour', 'account_opens_per_hour'] as const) {
+    const res = await app.request('PATCH', '/admin/limits', {
+      token: admin.access_token,
+      json: { [field]: 0 },
+    });
+    assertEquals(res.status, 400, `${field}=0 without confirmation must be rejected`);
+    assertEquals((res.body as { error: string }).error, 'kill_switch_confirmation_required');
+  }
+  const check = await app.request('GET', '/admin/limits', { token: admin.access_token });
+  assertEquals(
+    (check.body as { overrides: { opens_per_hour: number | null } }).overrides.opens_per_hour,
+    null,
+    'rejected kill switch must not persist',
+  );
+
+  // With the flag → the kill switch engages (0 stays a valid feature).
+  const confirmed = await app.request('PATCH', '/admin/limits', {
+    token: admin.access_token,
+    json: { opens_per_hour: 0, confirm_kill_switch: true },
+  });
+  assertEquals(confirmed.status, 200);
+  assertEquals(
+    (confirmed.body as { overrides: { opens_per_hour: number | null } }).overrides.opens_per_hour,
+    0,
+  );
+
+  // Non-bricking zeroes stay unceremonious: cooldown 0 just disables it.
+  const cooldown = await app.request('PATCH', '/admin/limits', {
+    token: admin.access_token,
+    json: { open_cooldown_s: 0 },
+  });
+  assertEquals(cooldown.status, 200);
+
+  // The flag alone (no limit field) is still a 400.
+  const flagOnly = await app.request('PATCH', '/admin/limits', {
+    token: admin.access_token,
+    json: { confirm_kill_switch: true },
+  });
+  assertEquals(flagOnly.status, 400);
+
+  // Clean up the override so later tests see the neutral env config.
+  const clear = await app.request('PATCH', '/admin/limits', {
+    token: admin.access_token,
+    json: { opens_per_hour: null, open_cooldown_s: null },
+  });
+  assertEquals(clear.status, 200);
+});
+
+dbTest('search: % and _ in admin queries match literally, not as wildcards', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const { sql } = await setupTestDb();
+  const admin = await registerUser(app);
+  await makePlatformAdmin(admin.user_id);
+  const t1 = await registerUser(app);
+  await registerUser(app); // a third account that must NOT match the probes
+  await sql`update accounts set name = '100% Legit' where id = ${t1.account_id}`;
+  const underscoreUser = await registerUser(app, { email: `under_score-${Date.now()}@example.com` });
+
+  // '%' as a query must only match names CONTAINING a literal percent —
+  // previously it matched every row (wildcard injection).
+  const pct = await app.request('GET', '/admin/accounts', {
+    token: admin.access_token,
+    query: { query: '%' },
+  });
+  const pctBody = pct.body as { accounts: Array<{ id: string }>; total: number };
+  assertEquals(pctBody.total, 1, `'%' must match only the literal-% account`);
+  assertEquals(pctBody.accounts[0]!.id, t1.account_id);
+
+  const full = await app.request('GET', '/admin/accounts', {
+    token: admin.access_token,
+    query: { query: '100%' },
+  });
+  assertEquals((full.body as { total: number }).total, 1);
+
+  // '_' in user search must not act as single-char wildcard.
+  const us = await app.request('GET', '/admin/users', {
+    token: admin.access_token,
+    query: { query: '_' },
+  });
+  const usBody = us.body as { users: Array<{ id: string }>; total: number };
+  assertEquals(usBody.total, 1, `'_' must match only the literal-underscore email`);
+  assertEquals(usBody.users[0]!.id, underscoreUser.user_id);
 });
 
 // ---------------------------------------------------------------------------

@@ -77,7 +77,7 @@ export type LogAccessResult =
   | { allowed: true }
   | {
       allowed: false;
-      reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended';
+      reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended' | 'user_disabled';
       retry_after_s: number;
     };
 
@@ -132,6 +132,29 @@ export async function logAccess(
          false, 'account_suspended')
     `;
     return { allowed: false, reason: 'account_suspended', retry_after_s: 0 };
+  }
+
+  // Disabled user: JWT/portal/API paths already die at requireAuth's live
+  // gate, but the WhatsApp/Slack paths resolve members by phone / Slack ID
+  // without a JWT — so the choke point must check users.status itself, or a
+  // disabled member keeps opening gates via chat. Fail-closed: a missing
+  // users row (or any non-active status) denies. 'close' stays allowed
+  // (safe direction), and visitor grants (user_id null) are unaffected.
+  if (args.command === 'open' && args.user_id) {
+    const userRows = await tx<{ status: string }[]>`
+      select status from users where id = ${args.user_id}
+    `;
+    if ((userRows[0]?.status ?? null) !== 'active') {
+      await tx`
+        insert into access_logs
+          (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
+        values
+          (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
+           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null},
+           false, 'user_disabled')
+      `;
+      return { allowed: false, reason: 'user_disabled', retry_after_s: 0 };
+    }
   }
 
   // 'close' is never limited — closing a gate is the safe direction.
@@ -517,6 +540,12 @@ function accessRouter() {
         throw Forbidden(
           'account_suspended',
           'This account has been suspended by the gateway operator.',
+        );
+      }
+      if (verdict.reason === 'user_disabled') {
+        throw Forbidden(
+          'user_disabled',
+          'This user has been disabled by the instance operator.',
         );
       }
       throw TooManyRequests(

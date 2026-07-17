@@ -523,11 +523,14 @@ export async function noteChatMessage(
 // ---------------------------------------------------------------------------
 
 export function chatDenialMessage(denial: {
-  reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended';
+  reason: 'rate_limited' | 'quota_exceeded' | 'account_suspended' | 'user_disabled';
   retry_after_s: number;
 }): string {
   if (denial.reason === 'account_suspended') {
     return 'This account has been suspended by the gateway operator — the gate cannot be opened. Contact your operator for help.';
+  }
+  if (denial.reason === 'user_disabled') {
+    return 'Your whatsacc user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help.';
   }
   if (denial.reason === 'quota_exceeded') {
     const base = getEnv().APP_PUBLIC_URL.replace(/\/$/, '');

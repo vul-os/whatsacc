@@ -8,7 +8,7 @@ import { assert, assertEquals } from '../helpers/assert.ts';
 import { resetEnvCache } from '@/lib/env.ts';
 import { withRLS } from '@/lib/db.ts';
 import { bootTestApp, type AppHandle } from '../helpers/app.ts';
-import { resetData } from '../helpers/db.ts';
+import { resetData, setupTestDb } from '../helpers/db.ts';
 import {
   makePlatformAdmin,
   registerUser,
@@ -74,15 +74,14 @@ dbTest('security: every /admin route is 403 for non-admins + denial audit rows',
     assertEquals(res.status, 401, `${ep.method} ${ep.path} must be 401 unauthenticated`);
   }
 
-  // One denial audit row per authenticated denied attempt.
-  const denials = await withRLS(
-    { user_id: '', account_id: null, is_platform_admin: true },
-    async (tx) =>
-      await tx<{ actor_user_id: string | null; target_id: string | null }[]>`
-        select actor_user_id, target_id from admin_audit_log
-        where action = 'admin_access_denied' and allowed = false
-      `,
-  );
+  // One denial audit row per authenticated denied attempt. (Raw superuser
+  // read: admin_audit_log is admin-only under RLS and the forged-GUC "fake
+  // admin" context no longer unlocks it — by design.)
+  const { sql } = await setupTestDb();
+  const denials = await sql<{ actor_user_id: string | null; target_id: string | null }[]>`
+    select actor_user_id, target_id from admin_audit_log
+    where action = 'admin_access_denied' and allowed = false
+  `;
   assertEquals(denials.length, surface.length);
   assert(denials.every((d) => d.actor_user_id === owner.user_id));
 });

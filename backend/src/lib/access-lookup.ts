@@ -75,11 +75,13 @@ export async function getAvailableAccessPoints(
       select ap.id as ap_id, ap.name as ap_name, l.id as loc_id, l.name as loc_name
       from profile_phone_numbers ppn
       join profiles p on p.id = ppn.profile_id
+      join users u on u.id = p.id
       join account_members am on am.user_id = p.id
       join locations l on l.account_id = am.account_id
       join access_points ap on ap.location_id = l.id
       where ppn.phone_e164 = ${phoneE164}
         and ppn.verified_at is not null
+        and u.status = 'active'  -- disabled users lose chat-resolved access
         and am.status = 'active'
         and ap.status = 'active'
     `;
@@ -109,10 +111,12 @@ export async function getAvailableAccessPoints(
     >`
       select ap.id as ap_id, ap.name as ap_name, l.id as loc_id, l.name as loc_name
       from profiles p
+      join users u on u.id = p.id
       join account_members am on am.user_id = p.id
       join locations l on l.account_id = am.account_id
       join access_points ap on ap.location_id = l.id
       where p.id = ${profileId}
+        and u.status = 'active'  -- disabled users lose chat-resolved access
         and am.status = 'active'
         and ap.status = 'active'
     `;
