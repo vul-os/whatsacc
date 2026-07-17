@@ -1,30 +1,26 @@
 # Linking WhatsApp
 
-WhatsApp is whatsacc's primary channel — and the one with a genuinely hard
-self-hosting story. This chapter explains how WhatsApp works on the flagship, and what
-it takes to bring your own number to a self-hosted gateway.
+WhatsApp is whatsacc's primary channel — and the one with genuinely hard setup, because
+Meta gates it behind business verification. This chapter is what it takes to bring your
+own number to your gateway. (If you want to be texting your gate *today*, start with
+Slack — minutes, not days — and add WhatsApp when the WABA clears.)
 
-## On the flagship: nothing to link
-
-If your gate lives on whatsacc.com, **you don't need a WhatsApp number of your own**.
-Residents text the flagship's number. One verified WhatsApp Business account (WABA)
-serves every tenant, and the gateway routes each message by its sender:
+Once linked, the flow is simple: residents text your number, Meta's Cloud API delivers
+the webhook, and the gateway routes each message by its sender:
 
 ```
-resident's message → Meta Cloud API → flagship gateway
-                     └─ resolve (whatsapp, +27…) → memberships → your location
+resident's message → Meta Cloud API → your gateway
+                     └─ resolve (whatsapp, +27…) → memberships → location
 ```
 
-Your complex never touches Meta. Invite a member by phone number and they can text the
-gate immediately — WhatsApp is their identity, not their configuration.
+Invite a member by phone number and they can text the gate immediately — WhatsApp is
+their identity, not their configuration. The number residents should save is shown in
+the portal under **Settings → Channels → WhatsApp**.
 
-The number your residents should save is shown in the portal under
-**Settings → Channels → WhatsApp**.
+## Bring your own WABA
 
-## Self-hosting: bring your own WABA
-
-A self-hosted gateway that wants a WhatsApp channel needs its own **Meta Cloud API**
-setup. This is the high-friction channel — budget an afternoon and some patience:
+A gateway that wants a WhatsApp channel needs its own **Meta Cloud API** setup. This is
+the high-friction channel — budget an afternoon and some patience:
 
 1. **A Meta Business portfolio**, verified. Meta's business verification can take days
    and wants real documents.
@@ -39,15 +35,14 @@ setup. This is the high-friction channel — budget an afternoon and some patien
    number id go in your gateway's `.env`. The gateway verifies every incoming webhook
    with Meta's HMAC signature; unsigned or mis-signed payloads are dropped.
 
-If that list made you tired: that asymmetry is exactly what the flagship absorbs for
-you, free. One more honest note for those who push through: Meta charges per-conversation
-fees on your WABA and bills you directly — those costs are between you and Meta, never
-routed through whatsacc. Slack takes minutes — see [Chat channels](channels.md) — and
-many self-hosters run Slack-first, WhatsApp never.
+One honest note for those who push through: Meta charges per-conversation fees on your
+WABA and bills you directly — those costs are between you and Meta, never routed
+through whatsacc. Slack takes minutes — see [Chat channels](channels.md) — and many
+gateways run Slack-first, WhatsApp later or never.
 
 ## Which number should residents see?
 
-For self-hosted complexes we recommend a **dedicated number** for the property rather
+We recommend a **dedicated number** for the property rather
 than someone's personal number: residents shouldn't see a personal profile photo and
 status, and the number should survive a change of trustees.
 

@@ -4,7 +4,7 @@ The HTTP API isn't required to use whatsacc — most people only ever touch chat
 you're integrating with property-management software, wiring the gate into a home
 automation, or building on top of a gateway, this is for you.
 
-The API is served by the gateway itself, hosted or self-hosted alike, under `/v1`.
+The API is served by the gateway itself — every gateway, the same way — under `/v1`.
 
 > The `/v1` surface is stabilising alongside the Go gateway; pre-1.0, expect additive
 > changes and check the repository for the generated, always-current route list.
@@ -18,7 +18,7 @@ specific locations and to read or read-write.
 Authorization: Bearer wacc_live_<token>
 ```
 
-Self-hosted gateways issue their own tokens — there is no central token authority.
+Every gateway issues its own tokens — there is no central token authority.
 
 ## Open an access point
 

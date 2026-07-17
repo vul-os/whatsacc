@@ -30,8 +30,7 @@ fails. Replies use the Cloud API send endpoint — including interactive numbere
 for gate pickers.
 
 The full walkthrough, including number advice and failure modes, is in
-[Linking WhatsApp](linking-whatsapp.md). On the flagship you skip all of it — residents
-text our number.
+[Linking WhatsApp](linking-whatsapp.md).
 
 ## Slack
 
@@ -51,6 +50,11 @@ WACC_CHANNEL_SLACK_SIGNING_SECRET=…
 
 Every incoming event is verified against the signing secret (Slack's signed-request
 scheme, timestamp-checked against replay); anything unverifiable is dropped and logged.
+
+No public URL? Use **Socket Mode** instead of the Events API: the gateway dials out to
+Slack over an outbound WebSocket, so a LAN-only gateway with no reachable address still
+receives every message. Enable it in the app manifest and give the gateway the
+app-level token (`WACC_CHANNEL_SLACK_APP_TOKEN`).
 
 Residents then DM the app — or use a channel you allow — with `open`. Their Slack
 member id is their identity; invite members from the portal's **Members** page by id or

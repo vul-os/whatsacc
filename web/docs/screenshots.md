@@ -33,6 +33,15 @@ Opens over time, denials and their reasons, per-member and per-access-point brea
 
 [Dark variant](../screenshots/dark/portal-analytics.png)
 
+### The security page
+
+Served by the gateway itself: the trust model — pinned keys, row-level isolation,
+identity by verified sender — spelled out where residents and trustees can read it.
+
+![The gateway's security page](../screenshots/security.png)
+
+[Dark variant](../screenshots/dark/security.png)
+
 ## The app
 
 ### Emergency access

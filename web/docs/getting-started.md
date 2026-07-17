@@ -1,36 +1,47 @@
 # Getting started
 
-This chapter walks the **hosted flagship** path: your gate on whatsacc.com, residents
-texting our WhatsApp number, nothing for you to deploy. If you'd rather run your own
-gateway, jump to [Run a gateway](self-host.md) — the concepts below still apply.
-
 whatsacc gets you from "I'd like to text my gate open" to actually doing it in about an
-evening, assuming the controller hardware is mounted.
+evening, assuming the controller hardware is mounted. Everything runs on your own
+gateway — there is no hosted service and nothing to sign up for. This chapter is the
+short path; [Run a gateway](self-host.md) has the full install, reachability and backup
+detail.
 
 ## What you'll need
 
 - A gate, door or barrier with a **dry-contact relay input** (most motors have one).
 - A whatsacc controller, or a supported Pi-class board running the controller agent.
-- A phone with WhatsApp — the flagship's primary channel. Slack works too.
+- Somewhere for the gateway to live: a VPS, a Pi, any always-on box. Docker or a bare
+  binary — your call.
+- A chat channel to bring: a Slack workspace is the five-minute start; WhatsApp needs
+  your own Meta business number (a WABA) — see [Chat channels](channels.md).
 - Ten minutes of ladder time to wire the controller in parallel with your existing motor.
 
-You do **not** need your own WhatsApp business number on the flagship. That's the point
-of the flagship: residents text *whatsacc's* number, and the gateway routes by sender.
+## The six steps
 
-## The five steps
+1. **Run the gateway.** One binary, one SQLite file, portal embedded:
 
-1. **Create an account** at the [portal](https://whatsacc.com/portal). The flagship is
-   free — no card, no plans; sign up and you're in.
-2. **Name your location** during onboarding — house, complex, building or other. Give it
-   a name residents will recognise, and optionally drop a map pin: that pin anchors the
-   geofence if you enable it later.
-3. **Add an access point** under **Access points → New**. Main gate, pedestrian gate,
-   parking barrier — each is a separate access point, and each gets its own controller.
+   ```sh
+   docker run -d --name whatsacc \
+     -p 8080:8080 -v whatsacc:/data \
+     ghcr.io/vul-os/whatsacc-gateway
+   ```
+
+   Or grab the release binary — `./whatsacc-gateway --data /var/lib/whatsacc`. Details,
+   reachability options and backups in [Run a gateway](self-host.md).
+2. **Claim the admin account.** On first boot the gateway prints a one-time URL; open
+   it and the embedded portal walks you through creating the owner account.
+3. **Name your location** — house, complex, building or other. Give it a name residents
+   will recognise, and optionally drop a map pin: that pin anchors the geofence if you
+   enable it later. Then add an access point under **Access points → New** — main gate,
+   pedestrian gate, parking barrier; each gets its own controller.
 4. **Pair a controller.** Portal → **Devices → Pair new** creates a claim token; the
    controller redeems it and pins the gateway's signing key. Full walkthrough in
    [Controllers](controllers.md).
-5. **Invite yourself as a member** under **Members**, then send your first `open` to
-   the flagship number shown in the portal. The reply tells you what happened, in plain
+5. **Link a channel.** Slack first is the pragmatic order: an app manifest and a signing
+   secret, minutes not days ([Chat channels](channels.md)). WhatsApp when your WABA is
+   ready ([Linking WhatsApp](linking-whatsapp.md)).
+6. **Invite yourself as a member** under **Members**, then send your first `open` to
+   your gateway's number or Slack app. The reply tells you what happened, in plain
    language.
 
 ## Members and roles
@@ -58,6 +69,7 @@ the reply is a numbered picker — they answer `1`, `2` or `3`.
 
 ## Next
 
-- [Linking WhatsApp](linking-whatsapp.md) — how numbers, identities and the flagship
-  number fit together (and what changes when you self-host).
+- [Run a gateway](self-host.md) — install options, reachability, backup and restore.
+- [Chat channels](channels.md) — Slack in minutes, the channel seam, Discord roadmap.
+- [Linking WhatsApp](linking-whatsapp.md) — bringing your own number and WABA.
 - [Controllers](controllers.md) — wiring and pairing.

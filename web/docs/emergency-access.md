@@ -49,8 +49,8 @@ portal; existing grants for it die at their expiry, new ones are never issued.
 ## Setting it up
 
 1. Install the whatsacc app and sign in to your gateway. On first run the app asks
-   *which gateway* — the flagship is pre-filled; self-hosters enter their own URL.
-   That question is the decentralization, made visible.
+   *which gateway* — you enter your gateway's URL. That question is the
+   decentralization, made visible.
 2. Grants refresh silently from then on. You can see your current grant's expiry under
    **App → Emergency access**.
 3. Near the gate with no internet, open the app — the emergency screen appears

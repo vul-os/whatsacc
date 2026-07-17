@@ -1,8 +1,8 @@
 # Security
 
 A gate is the smallest serious piece of infrastructure in your day. This chapter is how
-whatsacc earns the right to open one — and it applies equally to the flagship and to
-any self-hosted gateway, because they are the same binary.
+whatsacc earns the right to open one — and it applies to every gateway alike, because
+there is only one binary.
 
 ## The layers
 
@@ -30,7 +30,7 @@ once — at pairing — and pins it. The consequences are pleasant:
   leaves the device. Losing one device never compromises another.
 
 Because the controller dials out and verifies content, not network position, whatsacc
-doesn't need to trust the path — including our own relay infrastructure.
+doesn't need to trust the path — including any tunnel you put in front.
 
 ## Geofence safety
 
@@ -69,7 +69,7 @@ the grant TTL; see [Emergency access](emergency-access.md) for the full trade-of
 
 - whatsacc is not end-to-end encrypted messaging — chat channels are WhatsApp's and
   Slack's infrastructure, and the gateway must read messages to act on them.
-- A self-hosted gateway is as secure as the machine it runs on. Back up your data
+- Your gateway is as secure as the machine it runs on. Back up your data
   directory; protect your `.env`.
 - The audit log is append-only at the application layer; if an attacker owns the host,
   they own the SQLite file too.

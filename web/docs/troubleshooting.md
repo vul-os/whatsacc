@@ -5,11 +5,12 @@ The short list of things that actually go wrong, and what to do about each.
 ## Chat
 
 **I text `open` and get no reply at all.**
-The gateway never got the message. On the flagship, check you're texting the number
-shown in the portal. Self-hosted: the channel webhook isn't reaching your gateway —
-verify your public URL is up (`curl https://your-gate.example/healthz`), and re-check
-the webhook URL in the Meta/Slack console. Tunnel users: is the tunnel actually
-connected?
+The gateway never got the message. First check you're texting the number (or Slack app)
+shown in the portal under **Settings → Channels**. Then check the channel is actually
+reaching your gateway — verify your public URL is up
+(`curl https://your-gate.example/healthz`), and re-check the webhook URL in the
+Meta/Slack console. Tunnel users: is the tunnel actually connected? Slack Socket Mode
+users: does the gateway log show the socket connected?
 
 **I get "I don't recognise this number/account".**
 Your chat identity isn't a member anywhere on this gateway. An admin adds you under
@@ -27,7 +28,7 @@ An admin set a per-member open quota on your membership (an access rule, like ti
 windows). The web portal keeps working (it is never quota-limited), or ask an admin to
 raise the quota under **Members**.
 
-## Webhooks (self-host)
+## Webhooks
 
 **Meta webhook verification never completes.**
 Meta must reach your URL over valid HTTPS. Check the verify token matches your `.env`,
@@ -68,7 +69,7 @@ app is signed into.
 Grants are short-lived on purpose. Open the app anywhere with connectivity and it
 refreshes silently; then the offline path works again.
 
-## Gateway (self-host)
+## Gateway
 
 **It won't start after an upgrade.**
 Read the first log lines — schema migrations run at boot and say what they did.
@@ -79,5 +80,5 @@ instead.
 The backup didn't include the key material next to `whatsacc.db`. Restore the full
 data directory, or re-pair each controller.
 
-Still stuck? [GitHub issues](https://github.com/vul-os/whatsacc) for self-host,
-hello@whatsacc.com for the flagship.
+Still stuck? Open a [GitHub issue](https://github.com/vul-os/whatsacc) — or mail
+hello@whatsacc.com.

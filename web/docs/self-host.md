@@ -4,11 +4,11 @@ The gateway is the entire server side of whatsacc: channels, rules, portal, API,
 hub and audit log — one Go binary with one SQLite file. This chapter takes you from
 nothing to a reachable gateway with a channel attached.
 
-Everything here is MIT-licensed and free. A self-hosted gateway is not a demo: it is the
-same binary the flagship runs, with every feature and no caps — and no billing code in
-the binary, so there is nothing to configure and nothing to pay us. Your costs are your
-own: a VPS or a Pi, and Meta's per-conversation fees if you bring your own WhatsApp
-number (Meta bills you directly).
+Everything here is MIT-licensed and free. Your gateway is not a demo of anything: it is
+the whole system, every feature, no caps — and no billing code in the binary, so there
+is nothing to configure and nothing to pay us. Your costs are your own: a VPS or a Pi,
+and Meta's per-conversation fees if you run a WhatsApp channel on your own number
+(Meta bills you directly).
 
 ## Install
 
@@ -60,17 +60,19 @@ ones:
 The gateway binds a listener, full stop — it is transport-agnostic, and tunnels compose
 at the HTTP layer. Pick whichever of these fits your life:
 
-- **A public VPS or IP** — nothing else needed. Terminate TLS in the gateway (it can
-  manage its own certificates) or behind your own reverse proxy.
-- **vulos-relay** — one config line attaches the gateway to a relay tunnel; the relay
-  carries traffic without terminating your TLS where SNI passthrough is available.
-- **cloudflared, frp, or your own tunnel** — anything that forwards HTTPS to a local
-  port works. whatsacc has no structural dependency on any one provider.
+- **A public VPS or IP** — nothing else needed. Terminate TLS in the gateway (it
+  manages its own certificates via built-in ACME) or behind your own reverse proxy.
+- **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, or your own:
+  anything that forwards HTTPS to a local port works, run beside the binary. whatsacc
+  has no structural dependency on any provider.
+- **No public URL at all** — a gateway on the estate LAN is a complete installation.
+  Slack **Socket Mode** dials out to Slack (no request URL needed), Discord's bot
+  gateway will dial out the same way when it lands, and controllers always dial out.
+  You only need a URL for two things: **WhatsApp webhooks** (Meta must reach you) and
+  **portal/app access from outside the property**.
 
-Two things need to reach the gateway from outside: **channel webhooks** (Meta, Slack)
-and **your residents' portal/app sessions**. Controllers also connect here — but
-they dial out from the gate side, so they work behind NAT and CGNAT'd 4G SIMs with zero
-inbound ports at the gate.
+Controllers connect to the gateway too — but they dial out from the gate side, so they
+work behind NAT and CGNAT'd 4G SIMs with zero inbound ports at the gate.
 
 ## Attach a channel
 
@@ -94,9 +96,11 @@ design — that pinning is your defence against impersonation) and must be re-pa
 The gateway migrates its SQLite schema forward automatically on boot, from a clean
 folded baseline. Downgrades are not supported; take a backup before major upgrades.
 
-## Moving to or from the flagship
+## Moving between gateways
 
-Nothing about the flagship is special except that we run it well. Leaving it means:
-stand up your own gateway, export your data from the portal, import it, re-pair your
-controllers against your gateway's key. The wire contracts (pairing, commands, grants)
-are versioned precisely so deployed hardware survives this.
+Moving your installation to a different gateway — new operator, new region, a fresh
+start — means: stand up the new gateway, export your data from the old portal, import
+it, re-pair your controllers against the new gateway's key. The wire contracts
+(pairing, commands, grants) are versioned precisely so deployed hardware survives this.
+(Moving the *same* gateway to new hardware is even easier — see backup and restore
+above.)

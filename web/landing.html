@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>whatsacc — texts that open gates</title>
-<meta name="description" content="whatsacc is a decentralized access network: one MIT-licensed gateway binary that turns a WhatsApp, Discord or Slack message into a signed command at your gate. Self-host it, or use the flagship we run.">
+<meta name="description" content="whatsacc is a decentralized access network: one MIT-licensed gateway binary that turns a WhatsApp, Discord or Slack message into a signed command at your gate. Run it yourself — the whole system is the product.">
 <meta name="author" content="whatsacc">
 <meta name="application-name" content="whatsacc">
 <meta name="color-scheme" content="light dark">
@@ -429,7 +429,7 @@ p{margin:0}
         <a href="#free">Free</a>
         <a href="docs/">Docs</a>
         <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
-        <a class="nav-cta" href="https://whatsacc.com/portal">Get started</a>
+        <a class="nav-cta" href="docs/#/self-host">Run a gateway</a>
       </nav>
       <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
         <svg class="ic-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
@@ -452,7 +452,7 @@ p{margin:0}
       <a href="#free">Free</a>
       <a href="docs/">Docs</a>
       <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
-      <a href="https://whatsacc.com/portal">Get started</a>
+      <a href="docs/#/self-host">Run a gateway</a>
     </nav>
   </div>
 </header>
@@ -492,11 +492,11 @@ p{margin:0}
           turns a WhatsApp, Slack or Discord message into a signed command at your gate.
         </p>
         <p class="hero-sub">
-          Run the gateway yourself — your number, your rules, your SQLite file — or
-          use the flagship we host. Same binary, nothing held back.
+          You run it — your number, your rules, your SQLite file. There is no hosted
+          service and nothing to sign up for: the whole system is the product.
         </p>
         <div class="cta-row">
-          <a class="btn btn-ink" href="https://whatsacc.com/portal">Get started</a>
+          <a class="btn btn-ink" href="docs/#/self-host">Run a gateway</a>
           <a class="btn btn-outline" href="docs/">Read the docs</a>
           <a class="btn btn-ghost" href="https://github.com/vul-os/whatsacc" rel="noopener">
             View on GitHub
@@ -518,7 +518,7 @@ p{margin:0}
               <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
               <span class="addr">
                 <svg class="lock" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="1" y="4.5" width="7" height="5.5" rx="1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5"/></svg>
-                <span>gate.whatsacc.com — portal</span>
+                <span>gate.silveroaks.example — portal</span>
               </span>
             </div>
             <div class="shot">
@@ -774,21 +774,30 @@ p{margin:0}
         <h2 class="display-tight">No cloud center.<br><em>Anyone can run one.</em></h2>
         <p class="lede">
           whatsacc is a network of independent gateways — Go, one binary, one SQLite file.
-          We run the flagship at whatsacc.com; you can run yours on a Pi behind your couch.
-          Same code, all of it MIT. The only private thing about our gateway is its <code style="font-family:var(--font-mono);font-size:.9em">.env</code>.
+          There is no hosted service: every gateway is somebody's own, on a VPS, a Pi
+          behind the couch, or a box in the gatehouse. All of it MIT; the only private
+          thing about any gateway is its <code style="font-family:var(--font-mono);font-size:.9em">.env</code>.
         </p>
         <ul class="selfhost-points">
           <li>
             <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-4-.9L3 20l1.2-5.2a8 8 0 0 1-.7-3.3A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3Z"/></svg></span>
             <div><b>Bring your own channel</b>
             <span>Slack takes minutes — an app manifest and a signing secret (Discord lands next). WhatsApp needs a verified
-            Meta business number (a WABA); that friction is exactly what the hosted flagship absorbs for you.</span></div>
+            Meta business number (a WABA); Meta bills you directly for conversations on your own number.</span></div>
           </li>
           <li>
             <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span>
             <div><b>Reachable your way</b>
-            <span>A public VPS needs nothing. Behind NAT, attach a tunnel — vulos-relay is one config line,
-            cloudflared and frp work too. Controllers always dial out, so they never need a port.</span></div>
+            <span>A public IP or VPS needs nothing — the gateway manages its own certificates (ACME).
+            Behind NAT, run any tunnel you already trust beside the binary — cloudflared, frp,
+            Tailscale Funnel. Controllers always dial out, so they never need a port.</span></div>
+          </li>
+          <li>
+            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13.5V3.5M8.5 7 12 3.5 15.5 7"/><path d="M5 12v6a2.5 2.5 0 0 0 2.5 2.5h9A2.5 2.5 0 0 0 19 18v-6"/></svg></span>
+            <div><b>No public URL? Still a full install</b>
+            <span>Slack Socket Mode (and Discord's bot gateway, when it lands) dial out — and so do
+            controllers. A Pi on the estate LAN with no public URL is a complete installation;
+            only WhatsApp webhooks and remote portal/app access need a URL.</span></div>
           </li>
           <li>
             <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg></span>
@@ -812,8 +821,8 @@ docker run -d --name whatsacc \
 <span class="c"># point a channel at it (slack: minutes)</span>
 whatsacc channel add slack --manifest slack.yml
 
-<span class="c"># behind NAT? one line of tunnel config</span>
-whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span>
+<span class="c"># behind NAT? bring any tunnel you already trust</span>
+cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale funnel…</span>
 
 <span class="g">✓ gateway up</span> — portal at <span class="o">https://your-gate.example</span>
 <span class="g">✓ audit log</span>  /data/whatsacc.db</code></pre>
@@ -966,8 +975,8 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
         <h2 class="display-tight">Free.<br><em>All of it.</em></h2>
       </div>
       <p class="lede">
-        whatsacc has no billing system. No tiers, no wallet, no card — not on the
-        flagship, not in the binary. The code is MIT; the moat is running it well.
+        whatsacc has no billing system. No tiers, no wallet, no card — no code path
+        anywhere that collects money. The code is MIT; the whole system is the product.
       </p>
     </div>
 
@@ -986,27 +995,27 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
         edition and no billing module; there's nothing to unlock.</p>
       </div>
       <div class="feat reveal">
-        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-4-.9L3 20l1.2-5.2a8 8 0 0 1-.7-3.3A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3Z"/></svg></span>
-        <h3>The hosted flagship</h3>
-        <p>Your gate on whatsacc.com, residents texting our WhatsApp number. We carry the
-        Meta onboarding and the hosting — you never see a checkout.</p>
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span>
+        <h3>The gateway</h3>
+        <p>Yours. A VPS, a Pi, a box in the gatehouse — every whatsacc gateway is
+        somebody's own. There is no hosted service and nothing to sign up for.</p>
       </div>
       <div class="feat reveal">
-        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span>
-        <h3>Self-hosting</h3>
-        <p>The same binary, forever. Bring your own Slack app or Meta number — Meta bills
-        you directly for your own WhatsApp conversations; we bill you nothing.</p>
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 10.5v3M17.5 10.5v3"/></svg></span>
+        <h3>The money</h3>
+        <p>Out of scope. Want to charge your residents? Do it however you like, outside
+        the system — nothing in whatsacc meters, invoices or bills anyone.</p>
       </div>
     </div>
 
     <p class="free-note">
       No asterisks: there is no billing code in the gateway — nothing to configure,
       nothing to pay us. Your only costs are the ones you'd have anyway: your hardware,
-      and Meta's per-conversation fees if you bring your own number.
+      and Meta's per-conversation fees on your own WhatsApp number (Slack costs nothing).
     </p>
     <div class="cta-row" style="justify-content:center;margin-top:26px">
-      <a class="btn btn-ink" href="https://whatsacc.com/portal">Start free</a>
-      <a class="btn btn-outline" href="docs/#/self-host">Run your own</a>
+      <a class="btn btn-ink" href="docs/#/self-host">Run a gateway</a>
+      <a class="btn btn-outline" href="docs/">Read the docs</a>
     </div>
   </div>
 </section>
@@ -1036,19 +1045,20 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
         their local button and fail-safe wiring — whatsacc is in parallel, never in the way.</p>
       </details>
       <details>
-        <summary>Why is WhatsApp harder to self-host than Slack?<span class="plus">+</span></summary>
+        <summary>Why is WhatsApp harder to set up than Slack?<span class="plus">+</span></summary>
         <p class="a">WhatsApp requires a verified Meta business account and phone number (a WABA)
         before you can receive webhooks. Slack needs an app manifest and a signing secret — minutes
-        (Discord, when it lands, will be a bot token). That asymmetry is exactly why the hosted
-        flagship exists: it absorbs the WABA friction for you, free. Self-hosters deal with Meta
-        directly and pay Meta — not us — for their own conversations.</p>
+        (Discord, when it lands, will be a bot token). You deal with Meta directly and pay Meta —
+        not us — for conversations on your own number. Many installations run Slack-first, and add
+        WhatsApp once the WABA clears.</p>
       </details>
       <details>
         <summary>Really free? What's the catch?<span class="plus">+</span></summary>
-        <p class="a">There isn't one. whatsacc has no billing system — nothing in the binary or the
-        flagship collects money from anyone. The code is MIT and the hosted flagship is free. If you
-        self-host with your own WhatsApp number, Meta bills you directly for your own conversations —
-        that's between you and Meta, and Slack costs nothing at all.</p>
+        <p class="a">There isn't one. whatsacc has no billing system — nothing in the binary
+        collects money from anyone, and there is no paid edition to upsell you to. The code is MIT.
+        If you run your own WhatsApp number, Meta bills you directly for your own conversations —
+        that's between you and Meta, and Slack costs nothing at all. If you want to charge your
+        residents, that's your business, outside the system.</p>
       </details>
       <details>
         <summary>What hardware does it work with?<span class="plus">+</span></summary>
@@ -1064,10 +1074,12 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
         log. Every open earns its way through. Details in the security chapter of the docs.</p>
       </details>
       <details>
-        <summary>Can I leave the flagship later?<span class="plus">+</span></summary>
-        <p class="a">Yes, and structurally so: the self-hosted gateway is the same binary. Export
-        your data, stand up your own gateway, re-pair your controllers. Nothing about the flagship
-        is special except that we run it well.</p>
+        <summary>Do I need a public URL or a domain?<span class="plus">+</span></summary>
+        <p class="a">Not necessarily. Slack Socket Mode (and Discord's bot gateway, when it lands)
+        dial out from the gateway, and controllers dial out too — so a Pi on the estate LAN with no
+        public URL is a complete installation. You only need a URL for WhatsApp webhooks and for
+        reaching the portal or app from outside the property; then it's a public IP with the
+        gateway's built-in ACME, or any tunnel you already trust running beside the binary.</p>
       </details>
     </div>
   </div>
@@ -1101,7 +1113,7 @@ whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span
             <li><a href="#how">How it works</a></li>
             <li><a href="#free">Free</a></li>
             <li><a href="docs/#/security">Security</a></li>
-            <li><a href="https://whatsacc.com/portal">Portal</a></li>
+            <li><a href="docs/#/getting-started">Getting started</a></li>
           </ul>
         </div>
         <div>

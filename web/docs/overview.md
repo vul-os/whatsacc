@@ -3,10 +3,12 @@
 **Texts that open gates.** whatsacc is a decentralized access-control system: a chat
 message — WhatsApp or Slack today, Discord soon — opens a physical gate, door or barrier.
 
-There is no cloud center. whatsacc is a network of independent **gateways**. Anyone can
-run one; whatsacc runs the flagship at whatsacc.com. Every line of code is MIT-licensed,
-and everything is free — there is no billing system anywhere in whatsacc. The only
-private thing about the hosted gateway is its `.env`.
+There is no cloud center — and no hosted service. whatsacc is a network of independent
+**gateways**; anyone can run one, and every gateway is somebody's own. whatsacc.com is
+the project site — this landing, these docs, the downloads — not a service: there is
+nothing to sign up for. Every line of code is MIT-licensed, and everything is free —
+there is no billing system anywhere in whatsacc. The only private thing about any
+gateway is its `.env`.
 
 ## The pieces
 
@@ -26,16 +28,20 @@ private thing about the hosted gateway is its `.env`.
    over LAN or Bluetooth. See [Emergency access](emergency-access.md).
 3. **The web portal — the fallback.** Unlimited opens through the gateway's own dashboard.
 
-## Hosted or self-hosted?
+## Running it
 
-Both run the **same binary**.
+There is one way to run whatsacc: yourself. That is the product — the whole system,
+nothing held back.
 
-- **The flagship** (whatsacc.com): residents text *our* WhatsApp number; we carry the
-  Meta business verification, hosting and uptime. Free — no card, no plans. Start with
-  [Getting started](getting-started.md).
-- **Your own gateway**: bring your own channel credentials and a public URL — a VPS, a
-  vulos-relay tunnel, or cloudflared. Also free; Meta bills you directly for your own
-  WhatsApp conversations. Start with [Run a gateway](self-host.md).
+- **Run a gateway** on a VPS, a Pi, or a box in the gatehouse — one binary, one SQLite
+  file. Start with [Getting started](getting-started.md) or the full
+  [Run a gateway](self-host.md) chapter.
+- **Bring your own channel credentials.** Slack takes minutes; WhatsApp needs your own
+  verified Meta business number (a WABA), and Meta bills you directly for your own
+  conversations. See [Chat channels](channels.md).
+- **Reachability is your choice**: a public IP with the gateway's built-in ACME, any
+  tunnel you already trust running beside the binary, or no public URL at all — Slack
+  Socket Mode and the controllers all dial out, so a LAN-only gateway still works.
 
 ## Where to go next
 
