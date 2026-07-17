@@ -1,6 +1,55 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
+/* ── Self-hosted fonts ───────────────────────────────────────────────────────
+   Variable woff2s vendored in public/fonts (same files web/landing.html uses),
+   covering the families/axes previously pulled from Google Fonts — Fraunces
+   (opsz/wght/SOFT), Inter, JetBrains Mono — so the portal makes no request to
+   fonts.googleapis.com / fonts.gstatic.com. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("/fonts/fraunces-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-italic-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-italic-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-italic-var.woff2") format("woff2");
+}
+
 @theme {
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);

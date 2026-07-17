@@ -822,7 +822,12 @@ export type AdminLimitsResponse = {
   effective: AdminLimitValues;
 };
 
-export type AdminLimitsPatch = Partial<Record<AdminLimitField, number | null>>;
+// Setting opens_per_hour / account_opens_per_hour to 0 is an instance-wide
+// kill switch — the backend rejects it (400 kill_switch_confirmation_required)
+// unless confirm_kill_switch: true accompanies the patch.
+export type AdminLimitsPatch = Partial<Record<AdminLimitField, number | null>> & {
+  confirm_kill_switch?: boolean;
+};
 
 export type AdminAuditKind =
   | 'all'

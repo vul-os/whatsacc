@@ -3,11 +3,11 @@ import { Accordion } from '@/components/ui/Accordion';
 const items = [
   {
     q: 'Do residents need to install anything?',
-    a: 'No. Residents text the whatsacc number from WhatsApp like they would any contact. The only people who install something are the property owner or manager — and that\'s the controller hardware that talks to the gate.',
+    a: 'No. Residents text your gateway\'s number from WhatsApp like they would any contact. The only people who set something up are the property owner or manager — the gateway software, plus the controller wired to the gate.',
   },
   {
     q: 'What happens if WhatsApp is down or my phone has no signal?',
-    a: 'Most controllers can fall back to a local PIN keypad or a physical override. whatsacc isn\'t the only way in — it\'s the fastest, most pleasant way in. We also queue commands for up to 30 seconds across brief network blips.',
+    a: 'Most controllers can fall back to a local PIN keypad or a physical override. whatsacc isn\'t the only way in — it\'s the fastest, most pleasant way in. The gateway also queues commands for up to 30 seconds across brief network blips.',
   },
   {
     q: 'How does the geofence work?',
@@ -19,11 +19,11 @@ const items = [
   },
   {
     q: 'What hardware does it work with?',
-    a: 'Any gate or barrier with a dry-contact relay input — which is most of them. Our ACC controller plugs into the existing wiring next to your motor. We also have software-only integrations for Centurion, Came, BFT and Nice systems.',
+    a: 'Any gate or barrier with a dry-contact relay input — which is most of them. The ACC controller (in development) is designed for standard dry-contact gate motors and plugs into the existing wiring next to your motor; vendor-specific integrations for Centurion, Came, BFT and Nice are on the roadmap.',
   },
   {
     q: 'Is this secure enough for a complex with 200 residents?',
-    a: 'Phone-number identity, signed device commands, optional geofence, full audit log, time-of-day and per-member rules. We treat every open as a request that has to earn its way through. See the security page for specifics.',
+    a: 'Phone-number identity, signed device commands, optional geofence, full audit log, time-of-day and per-member rules. Every open is treated as a request that has to earn its way through. See the security page for specifics.',
   },
 ];
 

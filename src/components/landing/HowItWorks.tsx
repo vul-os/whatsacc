@@ -4,7 +4,7 @@ const steps = [
   {
     n: '01',
     title: 'Send the word',
-    body: 'A resident texts open (or any phrase you allow) to your whatsacc number from WhatsApp. No app to install, no fob to carry.',
+    body: 'A resident texts open (or any phrase you allow) to your gateway\'s number from WhatsApp. No app to install, no fob to carry.',
   },
   {
     n: '02',

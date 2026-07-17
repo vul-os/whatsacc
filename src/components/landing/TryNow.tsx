@@ -90,7 +90,7 @@ export function TryNow() {
                 open
               </span>{' '}
               on either channel below. The bot replies in under a second — so
-              you can feel the response time before you sign up.
+              you can feel the response time before you run your own.
             </p>
 
             <div className="mt-7 flex items-center gap-2.5 text-[12px] text-ink/55">
@@ -104,7 +104,7 @@ export function TryNow() {
                   style={{ backgroundColor: '#25D366' }}
                 />
               </span>
-              <span>Live — same backend you get when you sign up.</span>
+              <span>Live — a demo gateway we run: one instance of the same MIT code you self-host.</span>
             </div>
           </div>
 

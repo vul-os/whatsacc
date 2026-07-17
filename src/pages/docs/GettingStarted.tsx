@@ -13,17 +13,17 @@ export default function GettingStarted() {
       <DocSection heading="What you'll need">
         <ul className="list-disc pl-6 space-y-2">
           <li>A gate, door or barrier with a <strong>dry-contact relay input</strong> (almost every motorised gate built since 2005 has one).</li>
-          <li>A <strong>whatsacc ACC controller</strong>, or a supported third-party controller (Centurion, BFT, Came, Nice, ET Blue).</li>
+          <li>A <strong>controller</strong> that can pulse that relay from your gateway. The whatsacc ACC controller is <em>in development</em>, designed for standard dry-contact gate motors (Centurion, BFT, Came, Nice, ET Blue); vendor-specific integrations are on the roadmap.</li>
           <li>A <strong>WhatsApp number</strong> that you control (most setups use a fresh secondary line).</li>
           <li>About <strong>10 minutes of ladder time</strong> to wire the controller in parallel with your existing motor.</li>
-          <li>Wi-Fi or LTE coverage at the gate (LTE controllers ship with a Vodacom-roaming SIM by default in ZA).</li>
+          <li>Wi-Fi or LTE coverage at the gate.</li>
         </ul>
       </DocSection>
 
       <DocSection heading="The five steps">
         <ol className="list-decimal pl-6 space-y-3">
           <li><Link to="/signup" className="underline underline-offset-4 decoration-terracotta">Create an account</Link> on your gateway. Free — whatsacc has no plans and no billing.</li>
-          <li><Link to="/docs/linking-whatsapp" className="underline underline-offset-4 decoration-terracotta">Link your WhatsApp number</Link>. We&rsquo;ll walk you through verification.</li>
+          <li><Link to="/docs/linking-whatsapp" className="underline underline-offset-4 decoration-terracotta">Link your WhatsApp number</Link>. The dashboard walks you through verification.</li>
           <li><Link to="/docs/locations" className="underline underline-offset-4 decoration-terracotta">Create a Location</Link>. House, complex, building, or other.</li>
           <li><Link to="/docs/pairing-device" className="underline underline-offset-4 decoration-terracotta">Pair a Device</Link>. Scan the QR on the controller, name it, assign it to an access point.</li>
           <li>Send your first <code>open</code>. The reply tells you what happened, in plain language.</li>
@@ -50,28 +50,31 @@ whatsacc 14:09   🔒 Front gate closing — Sunset Apartments`}</CodeBlock>
 
       <DocSection heading="What happens behind a single 'open'">
         <p>
-          Every message that reaches whatsacc goes through the same five-step pipeline before
-          we send a relay pulse:
+          Every message that reaches your gateway goes through the same five-step pipeline
+          before it sends a relay pulse:
         </p>
         <ol className="list-decimal pl-6 space-y-2">
           <li><strong>Verify the sender</strong>. The WhatsApp number must match a member or invited guest.</li>
-          <li><strong>Resolve the location</strong>. We pick the right gate using your role and (if enabled) GPS.</li>
+          <li><strong>Resolve the location</strong>. The gateway picks the right gate using your role and (if enabled) GPS.</li>
           <li><strong>Check the schedule</strong>. Time-of-day window, day-of-week, expiring guest grants.</li>
           <li><strong>Pulse the relay</strong>. The controller fires for the configured contact time (250 ms default).</li>
           <li><strong>Audit + reply</strong>. Every event is logged and you get a one-line confirmation.</li>
         </ol>
         <p className="text-ink/55 text-[14px]">
-          Median open latency is <strong>1.8 seconds</strong>, end-to-end, in South Africa.
+          A typical open completes in <strong>about two seconds</strong> end-to-end — most of
+          that is the WhatsApp round-trip.
         </p>
       </DocSection>
 
       <DocSection heading="Quick CLI sanity check (optional)">
         <p>
-          If you have an API token (Settings → API tokens), you can fire an open without WhatsApp.
-          Useful for dashboards, integrations, and ops health checks:
+          If you have an API token (a Settings → API tokens screen is planned — see the{' '}
+          <Link to="/docs/api-reference" className="underline underline-offset-4 decoration-terracotta">API reference</Link>),
+          you can fire an open without WhatsApp. Useful for dashboards, integrations, and ops
+          health checks:
         </p>
         <CodeBlock lang="bash" title="curl">{`# replace ap_ABC123 with your access point id and wacc_live_… with your token
-curl -X POST https://api.whatsacc.com/v1/access-points/ap_ABC123/open \\
+curl -X POST https://<your-gateway>/v1/access-points/ap_ABC123/open \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{"actor":{"phone":"+27825550144"}}'`}</CodeBlock>

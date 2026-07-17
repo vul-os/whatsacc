@@ -28,7 +28,7 @@ export default function LinkingWhatsApp() {
       <DocSection heading="The link flow">
         <ol className="list-decimal pl-6 space-y-3">
           <li>In the dashboard, go to <strong>Settings → WhatsApp</strong> and click <em>Link a number</em>.</li>
-          <li>You&rsquo;ll receive a 6-digit code. Reply to our verification message with that code from the number you want to link. We never store your message contents.</li>
+          <li>You&rsquo;ll receive a 6-digit code. Reply to the gateway&rsquo;s verification message with that code from the number you want to link. The gateway never stores your message contents.</li>
           <li>Within a few seconds the dashboard flips to <em>Linked</em>. The number is now your control channel.</li>
         </ol>
         <p>
@@ -48,7 +48,7 @@ export default function LinkingWhatsApp() {
   "verified_at": "2026-05-14T09:21:04Z"
 }`}</CodeBlock>
         <p>
-          We don&rsquo;t store messages, conversation history, contacts, or media. Inbound messages
+          The gateway doesn&rsquo;t store messages, conversation history, contacts, or media. Inbound messages
           flow through a stateless pipeline that classifies the intent, fires the relay, and writes
           one event row.
         </p>
@@ -74,7 +74,7 @@ export default function LinkingWhatsApp() {
           You can confirm a number is linked + verified via the API at any time:
         </p>
         <CodeBlock lang="bash">{`curl -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
-  https://api.whatsacc.com/v1/phones/me`}</CodeBlock>
+  https://<your-gateway>/v1/phones/me`}</CodeBlock>
         <CodeBlock lang="json">{`{
   "phones": [
     {

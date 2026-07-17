@@ -13,7 +13,16 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
-import { ErrorNote, LoadingRow, Td, Th, adminErrorMessage, useAdminLoad, useAdminToast } from './shared';
+import {
+  ConfirmModal,
+  ErrorNote,
+  LoadingRow,
+  Td,
+  Th,
+  adminErrorMessage,
+  useAdminLoad,
+  useAdminToast,
+} from './shared';
 
 const KNOBS: Array<{
   field: AdminLimitField;
@@ -53,6 +62,12 @@ const KNOBS: Array<{
   },
 ];
 
+// Fields where a 0 is an instance-wide kill switch. The backend refuses to set
+// these to 0 unless the patch carries confirm_kill_switch: true — we surface
+// that as an explicit ConfirmModal before sending.
+const KILL_SWITCH_FIELDS = ['opens_per_hour', 'account_opens_per_hour'] as const satisfies
+  readonly AdminLimitField[];
+
 export default function AdminLimits() {
   const toast = useAdminToast();
   const { data, setData, error, loading } = useAdminLoad(() => api.adminLimits(), []);
@@ -65,6 +80,7 @@ export default function AdminLimits() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmingKill, setConfirmingKill] = useState(false);
 
   useEffect(() => {
     if (data) setDraft(overridesToDraft(data));
@@ -77,13 +93,26 @@ export default function AdminLimits() {
   const patch = buildPatch(data, draft);
   const dirty = Object.keys(patch).length > 0;
   const invalid = KNOBS.some((k) => !isValidDraft(draft[k.field]));
+  // Kill-switch knobs this save would set to 0 (only fields present in the
+  // patch count — an untouched existing 0 isn't re-sent).
+  const killFields = KILL_SWITCH_FIELDS.filter((f) => patch[f] === 0);
+  const killNames = killFields.map(
+    (f) => KNOBS.find((k) => k.field === f)?.name ?? f,
+  );
 
-  async function save() {
+  async function save(confirmedKillSwitch = false) {
+    if (killFields.length > 0 && !confirmedKillSwitch) {
+      setConfirmingKill(true);
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
-      const next = await api.adminLimitsUpdate(patch);
+      const body: AdminLimitsPatch =
+        killFields.length > 0 ? { ...patch, confirm_kill_switch: true } : patch;
+      const next = await api.adminLimitsUpdate(body);
       setData(next);
+      setConfirmingKill(false);
       toast('Limits saved — effective immediately on every open path.');
     } catch (err) {
       setSaveError(adminErrorMessage(err));
@@ -197,12 +226,44 @@ export default function AdminLimits() {
             >
               Reset
             </button>
-            <Button variant="ink" size="sm" disabled={!dirty || invalid || saving} onClick={save}>
+            <Button
+              variant="ink"
+              size="sm"
+              disabled={!dirty || invalid || saving}
+              onClick={() => save()}
+            >
               {saving ? 'Saving…' : 'Save overrides'}
             </Button>
           </div>
         </div>
       </Card>
+
+      {confirmingKill && (
+        <ConfirmModal
+          title="Confirm kill switch"
+          body={
+            <>
+              <p>
+                Setting{' '}
+                <strong>{killNames.join(' and ')}</strong> to{' '}
+                <span className="font-mono">0</span> blocks{' '}
+                <strong>ALL opens instance-wide</strong> — every member, every gate — until you
+                raise the limit again.
+              </p>
+              <p className="mt-2">Confirm to flip the kill switch.</p>
+            </>
+          }
+          confirmLabel="Set to 0 — block all opens"
+          danger
+          busy={saving}
+          error={saveError}
+          onConfirm={() => void save(true)}
+          onClose={() => {
+            setConfirmingKill(false);
+            setSaveError(null);
+          }}
+        />
+      )}
     </div>
   );
 }

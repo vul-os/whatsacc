@@ -2,15 +2,16 @@ import { LinkButton } from '@/components/ui/Button';
 import { HeroGateDayNight } from '@/components/illustrations/HeroGateDayNight';
 import { HeroGateDayNightMobile } from '@/components/illustrations/HeroGateDayNightMobile';
 
-// Hardware brands that the controllers integrate with — used as a quiet
-// trust band below the fold. Stays restrained: small caps, ink/45 colour,
-// no logo files (just wordmarks) so the page feels owned-and-considered
-// rather than like a partnerships salad.
+// Gate-motor brands whose standard dry-contact inputs whatsacc is designed
+// around — used as a quiet trust band below the fold. Stays restrained: small
+// caps, ink/45 colour, no logo files (just wordmarks) so the page feels
+// owned-and-considered rather than like a partnerships salad. These are
+// design targets (dry-contact compatibility), not shipped vendor integrations.
 const integrations = ['Centurion', 'BFT', 'Came', 'Nice', 'Et Blue'];
 
 const capabilities = [
   'WhatsApp-native',
-  'End-to-end encrypted',
+  'Ed25519-signed commands',
   'Geofence-aware',
   'Audit log per open',
 ];
@@ -139,12 +140,12 @@ export function Hero() {
         </div>
       </div>
 
-      {/* ── trust band: hardware integrations + 3 hard metrics ─────── */}
+      {/* ── trust band: hardware compatibility + 3 honest project stats ── */}
       <div className="border-y border-ink/10 bg-paper-warm/40">
         <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 grid grid-cols-12 gap-y-4 sm:gap-x-8 items-center">
           <div className="col-span-12 md:col-span-5">
             <span className="text-[10px] uppercase tracking-[0.22em] text-ink/55">
-              Talks to your hardware
+              Built for standard gate hardware
             </span>
             <ul className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 font-display text-sm sm:text-base text-ink/85">
               {integrations.map((brand, i) => (
@@ -161,9 +162,9 @@ export function Hero() {
           <span className="hidden md:block md:col-span-1 h-10 w-px bg-ink/15 mx-auto" aria-hidden />
 
           <dl className="col-span-12 md:col-span-6 grid grid-cols-3 gap-4 sm:gap-8">
-            <Stat label="Avg open" value="1.8 s" />
-            <Stat label="Locations live" value="412" />
-            <Stat label="Uptime" value="99.98%" />
+            <Stat label="Chat channels" value="3" />
+            <Stat label="Backend tests" value="100+" />
+            <Stat label="License" value="MIT" />
           </dl>
         </div>
       </div>

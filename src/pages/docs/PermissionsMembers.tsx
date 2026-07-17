@@ -51,7 +51,7 @@ export default function PermissionsMembers() {
       </DocSection>
 
       <DocSection heading="Programmatic invites">
-        <CodeBlock lang="bash">{`curl -X POST https://api.whatsacc.com/v1/locations/loc_oak/invites \\
+        <CodeBlock lang="bash">{`curl -X POST https://<your-gateway>/v1/locations/loc_oak/invites \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -73,9 +73,9 @@ export default function PermissionsMembers() {
           Open the member, hit <em>Revoke</em>. The next message they send to the gate is rejected
           with a polite "your access has ended" reply. The audit log keeps the record forever —
           revocation is not deletion. To purge a phone number entirely (e.g. GDPR-style request),
-          contact support.
+          contact your instance admin — the data lives on your gateway's own database.
         </p>
-        <CodeBlock lang="bash">{`curl -X DELETE https://api.whatsacc.com/v1/locations/loc_oak/members/+27821234567 \\
+        <CodeBlock lang="bash">{`curl -X DELETE https://<your-gateway>/v1/locations/loc_oak/members/+27821234567 \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx"`}</CodeBlock>
       </DocSection>
 

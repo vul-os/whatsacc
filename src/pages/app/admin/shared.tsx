@@ -51,6 +51,8 @@ const ADMIN_ERROR_COPY: Record<string, string> = {
   invalid_claim_token: "That token doesn't match the one configured on the server.",
   account_not_found: 'That account no longer exists.',
   user_not_found: 'That user no longer exists.',
+  kill_switch_confirmation_required:
+    'Setting this limit to 0 blocks ALL opens instance-wide — confirm the kill switch to proceed.',
 };
 
 export function adminErrorMessage(err: unknown): string {

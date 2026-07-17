@@ -83,7 +83,7 @@ whatsacc 14:09   Sorry, you're 1.8 km from Sunset Apartments.
           Every geofence verdict is logged whether the open succeeded or not. Use it to spot
           residents who are constantly at the radius edge and might benefit from a wider window:
         </p>
-        <CodeBlock lang="bash">{`curl -G https://api.whatsacc.com/v1/events \\
+        <CodeBlock lang="bash">{`curl -G https://<your-gateway>/v1/events \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   --data-urlencode "location=loc_oak" \\
   --data-urlencode "kind=open.geofence_check" \\

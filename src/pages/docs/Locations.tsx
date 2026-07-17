@@ -45,7 +45,7 @@ export default function LocationsDoc() {
       </DocSection>
 
       <DocSection heading="Or via the API">
-        <CodeBlock lang="bash">{`curl -X POST https://api.whatsacc.com/v1/locations \\
+        <CodeBlock lang="bash">{`curl -X POST https://<your-gateway>/v1/locations \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{

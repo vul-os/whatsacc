@@ -10,15 +10,20 @@ export default function ApiReference() {
       />
 
       <DocSection heading="Base URL">
-        <CodeBlock lang="plain">{`Production    https://api.whatsacc.com/v1
-Dev sandbox   https://api-dev.whatsacc.com/v1`}</CodeBlock>
+        <p>
+          whatsacc is self-hosted, so the base URL is wherever <em>you</em> deployed the
+          gateway. Every example below uses a placeholder — substitute your own host.
+        </p>
+        <CodeBlock lang="plain">{`Your gateway   https://<your-gateway>/v1
+Local dev      http://localhost:8787/v1  (or wherever you run the backend)`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Authentication">
         <p>
-          Issue tokens from the dashboard under <strong>Settings → API tokens</strong>. Tokens
-          are scoped to specific locations and roles. Carry them in the <code>Authorization</code>
-          header on every request.
+          Tokens are scoped to specific locations and roles. Carry them in the{' '}
+          <code>Authorization</code> header on every request. A{' '}
+          <strong>Settings → API tokens</strong> screen in the dashboard is <em>planned</em> —
+          until it lands, tokens are provisioned on the gateway itself.
         </p>
         <CodeBlock lang="http" title="every request">{`Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx
 Accept: application/json`}</CodeBlock>
@@ -47,12 +52,12 @@ Accept: application/json`}</CodeBlock>
 404  not_found                  lookup miss for an event / resource id
 400  validation_error           shape doesn't match the schema (issues[] included)
 429  rate_limited               cool down + retry; never affects opens
-500  internal_error             page us; the request id is in X-Request-Id`}</CodeBlock>
+500  internal_error             check your gateway logs; the request id is in X-Request-Id`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Open an access point">
         <p>The bread-and-butter endpoint. Same code path as a WhatsApp <em>open</em>.</p>
-        <CodeBlock lang="bash" title="curl">{`curl -X POST https://api.whatsacc.com/v1/access-points/ap_ABC123/open \\
+        <CodeBlock lang="bash" title="curl">{`curl -X POST https://<your-gateway>/v1/access-points/ap_ABC123/open \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -60,7 +65,7 @@ Accept: application/json`}</CodeBlock>
     "location_signal": { "lat": -33.918, "lng": 18.423 }
   }'`}</CodeBlock>
         <CodeBlock lang="ts" title="TypeScript (fetch)">{`const r = await fetch(
-  'https://api.whatsacc.com/v1/access-points/ap_ABC123/open',
+  'https://<your-gateway>/v1/access-points/ap_ABC123/open',
   {
     method: 'POST',
     headers: {
@@ -77,7 +82,7 @@ const event = await r.json();`}</CodeBlock>
         <CodeBlock lang="python" title="Python (requests)">{`import os, requests
 
 r = requests.post(
-    "https://api.whatsacc.com/v1/access-points/ap_ABC123/open",
+    "https://<your-gateway>/v1/access-points/ap_ABC123/open",
     headers={"Authorization": f"Bearer {os.environ['WACC_TOKEN']}"},
     json={
         "actor": {"phone": "+27825550144"},
@@ -103,7 +108,7 @@ func openGate() (*http.Response, error) {
     })
     req, _ := http.NewRequest(
         "POST",
-        "https://api.whatsacc.com/v1/access-points/ap_ABC123/open",
+        "https://<your-gateway>/v1/access-points/ap_ABC123/open",
         bytes.NewReader(body),
     )
     req.Header.Set("Authorization", "Bearer "+os.Getenv("WACC_TOKEN"))
@@ -127,7 +132,7 @@ func openGate() (*http.Response, error) {
           Read-only feed of everything that has happened on a location, paginated. Filterable by
           <code> kind</code>, <code>actor</code>, <code>since</code>, <code>until</code>.
         </p>
-        <CodeBlock lang="bash">{`curl -G https://api.whatsacc.com/v1/events \\
+        <CodeBlock lang="bash">{`curl -G https://<your-gateway>/v1/events \\
   -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
   --data-urlencode "location=loc_oak" \\
   --data-urlencode "since=2026-05-01" \\
@@ -183,7 +188,7 @@ def verify_wacc_webhook(raw_body: bytes, signature: str, secret: str) -> bool:
 
       <DocSection heading="Rate limits">
         <p>
-          1,000 requests / minute per token, soft. We never deny an open because of rate limits —
+          1,000 requests / minute per token, soft. The gateway never denies an open because of rate limits —
           those are routed through a separate fast path with its own budget. The HTTP API will
           return <code>429</code> with a <code>Retry-After</code> header for everything else.
         </p>
@@ -199,13 +204,13 @@ Content-Type: application/json
 
       <DocSection heading="SDK (preview)">
         <p>
-          A first-party TypeScript SDK is in beta. Until it lands in npm, the recommended path is
+          A first-party TypeScript SDK is planned. Until it lands in npm, the recommended path is
           a small wrapper around <code>fetch</code>:
         </p>
         <CodeBlock lang="ts" title="lib/wacc.ts">{`export class Wacc {
   constructor(
     private token: string,
-    private base = 'https://api.whatsacc.com/v1',
+    private base = 'https://<your-gateway>/v1',
   ) {}
 
   async open(accessPointId: string, body: OpenBody): Promise<OpenEvent> {
