@@ -32,6 +32,12 @@ export interface Env {
   SLACK_BOT_TOKEN?: string;
   SLACK_SIGNING_SECRET?: string;
   SLACK_APP_ID?: string;
+  // Abuse-protection rate limits (see lib/rate-limit.ts for parsing +
+  // defaults: 10 / 30 / 10 / 500). Raw strings; non-negative integers.
+  RATE_OPEN_COOLDOWN_S?: string;
+  RATE_OPENS_PER_HOUR?: string;
+  RATE_CHAT_MSGS_PER_MIN?: string;
+  RATE_ACCOUNT_OPENS_PER_HOUR?: string;
   // Local-dev port (unused on Workers — we listen on platform-managed port)
   PORT?: number;
 }
@@ -66,6 +72,10 @@ function buildEnv(raw: RawEnv): Env {
     SLACK_BOT_TOKEN: raw['SLACK_BOT_TOKEN'],
     SLACK_SIGNING_SECRET: raw['SLACK_SIGNING_SECRET'],
     SLACK_APP_ID: raw['SLACK_APP_ID'],
+    RATE_OPEN_COOLDOWN_S: raw['RATE_OPEN_COOLDOWN_S'],
+    RATE_OPENS_PER_HOUR: raw['RATE_OPENS_PER_HOUR'],
+    RATE_CHAT_MSGS_PER_MIN: raw['RATE_CHAT_MSGS_PER_MIN'],
+    RATE_ACCOUNT_OPENS_PER_HOUR: raw['RATE_ACCOUNT_OPENS_PER_HOUR'],
     PORT: raw['PORT'] ? Number(raw['PORT']) : undefined,
   };
 }

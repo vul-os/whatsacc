@@ -4,7 +4,8 @@ import { zValidator } from '@hono/zod-validator';
 import { requireAuth, getUser, type AppEnv } from '../middleware/auth.ts';
 import { withUserDb } from '../middleware/rls.ts';
 import { withRLS } from '../lib/db.ts';
-import { BadRequest, Forbidden, NotFound } from '../lib/errors.ts';
+import { BadRequest, Forbidden, NotFound, TooManyRequests } from '../lib/errors.ts';
+import { guardedCheckOpenLimits } from '../lib/rate-limit.ts';
 import type { TxSql } from '../lib/db.ts';
 import { sendWhatsAppText, sendWhatsAppInteractive } from '../lib/whatsapp.ts';
 
@@ -72,6 +73,21 @@ const maintenanceSchema = z
   })
   .strict();
 
+export type LogAccessResult =
+  | { allowed: true }
+  | { allowed: false; reason: 'rate_limited' | 'quota_exceeded'; retry_after_s: number };
+
+/**
+ * The single choke point for gate commands. Every open path (portal, API,
+ * WhatsApp, Slack) funnels through here, so rate limits and quotas are
+ * enforced centrally and cannot be bypassed by picking a different channel.
+ *
+ * On denial the attempt is still audit-logged (success=false, error=reason)
+ * in the SAME transaction and the function returns a verdict instead of
+ * throwing — throwing would roll the caller's transaction back and lose the
+ * denial audit row. Callers translate the verdict per channel (429 +
+ * Retry-After for HTTP, honest chat replies for WhatsApp/Slack).
+ */
 export async function logAccess(
   tx: TxSql,
   args: {
@@ -81,8 +97,10 @@ export async function logAccess(
     source: string;
     lat?: number;
     long?: number;
+    /** Opener's phone (WhatsApp path) — rate-limit subject for visitors. */
+    phone_e164?: string;
   },
-): Promise<void> {
+): Promise<LogAccessResult> {
   const apRows = await tx<{
     location_id: string;
     account_id: string;
@@ -94,14 +112,42 @@ export async function logAccess(
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
 
+  // 'close' is never limited — closing a gate is the safe direction.
+  let degradedNote: string | null = null;
+  if (args.command === 'open') {
+    const decision = await guardedCheckOpenLimits(tx, {
+      userId: args.user_id,
+      phoneE164: args.phone_e164 ?? null,
+      accessPointId: args.access_point_id,
+      locationId: ap.location_id,
+      accountId: ap.account_id,
+    });
+    if (!decision.allowed) {
+      await tx`
+        insert into access_logs
+          (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
+        values
+          (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
+           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null},
+           false, ${decision.reason})
+      `;
+      return { allowed: false, reason: decision.reason, retry_after_s: decision.retryAfterS };
+    }
+    // Counter store failed: the open proceeds (physical access availability
+    // wins), but the audit row is tagged so the failure stays visible.
+    if (decision.degraded) degradedNote = 'rate_limit_check_failed';
+  }
+
   await tx`
     insert into access_logs
-      (access_point_id, location_id, account_id, user_id, command, source, lat, long, success)
+      (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
     values
       (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
-       ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, true)
+       ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null},
+       true, ${degradedNote})
   `;
   // TODO: enqueue device_command and dispatch via Durable Object.
+  return { allowed: true };
 }
 
 type AccessPointWithMeter = {
@@ -430,8 +476,10 @@ function accessRouter() {
     const user = getUser(c);
     const id = c.req.param('id');
     const body = c.req.valid('json');
-    await withUserDb(c, async (tx) => {
-      await logAccess(tx, {
+    // Throw the 429 OUTSIDE the transaction: logAccess writes the denial
+    // audit row inside the tx, and throwing in there would roll it back.
+    const verdict = await withUserDb(c, async (tx) => {
+      return await logAccess(tx, {
         user_id: user.sub,
         access_point_id: id,
         command: 'open',
@@ -440,6 +488,15 @@ function accessRouter() {
         long: body.long,
       });
     });
+    if (!verdict.allowed) {
+      throw TooManyRequests(
+        verdict.reason,
+        verdict.retry_after_s,
+        verdict.reason === 'quota_exceeded'
+          ? 'Daily open limit reached for this location — contact your admin.'
+          : 'Too many opens — slow down and retry shortly.',
+      );
+    }
     return c.json({ ok: true, command: 'open' });
   });
 
@@ -661,6 +718,25 @@ export const accessRoutes = accessRouter();
  * and access point. Returns the grant id on success, null when no usable grant
  * exists. Intended for the WhatsApp inbound flow.
  */
+/**
+ * Give back one grant use. Used when a consumed grant's open is then denied
+ * by a rate limit / quota — the visitor should not lose a use on a denied
+ * attempt. Runs in its own transaction like tryConsumeGrant.
+ */
+export async function refundGrantUse(grantId: string): Promise<void> {
+  await withRLS(
+    { user_id: '', account_id: null, is_platform_admin: true },
+    async (tx) => {
+      await tx`
+        update temporary_access_grants
+        set uses_count = greatest(uses_count - 1, 0),
+            updated_at = now()
+        where id = ${grantId}
+      `;
+    },
+  );
+}
+
 export async function tryConsumeGrant(
   phoneE164: string,
   accessPointId: string,

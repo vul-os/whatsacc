@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireAuth, type AppEnv } from '../middleware/auth.ts';
 import { withUserDb } from '../middleware/rls.ts';
 import { NotFound } from '../lib/errors.ts';
+import { DAY_S, fixedWindowStart } from '../lib/rate-limit.ts';
 
 function analyticsRouter() {
   const app = new Hono<AppEnv>();
@@ -9,6 +10,7 @@ function analyticsRouter() {
 
   app.get('/locations/:id/summary', async (c) => {
     const id = c.req.param('id');
+    const dayStart = fixedWindowStart(new Date(), DAY_S);
     const data = await withUserDb(c, async (tx) => {
       // Verify the caller can actually see this location before reporting
       // any analytics — otherwise non-members get a 200 with zeroed data,
@@ -22,7 +24,33 @@ function analyticsRouter() {
           count(*)::int as total
         from access_logs where location_id = ${id}
       `;
-      return rows[0] ?? { opens: 0, closes: 0, total: 0 };
+      // Usage vs (abuse-protection) quota so the UI can render "N of M
+      // opens used today". Same UTC day window the limiter counts in.
+      const today = await tx<
+        {
+          opens_today: number;
+          max_opens_per_member_per_day: number | null;
+          max_opens_per_location_per_day: number | null;
+        }[]
+      >`
+        select
+          (select count(*)::int from access_logs
+            where location_id = ${id} and command = 'open' and success = true
+              and ts >= ${dayStart}) as opens_today,
+          ls.max_opens_per_member_per_day,
+          ls.max_opens_per_location_per_day
+        from (select 1) as one
+        left join location_settings ls on ls.location_id = ${id}
+      `;
+      return {
+        ...(rows[0] ?? { opens: 0, closes: 0, total: 0 }),
+        today: {
+          day_start: dayStart.toISOString(),
+          opens: Number(today[0]?.opens_today ?? 0),
+          max_opens_per_member_per_day: today[0]?.max_opens_per_member_per_day ?? null,
+          max_opens_per_location_per_day: today[0]?.max_opens_per_location_per_day ?? null,
+        },
+      };
     });
     return c.json({ location_id: id, ...data });
   });

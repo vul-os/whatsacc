@@ -4,8 +4,9 @@ import { zValidator } from '@hono/zod-validator';
 import type { JSONValue } from '../lib/db.ts';
 import { requireAuth, getUser, type AppEnv } from '../middleware/auth.ts';
 import { withUserDb, withAnonDb } from '../middleware/rls.ts';
-import { NotFound } from '../lib/errors.ts';
+import { Forbidden, NotFound } from '../lib/errors.ts';
 import { bootstrapPersonalAccount, makeLocationSlug } from './auth.ts';
+import { DAY_S, fixedWindowStart } from '../lib/rate-limit.ts';
 
 const createLocationSchema = z
   .object({
@@ -34,6 +35,15 @@ const createTopLevelLocationSchema = z
     address: z.record(z.unknown()).optional(),
     lat: z.number().optional(),
     long: z.number().optional(),
+  })
+  .strict();
+
+// Abuse-protection quotas (NOT billing — whatsacc has none). NULL clears a
+// cap (= unlimited); omitted fields are left unchanged.
+const patchLimitsSchema = z
+  .object({
+    max_opens_per_member_per_day: z.number().int().min(1).max(100_000).nullable().optional(),
+    max_opens_per_location_per_day: z.number().int().min(1).max(1_000_000).nullable().optional(),
   })
   .strict();
 
@@ -120,6 +130,115 @@ function locationsRouter() {
       return c.json(result, 201);
     },
   );
+
+  // -------------------------------------------------------------------------
+  // Abuse-protection quotas ("limits") + usage. GET is member-visible so the
+  // portal can show "3 of 4 opens used"; PATCH is admin-only. Usage is
+  // computed from access_logs over the same UTC day window the enforcement
+  // counters use, so what the UI shows matches what the limiter counts.
+  // -------------------------------------------------------------------------
+
+  app.get('/:id/limits', async (c) => {
+    const id = c.req.param('id');
+    const user = getUser(c);
+    const dayStart = fixedWindowStart(new Date(), DAY_S);
+    const data = await withUserDb(c, async (tx) => {
+      const loc = await tx<{ id: string; account_id: string }[]>`
+        select id, account_id from locations where id = ${id}
+      `;
+      if (!loc[0]) throw NotFound('location_not_found');
+
+      const settings = await tx<
+        { max_opens_per_member_per_day: number | null; max_opens_per_location_per_day: number | null }[]
+      >`
+        select max_opens_per_member_per_day, max_opens_per_location_per_day
+        from location_settings where location_id = ${id}
+      `;
+
+      const totals = await tx<{ location_opens_today: string; my_opens_today: string }[]>`
+        select
+          count(*) filter (where success = true and command = 'open')::text as location_opens_today,
+          count(*) filter (
+            where success = true and command = 'open' and user_id = ${user.sub}
+          )::text as my_opens_today
+        from access_logs
+        where location_id = ${id} and ts >= ${dayStart}
+      `;
+
+      // Per-member breakdown for the admin UI. Email is left-joined under
+      // the caller's RLS — other users' rows resolve to null email, which
+      // the frontend maps via the members list.
+      const members = await tx<{ user_id: string | null; email: string | null; opens_today: string }[]>`
+        select al.user_id, u.email::text as email, count(*)::text as opens_today
+        from access_logs al
+        left join users u on u.id = al.user_id
+        where al.location_id = ${id}
+          and al.success = true
+          and al.command = 'open'
+          and al.ts >= ${dayStart}
+        group by al.user_id, u.email
+        order by count(*) desc
+        limit 50
+      `;
+
+      return {
+        quotas: {
+          max_opens_per_member_per_day: settings[0]?.max_opens_per_member_per_day ?? null,
+          max_opens_per_location_per_day: settings[0]?.max_opens_per_location_per_day ?? null,
+        },
+        usage: {
+          day_start: dayStart.toISOString(),
+          location_opens_today: Number(totals[0]?.location_opens_today ?? 0),
+          my_opens_today: Number(totals[0]?.my_opens_today ?? 0),
+          members: members.map((m) => ({
+            user_id: m.user_id,
+            email: m.email,
+            opens_today: Number(m.opens_today),
+          })),
+        },
+      };
+    });
+    return c.json({ location_id: id, ...data });
+  });
+
+  app.patch('/:id/limits', zValidator('json', patchLimitsSchema), async (c) => {
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    const hasMember = 'max_opens_per_member_per_day' in body;
+    const hasLocation = 'max_opens_per_location_per_day' in body;
+    const memberVal = body.max_opens_per_member_per_day ?? null;
+    const locationVal = body.max_opens_per_location_per_day ?? null;
+
+    const quotas = await withUserDb(c, async (tx) => {
+      // Pre-check admin so the caller gets a clean 403/404 instead of an
+      // RLS-shaped 500 on the location_settings upsert.
+      const loc = await tx<{ id: string; admin: boolean }[]>`
+        select l.id, app.is_account_admin(l.account_id) as admin
+        from locations l where l.id = ${id}
+      `;
+      if (!loc[0]) throw NotFound('location_not_found');
+      if (!loc[0].admin) throw Forbidden('not_account_admin');
+
+      const rows = await tx<
+        { max_opens_per_member_per_day: number | null; max_opens_per_location_per_day: number | null }[]
+      >`
+        insert into location_settings
+          (location_id, max_opens_per_member_per_day, max_opens_per_location_per_day)
+        values (${id}, ${memberVal}, ${locationVal})
+        on conflict (location_id) do update set
+          max_opens_per_member_per_day = case
+            when ${hasMember} then ${memberVal}::int
+            else location_settings.max_opens_per_member_per_day end,
+          max_opens_per_location_per_day = case
+            when ${hasLocation} then ${locationVal}::int
+            else location_settings.max_opens_per_location_per_day end,
+          updated_at = now()
+        returning max_opens_per_member_per_day, max_opens_per_location_per_day
+      `;
+      return rows[0]!;
+    });
+    return c.json({ location_id: id, quotas });
+  });
 
   app.get('/:id', async (c) => {
     const id = c.req.param('id');

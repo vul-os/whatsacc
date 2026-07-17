@@ -7,6 +7,7 @@ import { getEnv } from '../lib/env.ts';
 import { sendSlackText, sendSlackBlocks } from '../lib/slack.ts';
 import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 import { logAccess } from './access.ts';
+import { noteChatMessage, chatDenialMessage } from '../lib/rate-limit.ts';
 
 async function verifySlackSignature(secret: string, timestamp: string, body: string, signature: string): Promise<boolean> {
   const base = `v0:${timestamp}:${body}`;
@@ -162,6 +163,15 @@ function slackRouter() {
             on conflict do nothing
           `;
 
+          // Webhook flood throttle: past RATE_CHAT_MSGS_PER_MIN messages per
+          // Slack user per minute the bot goes quiet — no reply, but the
+          // webhook still returns 200 so Slack doesn't retry-amplify.
+          const throttle = await noteChatMessage(tx, `slack:${event.user}`);
+          if (throttle.quiet) {
+            console.warn('Slack chat throttle — staying quiet:', { user: event.user });
+            return;
+          }
+
           const text = normalizeSlackText(event.text);
           if (text) {
             if (['hi', 'hello', 'hey', 'help', 'menu', 'start'].includes(text)) {
@@ -271,12 +281,18 @@ function slackRouter() {
           const hasAccess = gates.some(g => g.ap_id === apId);
 
           if (hasAccess) {
-            await logAccess(tx, {
+            const verdict = await logAccess(tx, {
               user_id: profile.id,
               access_point_id: apId,
               command: 'open',
               source: 'slack',
             });
+            if (!verdict.allowed) {
+              // Denied by rate limit / quota — audit-logged by logAccess;
+              // reply honestly instead of pretending the gate opened.
+              await sendSlackText(channelId, chatDenialMessage(verdict));
+              return;
+            }
             await sendSlackText(channelId, `✅ Opening gate...`);
           } else {
             await sendSlackText(channelId, `❌ Sorry, you no longer have access to this gate.`);

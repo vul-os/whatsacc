@@ -41,6 +41,13 @@ export async function bootTestApp(): Promise<AppHandle> {
   // Force APP_ENV=test even when .env sets APP_ENV=local — sendEmail() uses
   // this flag to skip real Resend calls and avoid burning the daily quota.
   process.env.APP_ENV = 'test';
+  // Neutralize abuse rate limits by default: production defaults (10s open
+  // cooldown etc.) would break unrelated tests that open gates in rapid
+  // succession. Rate-limit tests set explicit values via their own helper.
+  if (!process.env.RATE_OPEN_COOLDOWN_S) process.env.RATE_OPEN_COOLDOWN_S = '0';
+  if (!process.env.RATE_OPENS_PER_HOUR) process.env.RATE_OPENS_PER_HOUR = '100000';
+  if (!process.env.RATE_CHAT_MSGS_PER_MIN) process.env.RATE_CHAT_MSGS_PER_MIN = '100000';
+  if (!process.env.RATE_ACCOUNT_OPENS_PER_HOUR) process.env.RATE_ACCOUNT_OPENS_PER_HOUR = '100000';
   // Ensure test DB is migrated and DATABASE_URL is pointed at it.
   await setupTestDb();
   setEnv(process.env as Record<string, string | undefined>);

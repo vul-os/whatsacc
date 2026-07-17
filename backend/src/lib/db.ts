@@ -34,6 +34,14 @@ export interface SqlFn {
 export interface TxSql extends SqlFn {
   json(value: unknown): JsonMarker;
   unsafe<R = unknown[]>(raw: string): Promise<R>;
+  /**
+   * Run `fn` inside a savepoint. On error the transaction is rolled back to
+   * the savepoint (recovering the surrounding transaction from Postgres's
+   * aborted state) and the error is rethrown. Used for best-effort work —
+   * e.g. rate-limit counter updates — that must not poison the enclosing
+   * transaction when it fails.
+   */
+  savepoint<T>(fn: (tx: TxSql) => Promise<T>): Promise<T>;
 }
 
 export interface Sql extends TxSql {
@@ -66,6 +74,19 @@ function makeTagged(runner: QueryRunner): TxSql {
     const r = await runner.query(raw, []);
     return r.rows;
   }) as TxSql['unsafe'];
+  let savepointSeq = 0;
+  fn.savepoint = async <T>(cb: (tx: TxSql) => Promise<T>): Promise<T> => {
+    const name = `wa_sp_${savepointSeq++}`;
+    await runner.query(`SAVEPOINT ${name}`, []);
+    try {
+      const result = await cb(fn);
+      await runner.query(`RELEASE SAVEPOINT ${name}`, []);
+      return result;
+    } catch (e) {
+      await runner.query(`ROLLBACK TO SAVEPOINT ${name}`, []);
+      throw e;
+    }
+  };
   return fn;
 }
 

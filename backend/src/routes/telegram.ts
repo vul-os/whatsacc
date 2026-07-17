@@ -5,6 +5,7 @@ import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
 import { sendTelegramText } from '../lib/telegram.ts';
+import { noteChatMessage } from '../lib/rate-limit.ts';
 
 type TelegramUpdate = {
   update_id: number;
@@ -79,7 +80,10 @@ function telegramRouter() {
         on conflict do nothing
       `;
 
-      if (msg.text) {
+      // Webhook flood throttle — same policy as WhatsApp/Slack: go quiet
+      // past the per-minute cap but still 200 so Telegram doesn't retry.
+      const throttle = await noteChatMessage(tx, `tg:${msg.chat.id}`);
+      if (!throttle.quiet && msg.text) {
         const text = msg.text.trim().toLowerCase();
         const reply = text === 'open' ? 'success' : 'failed';
         replies.push({ to: msg.chat.id, chatId: chat.id, body: reply });

@@ -9,10 +9,15 @@ import type { AppEnv } from './auth.ts';
 
 export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
   if (err instanceof HttpError) {
+    // 429s (rate limit / quota) carry a Retry-After hint for clients.
+    if (err.retryAfterS !== undefined) {
+      c.header('Retry-After', String(err.retryAfterS));
+    }
     return c.json(
       {
         error: err.code,
         detail: err.message !== err.code ? err.message : undefined,
+        retry_after_s: err.retryAfterS,
       },
       err.status as ContentfulStatusCode,
     );

@@ -9,8 +9,9 @@ import {
   sendWhatsAppInteractive,
   type WhatsAppInteractive,
 } from '../lib/whatsapp.ts';
-import { tryConsumeGrant, logAccess } from './access.ts';
+import { tryConsumeGrant, refundGrantUse, logAccess } from './access.ts';
 import { getAvailableAccessPoints, type AvailableAP } from '../lib/access-lookup.ts';
+import { noteChatMessage, chatDenialMessage } from '../lib/rate-limit.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -252,12 +253,22 @@ async function pushAccessCommandResult(
     return;
   }
 
-  await logAccess(tx, {
+  const verdict = await logAccess(tx, {
     user_id: memberProfileId,
     access_point_id: accessPointId,
     command,
     source: 'whatsapp',
+    phone_e164: phoneE164,
   });
+  if (!verdict.allowed) {
+    // Rate limit / quota denied the open. The denial is already audit-logged
+    // by logAccess; reply honestly instead of pretending the gate opened.
+    // A visitor grant use consumed just above must not be burned by a
+    // limiter denial — refund it.
+    if (grantId) await refundGrantUse(grantId);
+    replies.push({ type: 'text', to, chatId, body: chatDenialMessage(verdict) });
+    return;
+  }
 
   replies.push({
     type: 'text',
@@ -364,6 +375,15 @@ function whatsappRouter() {
             `;
             if (inboundRows.length === 0) {
               console.log('WA duplicate message ignored:', { providerMessageId: msg.id });
+              continue;
+            }
+
+            // Webhook flood throttle: past RATE_CHAT_MSGS_PER_MIN messages
+            // per sender per minute the bot goes quiet — no reply, but the
+            // webhook still returns 200 so Meta's retries don't amplify.
+            const throttle = await noteChatMessage(tx, `phone:${from}`);
+            if (throttle.quiet) {
+              console.warn('WA chat throttle — staying quiet:', { from });
               continue;
             }
 

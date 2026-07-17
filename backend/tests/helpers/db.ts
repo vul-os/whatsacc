@@ -34,7 +34,11 @@ export async function setupTestDb(): Promise<TestDb> {
   setDbConnectionString(url);
 
   if (!testSql) {
-    testSql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
+    // max > 1: the WhatsApp open path nests a second transaction
+    // (tryConsumeGrant / refundGrantUse run in their own withRLS) inside the
+    // webhook's outer transaction — with a single pooled connection that
+    // self-deadlocks. Production (Workers + Neon Pool) has no such cap.
+    testSql = postgres(url, { prepare: false, max: 5, onnotice: () => {} });
     setSqlForTests(adaptPostgresSql(testSql));
   }
 
@@ -82,6 +86,27 @@ function adaptPostgresSql(pg: ReturnType<typeof postgres>): Sql {
     }) as TxSql;
     fn.json = (value: unknown) => runner.json(value) as never;
     fn.unsafe = (async (raw: string) => await runner.unsafe(raw)) as TxSql['unsafe'];
+    fn.savepoint = (async <T>(cb: (tx: TxSql) => Promise<T>): Promise<T> => {
+      // Inside a postgres.js transaction we MUST use its native savepoint():
+      // after any failed query postgres.js rejects every later query in the
+      // tx with the cached error unless the failure happened in a savepoint
+      // scope. Outside a transaction, fall back to manual SAVEPOINT SQL.
+      const r = runner as unknown as {
+        savepoint?: (f: (s: ReturnType<typeof postgres>) => unknown) => Promise<unknown>;
+      };
+      if (typeof r.savepoint === 'function') {
+        return (await r.savepoint(async (s) => await cb(make(s)))) as T;
+      }
+      await runner.unsafe('SAVEPOINT wa_sp');
+      try {
+        const result = await cb(fn);
+        await runner.unsafe('RELEASE SAVEPOINT wa_sp');
+        return result;
+      } catch (e) {
+        await runner.unsafe('ROLLBACK TO SAVEPOINT wa_sp');
+        throw e;
+      }
+    }) as TxSql['savepoint'];
     return fn;
   };
   const sql = make(pg) as Sql;
