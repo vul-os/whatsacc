@@ -13,14 +13,18 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ArchMark } from '@/components/illustrations/ArchMark';
+import { LocationLimitsPanel } from '@/components/locations/LocationLimitsPanel';
+import { RateLimitNotice } from '@/components/access/RateLimitNotice';
 import { useAuth } from '@/lib/auth';
 import {
   ApiError,
   api,
+  rateLimitInfo,
   type AccessPointDetail,
   type LocationRow,
   type MaintenanceCreateInput,
   type MaintenanceEvent,
+  type RateLimitDenial,
 } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
@@ -57,6 +61,7 @@ export default function AccessPointPage() {
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [denial, setDenial] = useState<RateLimitDenial | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -98,6 +103,7 @@ export default function AccessPointPage() {
     async (cmd: 'open' | 'close') => {
       if (!ap) return;
       setActionError(null);
+      setDenial(null);
       setStage(cmd === 'open' ? 'opening' : 'closing');
 
       const submit = async (lat?: number, long?: number) => {
@@ -113,6 +119,16 @@ export default function AccessPointPage() {
           refresh();
         } catch (err) {
           setStage('error');
+          // 429s get a friendly rate-limit notice (with live countdown for
+          // rate_limited) instead of a raw error string.
+          const rl = rateLimitInfo(err);
+          if (rl) {
+            setDenial(rl);
+            if (rl.reason === 'quota_exceeded') {
+              window.setTimeout(() => setStage('idle'), 2400);
+            }
+            return;
+          }
           const msg =
             err instanceof ApiError
               ? err.detail ?? err.code
@@ -221,7 +237,7 @@ export default function AccessPointPage() {
             <div className="lg:text-right">
               <motion.button
                 type="button"
-                disabled={isPending}
+                disabled={isPending || denial?.reason === 'rate_limited'}
                 onClick={() => send(isOpen ? 'close' : 'open')}
                 whileTap={{ scale: 0.97 }}
                 className={cn(
@@ -261,9 +277,18 @@ export default function AccessPointPage() {
                   )}
                 </span>
               </motion.button>
-              {actionError && (
+              {denial ? (
+                <RateLimitNotice
+                  denial={denial}
+                  onExpire={() => {
+                    setDenial(null);
+                    setStage('idle');
+                  }}
+                  className="mt-3 text-[12px] text-gold"
+                />
+              ) : actionError ? (
                 <p className="mt-3 text-[12px] text-terracotta">{actionError}</p>
-              )}
+              ) : null}
               {isOpen && (
                 <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-paper/55">
                   command sent · auto-resets in 25s
@@ -387,6 +412,14 @@ export default function AccessPointPage() {
             />
           </DefList>
         </Card>
+      </section>
+
+      {/* Location usage & abuse-protection limits (member view; admins edit) */}
+      <section data-shot="location-limits">
+        <LocationLimitsPanel
+          locationId={ap.location_id}
+          locationName={location?.name}
+        />
       </section>
 
       {showMaintenance && (

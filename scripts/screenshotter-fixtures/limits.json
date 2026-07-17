@@ -1,0 +1,20 @@
+{
+  "location_id": "loc_silveroaks",
+  "quotas": {
+    "max_opens_per_member_per_day": 30,
+    "max_opens_per_location_per_day": 50
+  },
+  "usage": {
+    "day_start": "{{now-9h}}",
+    "location_opens_today": 47,
+    "my_opens_today": 3,
+    "members": [
+      { "user_id": "usr_courier01", "email": "courier@fastway.co.za", "opens_today": 12 },
+      { "user_id": "usr_sipho01", "email": "sipho.dlamini@gmail.com", "opens_today": 9 },
+      { "user_id": "usr_annelie1", "email": "annelie.vdmerwe@icloud.com", "opens_today": 7 },
+      { "user_id": "usr_kagiso01", "email": "kagiso.m@outlook.com", "opens_today": 5 },
+      { "user_id": "usr_01hyx3f2m8q9vk4t7n2r5w8e1a", "email": "thandi@silveroaks.co.za", "opens_today": 3 },
+      { "user_id": null, "email": null, "opens_today": 2 }
+    ]
+  }
+}

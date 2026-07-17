@@ -3,8 +3,15 @@ import { PageHeader } from './AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArchMark } from '@/components/illustrations/ArchMark';
+import { RateLimitNotice } from '@/components/access/RateLimitNotice';
 import { useAuth } from '@/lib/auth';
-import { ApiError, api, type AccessPointDetail } from '@/lib/api';
+import {
+  ApiError,
+  api,
+  rateLimitInfo,
+  type AccessPointDetail,
+  type RateLimitDenial,
+} from '@/lib/api';
 
 type Stage = 'pick' | 'confirm' | 'locating' | 'sent' | 'denied';
 
@@ -15,6 +22,9 @@ export default function OpenGate() {
   const [stage, setStage] = useState<Stage>('pick');
   const [distance, setDistance] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [denial, setDenial] = useState<RateLimitDenial | null>(null);
+  // For rate_limited denials the retry button unlocks when the countdown ends.
+  const [retryLocked, setRetryLocked] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!currentAccount) return;
@@ -44,6 +54,14 @@ export default function OpenGate() {
         await api.accessOpen(ap.id, { source: 'web', lat, long });
         setStage('sent');
       } catch (err) {
+        // 429 → friendly rate-limit / quota state instead of a raw error.
+        const rl = rateLimitInfo(err);
+        if (rl) {
+          setDenial(rl);
+          setRetryLocked(rl.reason === 'rate_limited');
+          setStage('denied');
+          return;
+        }
         const msg =
           err instanceof ApiError
             ? err.code === 'access_point_not_found'
@@ -75,6 +93,8 @@ export default function OpenGate() {
     setStage('pick');
     setDistance(null);
     setErrorMsg(null);
+    setDenial(null);
+    setRetryLocked(false);
   }
 
   return (
@@ -182,16 +202,31 @@ export default function OpenGate() {
                   <div className="space-y-3">
                     <div className="inline-flex items-center gap-3 bg-terracotta text-paper rounded-full px-5 py-2.5">
                       <span className="h-2 w-2 rounded-full bg-paper" />
-                      <span className="font-medium">Denied</span>
+                      <span className="font-medium">
+                        {denial?.reason === 'quota_exceeded'
+                          ? 'Daily limit reached'
+                          : denial
+                            ? 'Slow down'
+                            : 'Denied'}
+                      </span>
                     </div>
-                    <p className="text-paper/75">{errorMsg ?? 'Something went wrong.'}</p>
+                    {denial ? (
+                      <RateLimitNotice
+                        denial={denial}
+                        onExpire={() => setRetryLocked(false)}
+                        className="text-paper/75"
+                      />
+                    ) : (
+                      <p className="text-paper/75">{errorMsg ?? 'Something went wrong.'}</p>
+                    )}
                     <Button
                       onClick={reset}
                       variant="outline"
                       size="md"
-                      className="border-paper/30 text-paper hover:bg-paper hover:text-ink"
+                      disabled={retryLocked}
+                      className="border-paper/30 text-paper hover:bg-paper hover:text-ink disabled:opacity-40"
                     >
-                      Try again
+                      {denial?.reason === 'quota_exceeded' ? 'Back' : 'Try again'}
                     </Button>
                   </div>
                 )}

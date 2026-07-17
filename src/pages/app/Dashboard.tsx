@@ -11,6 +11,7 @@ import {
   type AccountSummary,
   type LocationRow,
 } from '@/lib/api';
+import { cn } from '@/lib/cn';
 
 function relativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -38,6 +39,13 @@ function greetForHour(h: number): string {
   return 'Good evening';
 }
 
+type QuotaWatchEntry = {
+  id: string;
+  name: string;
+  opens: number;
+  cap: number;
+};
+
 export default function Dashboard() {
   const { user, currentAccount } = useAuth();
   const [summary, setSummary] = useState<AccountSummary | null>(null);
@@ -46,6 +54,9 @@ export default function Dashboard() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateAp, setShowCreateAp] = useState(false);
+  // Locations whose daily open quota is ≥80% consumed (admin-only heads-up).
+  const [quotaWatch, setQuotaWatch] = useState<QuotaWatchEntry[]>([]);
+  const isAdmin = currentAccount?.role === 'owner' || currentAccount?.role === 'admin';
 
   const refreshSummary = useCallback(async () => {
     if (!currentAccount) return;
@@ -69,12 +80,39 @@ export default function Dashboard() {
       setSummary(s);
       setLocations(l.locations);
       setAccessPoints(ap.access_points);
+      // Non-blocking: check each location's daily quota consumption so admins
+      // get a heads-up chip when a cap is ≥80% used. Failures are silent —
+      // the chip is informational only.
+      if (isAdmin) {
+        void (async () => {
+          const checks = await Promise.all(
+            l.locations.slice(0, 8).map(async (loc) => {
+              try {
+                return { loc, s: await api.locationSummary(loc.id) };
+              } catch {
+                return null;
+              }
+            }),
+          );
+          const near: QuotaWatchEntry[] = [];
+          for (const c of checks) {
+            if (!c) continue;
+            const cap = c.s.today.max_opens_per_location_per_day;
+            if (cap !== null && cap > 0 && c.s.today.opens / cap >= 0.8) {
+              near.push({ id: c.loc.id, name: c.loc.name, opens: c.s.today.opens, cap });
+            }
+          }
+          setQuotaWatch(near);
+        })();
+      } else {
+        setQuotaWatch([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard.');
     } finally {
       setDataLoaded(true);
     }
-  }, [currentAccount]);
+  }, [currentAccount, isAdmin]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -134,6 +172,38 @@ export default function Dashboard() {
           <Card className="border-terracotta/40 p-4">
             <p className="text-sm text-terracotta-deep">{error}</p>
           </Card>
+        )}
+
+        {quotaWatch.length > 0 && (
+          <div className="flex flex-wrap gap-2" role="status">
+            {quotaWatch.map((q) => {
+              const pct = Math.min(999, Math.round((q.opens / q.cap) * 100));
+              const atCap = q.opens >= q.cap;
+              return (
+                <span
+                  key={q.id}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs text-ink/75',
+                    atCap
+                      ? 'border-terracotta/40 bg-terracotta/10'
+                      : 'border-gold/40 bg-gold/10',
+                  )}
+                >
+                  <span
+                    className={cn('h-1.5 w-1.5 rounded-full', atCap ? 'bg-terracotta' : 'bg-gold')}
+                    aria-hidden
+                  />
+                  {q.name}
+                  <span className="font-mono tabular-nums text-ink/85">
+                    {q.opens.toLocaleString()}/{q.cap.toLocaleString()}
+                  </span>
+                  <span className="text-ink/50">
+                    daily opens · {pct}%{atCap ? ' · cap reached' : ''}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
         )}
 
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">

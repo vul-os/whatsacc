@@ -1,0 +1,49 @@
+{
+  "events": [
+    {
+      "id": "mev_001",
+      "access_point_id": "ap_maingate",
+      "kind": "service",
+      "performed_at": "{{now-74d}}",
+      "performed_by": "usr_01hyx3f2m8q9vk4t7n2r5w8e1a",
+      "technician_name": "Themba M.",
+      "notes": "Rack and pinion greased, limit switches adjusted.",
+      "parts": [{ "name": "Gear grease", "qty": 1, "cost_zar_cents": 18500 }],
+      "cost_zar_cents": 145000,
+      "movement_m_at_event": 61000,
+      "next_due_movement_m": 76000,
+      "next_due_at": "{{now+40d}}",
+      "created_at": "{{now-74d}}"
+    },
+    {
+      "id": "mev_002",
+      "access_point_id": "ap_maingate",
+      "kind": "inspection",
+      "performed_at": "{{now-160d}}",
+      "performed_by": "usr_01hyx3f2m8q9vk4t7n2r5w8e1a",
+      "technician_name": "Gate Doctor (Pty) Ltd",
+      "notes": "Annual inspection — motor brushes at 60%, track clear.",
+      "parts": [],
+      "cost_zar_cents": 65000,
+      "movement_m_at_event": 48200,
+      "next_due_movement_m": null,
+      "next_due_at": null,
+      "created_at": "{{now-160d}}"
+    },
+    {
+      "id": "mev_003",
+      "access_point_id": "ap_maingate",
+      "kind": "repair",
+      "performed_at": "{{now-230d}}",
+      "performed_by": null,
+      "technician_name": "Themba M.",
+      "notes": "Replaced snapped drive chain after storm debris jam.",
+      "parts": [{ "name": "Drive chain", "qty": 1, "cost_zar_cents": 92000 }],
+      "cost_zar_cents": 138000,
+      "movement_m_at_event": 39400,
+      "next_due_movement_m": null,
+      "next_due_at": null,
+      "created_at": "{{now-230d}}"
+    }
+  ]
+}

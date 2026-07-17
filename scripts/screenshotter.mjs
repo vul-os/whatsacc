@@ -63,10 +63,25 @@ function buildMockRoutes() {
     },
     { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/summary$/, body: () => loadFixture('summary.json') },
     { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/insights$/, body: () => loadFixture('insights.json') },
+    // Per-location usage-vs-quota summary. Only Silver Oaks has caps set; the
+    // handler nulls the caps for every other location id (pick transform) so
+    // the dashboard quota chip shows exactly one entry.
+    { method: 'GET', re: /^\/analytics\/locations\/[^/]+\/summary$/, body: () => loadFixture('location-summary.json'), pick: 'location-summary' },
+    { method: 'GET', re: /^\/locations\/[^/]+\/limits$/, body: () => loadFixture('limits.json') },
+    {
+      method: 'PATCH',
+      re: /^\/locations\/[^/]+\/limits$/,
+      body: () =>
+        JSON.stringify({
+          location_id: 'loc_silveroaks',
+          quotas: { max_opens_per_member_per_day: 30, max_opens_per_location_per_day: 50 },
+        }),
+    },
     { method: 'GET', re: /^\/locations\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
     { method: 'GET', re: /^\/accounts\/[^/]+\/members$/, body: () => loadFixture('members.json') },
     { method: 'GET', re: /^\/access\/access-points$/, body: () => loadFixture('access-points.json') },
     { method: 'GET', re: /^\/access\/access-points\/[^/]+$/, body: () => loadFixture('access-points.json'), pick: 'first-access-point' },
+    { method: 'GET', re: /^\/access\/access-points\/[^/]+\/maintenance$/, body: () => loadFixture('maintenance.json') },
     { method: 'GET', re: /^\/access\/grants(\?.*)?$/, body: () => loadFixture('grants.json') },
     { method: 'GET', re: /^\/reference\/countries$/, body: () => JSON.stringify({ countries: [
       { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}' },
@@ -103,6 +118,20 @@ async function installApiMocks(context) {
       let body = match.body();
       if (match.pick === 'first-access-point') {
         body = JSON.stringify(JSON.parse(body).access_points[0]);
+      }
+      if (match.pick === 'location-summary') {
+        // /analytics/locations/:id/summary → echo the requested id and only
+        // keep the quota caps for Silver Oaks so other locations read as
+        // "no cap set" (keeps the dashboard chip to a single, real entry).
+        const j = JSON.parse(body);
+        const id = url.pathname.split('/')[3];
+        j.location_id = id;
+        if (id !== 'loc_silveroaks') {
+          j.today.opens = 6;
+          j.today.max_opens_per_member_per_day = null;
+          j.today.max_opens_per_location_per_day = null;
+        }
+        body = JSON.stringify(j);
       }
       await route.fulfill({ status: 200, contentType: 'application/json', body });
     },
@@ -190,6 +219,13 @@ async function capture(page, origin, shot, outFile) {
     throw new Error(`page ${shot.path} is missing expected text "${shot.expectText}"`);
   }
 
+  // Optional: bring a below-the-fold element into view before capturing
+  // (viewport screenshots only — fullPage stays false).
+  if (shot.scrollTo) {
+    await page.locator(shot.scrollTo).first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(350);
+  }
+
   await page.addStyleTag({ content: DETERMINISM_CSS });
   await page.screenshot({
     path: outFile,
@@ -275,6 +311,16 @@ async function main() {
       { path: '/app', file: 'portal-dashboard.png', expectText: 'Recent activity' },
       { path: '/app/access-points', file: 'portal-locations.png', expectText: 'Main gate' },
       { path: '/app/analytics', file: 'portal-analytics.png', expectText: 'Analytics' },
+      // Usage & limits panel on the access-point detail page (scrolled into
+      // view — it sits below the hero + maintenance sections).
+      {
+        path: '/app/access-points/ap_maingate',
+        file: 'portal-limits.png',
+        // NB: the "Usage & limits" kicker is CSS-uppercased (innerText follows
+        // text-transform), so assert on the untransformed panel heading.
+        expectText: 'Daily opens',
+        scrollTo: '[data-shot="location-limits"]',
+      },
     ];
     const mobileShots = [
       // No Tauri app exists yet: the tap-to-open gate view at phone size is the

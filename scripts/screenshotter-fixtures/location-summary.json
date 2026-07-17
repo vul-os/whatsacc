@@ -1,0 +1,12 @@
+{
+  "location_id": "loc_silveroaks",
+  "opens": 24893,
+  "closes": 24811,
+  "total": 50104,
+  "today": {
+    "day_start": "{{now-9h}}",
+    "opens": 47,
+    "max_opens_per_member_per_day": 30,
+    "max_opens_per_location_per_day": 50
+  }
+}

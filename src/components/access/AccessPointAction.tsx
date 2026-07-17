@@ -15,7 +15,14 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError, api, type AccessPointDetail } from '@/lib/api';
+import {
+  ApiError,
+  api,
+  rateLimitInfo,
+  type AccessPointDetail,
+  type RateLimitDenial,
+} from '@/lib/api';
+import { RateLimitNotice } from './RateLimitNotice';
 import { cn } from '@/lib/cn';
 
 type Stage = 'idle' | 'opening' | 'closing' | 'open' | 'done' | 'error';
@@ -31,6 +38,7 @@ export function AccessPointAction({
 }) {
   const [stage, setStage] = useState<Stage>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [denial, setDenial] = useState<RateLimitDenial | null>(null);
 
   // After 'done' from an open, hold the 'open' state briefly so the button
   // shows 'Close'. Then auto-revert to 'idle' if user doesn't close manually.
@@ -43,6 +51,7 @@ export function AccessPointAction({
   const send = useCallback(
     async (cmd: 'open' | 'close') => {
       setErrorMsg(null);
+      setDenial(null);
       setStage(cmd === 'open' ? 'opening' : 'closing');
 
       const submit = async (lat?: number, long?: number) => {
@@ -57,6 +66,16 @@ export function AccessPointAction({
           onActivity?.();
         } catch (err) {
           setStage('error');
+          // 429 → friendly notice; rate_limited also locks the button until
+          // the retry_after_s countdown ends (see RateLimitNotice onExpire).
+          const rl = rateLimitInfo(err);
+          if (rl) {
+            setDenial(rl);
+            if (rl.reason === 'quota_exceeded') {
+              window.setTimeout(() => setStage('idle'), 2400);
+            }
+            return;
+          }
           const msg =
             err instanceof ApiError
               ? err.detail ?? err.code
@@ -168,7 +187,7 @@ export function AccessPointAction({
         <div className="mt-auto">
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || denial?.reason === 'rate_limited'}
             onClick={() => send(isOpen ? 'close' : 'open')}
             className={cn(
               'relative w-full h-12 sm:h-13 rounded-full font-medium text-sm tracking-tight',
@@ -203,11 +222,20 @@ export function AccessPointAction({
                     : 'Open'}
             </span>
           </button>
-          {errorMsg && (
+          {denial ? (
+            <RateLimitNotice
+              denial={denial}
+              onExpire={() => {
+                setDenial(null);
+                setStage('idle');
+              }}
+              className={cn('mt-2 text-[11px]', isOpen ? 'text-paper/70' : 'text-ink/65')}
+            />
+          ) : errorMsg ? (
             <p className="mt-2 text-[11px] text-terracotta-deep truncate" title={errorMsg}>
               {errorMsg}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </motion.div>

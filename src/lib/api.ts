@@ -10,12 +10,16 @@ export const API_BASE_URL = (env.VITE_API_BASE_URL ?? 'http://localhost:8787').r
 export type ApiErrorBody = {
   error: string;
   detail?: string;
+  /** Present on 429 responses (rate limit / quota); seconds until retry. */
+  retry_after_s?: number;
 };
 
 export class ApiError extends Error {
   status: number;
   code: string;
   detail?: string;
+  /** Seconds until the request may be retried (429 only). */
+  retryAfterS?: number;
   constructor(status: number, body: ApiErrorBody | any) {
     let code: string = 'error';
     let detail: string | undefined = undefined;
@@ -44,7 +48,27 @@ export class ApiError extends Error {
     this.status = status;
     this.code = code;
     this.detail = detail;
+    if (body && typeof body === 'object' && typeof body.retry_after_s === 'number') {
+      this.retryAfterS = body.retry_after_s;
+    }
   }
+}
+
+export type RateLimitDenial = {
+  reason: 'rate_limited' | 'quota_exceeded';
+  retryAfterS: number;
+};
+
+/**
+ * Narrow an unknown error to a 429 denial. Returns the denial reason and a
+ * clean retry hint (seconds, ≥1) or null when the error is anything else.
+ */
+export function rateLimitInfo(err: unknown): RateLimitDenial | null {
+  if (!(err instanceof ApiError) || err.status !== 429) return null;
+  return {
+    reason: err.code === 'quota_exceeded' ? 'quota_exceeded' : 'rate_limited',
+    retryAfterS: Math.max(1, Math.ceil(err.retryAfterS ?? 30)),
+  };
 }
 
 export const tokenStore = {
@@ -124,10 +148,16 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
   const payload = isJson ? await res.json().catch(() => null) : await res.text();
 
   if (!res.ok) {
-    if (isJson && payload && typeof payload === 'object' && 'error' in payload) {
-      throw new ApiError(res.status, payload as ApiErrorBody);
+    const err =
+      isJson && payload && typeof payload === 'object' && 'error' in payload
+        ? new ApiError(res.status, payload as ApiErrorBody)
+        : new ApiError(res.status, typeof payload === 'string' ? payload : `http_${res.status}`);
+    // Fall back to the Retry-After header when the body didn't carry the hint.
+    if (err.retryAfterS === undefined) {
+      const ra = res.headers.get('Retry-After');
+      if (ra && /^\d+$/.test(ra)) err.retryAfterS = Number(ra);
     }
-    throw new ApiError(res.status, typeof payload === 'string' ? payload : `http_${res.status}`);
+    throw err;
   }
   return payload as T;
 }
@@ -334,6 +364,19 @@ export const api = {
     },
   ) => apiFetch<void>(`/locations/${id}`, { method: 'PATCH', body }),
 
+  // Abuse-protection quotas + today's usage (member-visible).
+  locationLimits: (id: string) => apiFetch<LocationLimits>(`/locations/${id}/limits`),
+
+  // Admin-only. null clears a cap (= unlimited); omitted fields are unchanged.
+  locationLimitsUpdate: (id: string, body: LocationQuotaPatch) =>
+    apiFetch<{ location_id: string; quotas: LocationQuotas }>(`/locations/${id}/limits`, {
+      method: 'PATCH',
+      body,
+    }),
+
+  locationSummary: (id: string) =>
+    apiFetch<LocationSummary>(`/analytics/locations/${id}/summary`),
+
   // Devices
   devicesList: (filter?: { location_id?: string; account_id?: string }) => {
     const params = new URLSearchParams();
@@ -397,6 +440,44 @@ export type LocationRow = {
   access_point_count: number;
   member_count: number;
   last_opened_at: string | null;
+};
+
+export type LocationQuotas = {
+  max_opens_per_member_per_day: number | null;
+  max_opens_per_location_per_day: number | null;
+};
+
+export type LocationQuotaPatch = {
+  max_opens_per_member_per_day?: number | null;
+  max_opens_per_location_per_day?: number | null;
+};
+
+export type LocationLimits = {
+  location_id: string;
+  quotas: LocationQuotas;
+  usage: {
+    day_start: string;
+    location_opens_today: number;
+    my_opens_today: number;
+    members: Array<{
+      user_id: string | null;
+      email: string | null;
+      opens_today: number;
+    }>;
+  };
+};
+
+export type LocationSummary = {
+  location_id: string;
+  opens: number;
+  closes: number;
+  total: number;
+  today: {
+    day_start: string;
+    opens: number;
+    max_opens_per_member_per_day: number | null;
+    max_opens_per_location_per_day: number | null;
+  };
 };
 
 export type DeviceRow = {
