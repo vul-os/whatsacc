@@ -22,7 +22,7 @@ export default function GettingStarted() {
 
       <DocSection heading="The five steps">
         <ol className="list-decimal pl-6 space-y-3">
-          <li><Link to="/signup" className="underline underline-offset-4 decoration-terracotta">Create an account</Link>. Free plan is real — no credit card.</li>
+          <li><Link to="/signup" className="underline underline-offset-4 decoration-terracotta">Create an account</Link> on your gateway. Free — whatsacc has no plans and no billing.</li>
           <li><Link to="/docs/linking-whatsapp" className="underline underline-offset-4 decoration-terracotta">Link your WhatsApp number</Link>. We&rsquo;ll walk you through verification.</li>
           <li><Link to="/docs/locations" className="underline underline-offset-4 decoration-terracotta">Create a Location</Link>. House, complex, building, or other.</li>
           <li><Link to="/docs/pairing-device" className="underline underline-offset-4 decoration-terracotta">Pair a Device</Link>. Scan the QR on the controller, name it, assign it to an access point.</li>

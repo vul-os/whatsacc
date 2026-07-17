@@ -63,8 +63,8 @@ export default function GeofenceSafety() {
 whatsacc 14:09   Sorry, you're 1.8 km from Sunset Apartments.
                  Geofence radius is 200 m. Try again when you're closer.`}</CodeBlock>
         <p>
-          Both lines are templated and translatable per location. Owners on the Business plan can
-          override the copy in <strong>Settings → Messaging</strong>.
+          Both lines are templated and translatable per location. Owners can override the copy
+          in <strong>Settings → Messaging</strong>.
         </p>
       </DocSection>
 

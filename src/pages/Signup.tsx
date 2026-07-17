@@ -176,7 +176,7 @@ export default function Signup() {
       asideKicker={step === 'location' ? 'Almost there' : 'Get started'}
       asideTitle={
         step === 'auth'
-          ? 'First gate is on us.'
+          ? 'Your gate, your gateway.'
           : step === 'kind'
             ? 'Personal or business?'
             : 'Name your first place.'
@@ -184,7 +184,7 @@ export default function Signup() {
       asideBody={
         <p>
           {step === 'auth' &&
-            "The free signup is real. Three quick steps and you'll be ready to pair a device."}
+            "Your account lives on this gateway — nobody else's cloud. Three quick steps and you'll be ready to pair a device."}
           {step === 'kind' &&
             "It's only for dashboard hints — you can change it later in settings."}
           {step === 'location' &&
@@ -212,7 +212,7 @@ export default function Signup() {
             <>
               <h1 className="font-display-tight text-2xl sm:text-3xl text-ink">Create your account</h1>
               <p className="mt-1 text-sm text-ink/60">
-                {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. No credit card.'}
+                {isInviteSignup ? 'Create your profile to accept this invite.' : 'Two minutes. Your account, on this gateway.'}
               </p>
 
               {!isInviteSignup && (

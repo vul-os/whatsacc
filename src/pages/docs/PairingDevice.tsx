@@ -65,8 +65,8 @@ blink red       relay miswired or short detected`}</CodeBlock>
           public key is uploaded during pairing; the private key never leaves the device. Open
           commands are signed with a sliding nonce, so a captured packet can&rsquo;t be replayed.
         </p>
-        <CodeBlock lang="http" title="device → cloud">{`POST /v1/devices/dev_oak_main/open HTTP/1.1
-Host: api.whatsacc.com
+        <CodeBlock lang="http" title="device → gateway">{`POST /v1/devices/dev_oak_main/open HTTP/1.1
+Host: your-gateway.example.com
 Authorization: Bearer wacc_dev_session_xxxxxxxxxxxx
 Content-Type: application/json
 
@@ -76,7 +76,7 @@ Content-Type: application/json
   "signature": "ed25519:dN3w…/L8w=="
 }`}</CodeBlock>
         <p>
-          The cloud verifies the signature, checks the nonce hasn&rsquo;t been used in the last
+          The gateway verifies the signature, checks the nonce hasn&rsquo;t been used in the last
           120 seconds, and only then commits the open event. If verification fails, the request is
           dropped without a relay pulse <em>and</em> an audit row is written so the controller
           appears in your tamper-detection feed.

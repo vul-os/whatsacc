@@ -101,7 +101,7 @@ export function Hero() {
               the sun/gate behind it. The solid buttons below sit happily over the
               scene. At md+ the same line tucks inline beside the ctas instead. */}
           <p className="md:hidden mt-4 sm:mt-5 text-xs text-ink/45">
-            No credit card. Free up to 100 msgs / month.
+            Free &amp; open source. No card, no caps, no meters.
           </p>
 
           {/* ctas */}
@@ -123,7 +123,7 @@ export function Hero() {
               </svg>
             </LinkButton>
             <span className="hidden md:inline text-xs text-ink/45 ml-1">
-              No credit card. Free up to 100 msgs / month.
+              Free &amp; open source. No card, no caps, no meters.
             </span>
           </div>
         </div>

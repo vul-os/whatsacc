@@ -28,7 +28,7 @@ Accept: application/json`}</CodeBlock>
         <ul className="list-disc pl-6 space-y-1">
           <li><code>wacc_live_</code> — production traffic, opens real gates.</li>
           <li><code>wacc_test_</code> — sandbox, never opens a real gate.</li>
-          <li><code>wacc_dev_</code> — device-to-cloud session token, cycles automatically.</li>
+          <li><code>wacc_dev_</code> — device-to-gateway session token, cycles automatically.</li>
         </ul>
       </DocSection>
 

@@ -25,12 +25,12 @@ const pillars = [
   {
     n: '05',
     title: 'Audit log',
-    body: 'Every event — opens, denies, pairings, member changes — is appended with the actor, the location, the verdict, and the upstream message id. Exportable as CSV. Retained per your plan.',
+    body: 'Every event — opens, denies, pairings, member changes — is appended with the actor, the location, the verdict, and the upstream message id. Exportable as CSV. Retained as long as you like — it’s your database.',
   },
   {
     n: '06',
     title: 'Sensible failure modes',
-    body: 'If our service is unavailable, the controller falls back to its last good policy and a local PIN. Opens are queued for up to 30 seconds across brief network issues, not lost.',
+    body: 'If the gateway is unreachable, the controller falls back to its last good policy and a local PIN. Opens are queued for up to 30 seconds across brief network issues, not lost.',
   },
 ];
 

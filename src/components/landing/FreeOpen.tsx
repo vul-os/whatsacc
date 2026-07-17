@@ -1,13 +1,14 @@
 import { LinkButton } from '@/components/ui/Button';
 
-// whatsacc costs nothing: the hosted flagship is free and self-hosting is
-// free. This section is a statement, not a plan table.
+// whatsacc costs nothing: there is no hosted service and no billing code —
+// every gateway is one somebody runs themselves. This section is a
+// statement, not a plan table.
 const pillars = [
   {
-    name: 'Hosted flagship',
-    tag: 'free',
+    name: 'Your gateway',
+    tag: 'yours',
     blurb:
-      'Sign up, pair a device, open your gate. The hosted service is free to use — no card, no tiers, no metered messages.',
+      'Sign up on your gateway, pair a device, open your gate. Accounts live on the instance you (or someone you trust) run — no card, no tiers, no metered messages.',
     bullets: ['All features included', 'Unlimited locations & members', 'Audit log & analytics'],
     cta: 'Start now',
     href: '/signup',
@@ -40,8 +41,8 @@ export function FreeOpen() {
             </h2>
           </div>
           <p className="col-span-12 lg:col-span-5 text-ink/70 leading-relaxed">
-            whatsacc is open source under the MIT license. Use the hosted flagship for free, or
-            run the whole gateway yourself — same code, same features, either way.
+            whatsacc is fully open source under the MIT license. The gateway, the controllers,
+            this very portal — you run all of it yourself. Same code, every feature, no editions.
           </p>
         </div>
 
@@ -101,7 +102,8 @@ export function FreeOpen() {
         </div>
 
         <p className="mt-10 text-sm text-ink/55 text-center max-w-md mx-auto">
-          The only thing you might ever pay for is your own hardware and your own server.
+          Want to charge your residents? That&rsquo;s your business — literally. Nothing in
+          whatsacc does billing. The only bills are your own hardware and your own server.
         </p>
       </div>
     </section>

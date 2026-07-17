@@ -30,7 +30,7 @@ const features = [
   {
     kicker: 'e',
     title: 'Free & open source',
-    body: 'MIT-licensed, no meters, no tiers. Use the hosted flagship for free or run the whole gateway on your own box.',
+    body: 'MIT-licensed, no meters, no tiers. The whole gateway runs on your own box — your accounts, your data, no strings back to anyone.',
     span: 'md:col-span-4',
     visual: <OpenSourceVisual />,
   },
