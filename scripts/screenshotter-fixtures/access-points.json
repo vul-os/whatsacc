@@ -1,0 +1,96 @@
+{
+  "access_points": [
+    {
+      "id": "ap_maingate",
+      "location_id": "loc_silveroaks",
+      "name": "Main gate",
+      "kind": "sliding gate",
+      "device_id": "dev_01hyx9k2m4",
+      "status": "active",
+      "meter": {
+        "movement_m": 68432,
+        "total_opens": 12412,
+        "total_closes": 12398,
+        "last_op_at": "{{now-4m}}"
+      },
+      "maintenance": {
+        "last_serviced_at": "{{now-74d}}",
+        "last_service_movement_m": 61000,
+        "next_due_movement_m": 76000,
+        "next_due_at": "{{now+40d}}",
+        "due_now": false,
+        "movement_remaining_m": 7568,
+        "pct_used": 50
+      }
+    },
+    {
+      "id": "ap_pedestrian",
+      "location_id": "loc_silveroaks",
+      "name": "Pedestrian gate",
+      "kind": "pedestrian",
+      "device_id": "dev_01hyx9k7p2",
+      "status": "active",
+      "meter": {
+        "movement_m": 9120,
+        "total_opens": 5121,
+        "total_closes": 5121,
+        "last_op_at": "{{now-11m}}"
+      },
+      "maintenance": {
+        "last_serviced_at": "{{now-120d}}",
+        "last_service_movement_m": 7400,
+        "next_due_movement_m": 12000,
+        "next_due_at": "{{now+90d}}",
+        "due_now": false,
+        "movement_remaining_m": 2880,
+        "pct_used": 37
+      }
+    },
+    {
+      "id": "ap_barrier",
+      "location_id": "loc_silveroaks",
+      "name": "Parking barrier",
+      "kind": "barrier",
+      "device_id": "dev_01hyx9kb8x",
+      "status": "active",
+      "meter": {
+        "movement_m": 14208,
+        "total_opens": 3208,
+        "total_closes": 3208,
+        "last_op_at": "{{now-19m}}"
+      },
+      "maintenance": {
+        "last_serviced_at": "{{now-30d}}",
+        "last_service_movement_m": 13100,
+        "next_due_movement_m": 20000,
+        "next_due_at": "{{now+150d}}",
+        "due_now": false,
+        "movement_remaining_m": 5792,
+        "pct_used": 16
+      }
+    },
+    {
+      "id": "ap_clubhouse",
+      "location_id": "loc_silveroaks",
+      "name": "Clubhouse door",
+      "kind": "door",
+      "device_id": "dev_01hyx9kfj6",
+      "status": "active",
+      "meter": {
+        "movement_m": 1840,
+        "total_opens": 921,
+        "total_closes": 918,
+        "last_op_at": "{{now-42m}}"
+      },
+      "maintenance": {
+        "last_serviced_at": null,
+        "last_service_movement_m": null,
+        "next_due_movement_m": 5000,
+        "next_due_at": null,
+        "due_now": false,
+        "movement_remaining_m": 3160,
+        "pct_used": 37
+      }
+    }
+  ]
+}

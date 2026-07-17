@@ -1,0 +1,52 @@
+{
+  "locations": [
+    {
+      "id": "loc_silveroaks",
+      "parent_location_id": null,
+      "type": "complex",
+      "name": "Silver Oaks Estate",
+      "slug": "silver-oaks",
+      "status": "active",
+      "address": { "city": "Centurion" },
+      "access_point_count": 4,
+      "member_count": 148,
+      "last_opened_at": "{{now-4m}}"
+    },
+    {
+      "id": "loc_protea",
+      "parent_location_id": null,
+      "type": "house",
+      "name": "12 Protea Lane",
+      "slug": "protea-lane-12",
+      "status": "active",
+      "address": { "city": "Durban North" },
+      "access_point_count": 1,
+      "member_count": 4,
+      "last_opened_at": "{{now-64m}}"
+    },
+    {
+      "id": "loc_umhlanga",
+      "parent_location_id": null,
+      "type": "building",
+      "name": "Umhlanga Ridge Offices",
+      "slug": "umhlanga-ridge",
+      "status": "active",
+      "address": { "city": "Umhlanga" },
+      "access_point_count": 2,
+      "member_count": 36,
+      "last_opened_at": "{{now-88m}}"
+    },
+    {
+      "id": "loc_bergview",
+      "parent_location_id": null,
+      "type": "house",
+      "name": "Bergview Cottage",
+      "slug": "bergview",
+      "status": "active",
+      "address": { "city": "Stellenbosch" },
+      "access_point_count": 1,
+      "member_count": 5,
+      "last_opened_at": "{{now-2d}}"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "account_id": "acct_silveroaks",
+  "opens_today": 47,
+  "opens_yesterday": 41,
+  "location_count": 4,
+  "member_count": 193,
+  "recent_activity": [
+    {
+      "id": "act_001",
+      "ts": "{{now-4m}}",
+      "command": "open",
+      "success": true,
+      "source": "whatsapp",
+      "access_point_name": "Main gate",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "sipho.dlamini@gmail.com"
+    },
+    {
+      "id": "act_002",
+      "ts": "{{now-11m}}",
+      "command": "open",
+      "success": true,
+      "source": "whatsapp",
+      "access_point_name": "Pedestrian gate",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "annelie.vdmerwe@icloud.com"
+    },
+    {
+      "id": "act_003",
+      "ts": "{{now-19m}}",
+      "command": "open",
+      "success": true,
+      "source": "web",
+      "access_point_name": "Parking barrier",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "thandi@silveroaks.co.za"
+    },
+    {
+      "id": "act_004",
+      "ts": "{{now-27m}}",
+      "command": "open",
+      "success": false,
+      "source": "whatsapp",
+      "access_point_name": "Main gate",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "visitor.grant@whatsacc.com"
+    },
+    {
+      "id": "act_005",
+      "ts": "{{now-42m}}",
+      "command": "close",
+      "success": true,
+      "source": "web",
+      "access_point_name": "Clubhouse door",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "kagiso.m@outlook.com"
+    },
+    {
+      "id": "act_006",
+      "ts": "{{now-64m}}",
+      "command": "open",
+      "success": true,
+      "source": "whatsapp",
+      "access_point_name": "Front gate",
+      "location_name": "12 Protea Lane",
+      "actor_email": "pieter.botha@proteamail.co.za"
+    },
+    {
+      "id": "act_007",
+      "ts": "{{now-88m}}",
+      "command": "open",
+      "success": true,
+      "source": "whatsapp",
+      "access_point_name": "Lobby door",
+      "location_name": "Umhlanga Ridge Offices",
+      "actor_email": "naledi.khumalo@ridgeoffices.co.za"
+    },
+    {
+      "id": "act_008",
+      "ts": "{{now-113m}}",
+      "command": "open",
+      "success": true,
+      "source": "api",
+      "access_point_name": "Main gate",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "courier@fastway.co.za"
+    },
+    {
+      "id": "act_009",
+      "ts": "{{now-137m}}",
+      "command": "open",
+      "success": true,
+      "source": "whatsapp",
+      "access_point_name": "Pedestrian gate",
+      "location_name": "Silver Oaks Estate",
+      "actor_email": "lerato.mokoena@gmail.com"
+    }
+  ]
+}

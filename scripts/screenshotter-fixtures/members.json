@@ -1,0 +1,12 @@
+{
+  "members": [
+    { "user_id": "usr_thandi", "role": "owner", "status": "active", "email": "thandi@silveroaks.co.za", "display_name": "Thandi Nkosi" },
+    { "user_id": "usr_sipho", "role": "admin", "status": "active", "email": "sipho.dlamini@gmail.com", "display_name": "Sipho Dlamini" },
+    { "user_id": "usr_annelie", "role": "member", "status": "active", "email": "annelie.vdmerwe@icloud.com", "display_name": "Annelie van der Merwe" },
+    { "user_id": "usr_kagiso", "role": "member", "status": "active", "email": "kagiso.m@outlook.com", "display_name": "Kagiso Mothibi" },
+    { "user_id": "usr_lerato", "role": "member", "status": "active", "email": "lerato.mokoena@gmail.com", "display_name": "Lerato Mokoena" },
+    { "user_id": "usr_pieter", "role": "member", "status": "active", "email": "pieter.botha@proteamail.co.za", "display_name": "Pieter Botha" },
+    { "user_id": "usr_naledi", "role": "viewer", "status": "active", "email": "naledi.khumalo@ridgeoffices.co.za", "display_name": "Naledi Khumalo" },
+    { "user_id": "usr_guard", "role": "viewer", "status": "invited", "email": "guardhouse@silveroaks.co.za", "display_name": "Guard house" }
+  ]
+}

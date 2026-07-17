@@ -1,0 +1,351 @@
+#!/usr/bin/env node
+// Automated product screenshot generator.
+//
+// Usage:  npm run screenshotter
+//
+// Boots the existing Vite app on a free port, intercepts every backend API
+// request with Playwright route mocks (fixtures in scripts/screenshotter-fixtures/),
+// seeds an authenticated session, and captures polished PNGs into:
+//   web/screenshots/          (light)
+//   web/screenshots/dark/     (dark; copies of light while the app has no dark theme)
+//
+// No backend (Deno, port 8787/8000) is required. Exits non-zero on any failure.
+
+import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import net from 'node:net';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '..');
+const FIXTURES = path.join(__dirname, 'screenshotter-fixtures');
+const OUT_LIGHT = path.join(ROOT, 'web', 'screenshots');
+const OUT_DARK = path.join(OUT_LIGHT, 'dark');
+const MIN_BYTES = 30_000; // a real 2x/3x product shot is far bigger than this
+
+// The app's CSS has a single light `:root` palette (src/styles/tokens.css) and no
+// `prefers-color-scheme: dark` rules, so a real dark render is impossible today.
+// We copy the light shots into dark/ so documentation references never 404.
+const APP_HAS_DARK_MODE = false;
+
+// ---------------------------------------------------------------------------
+// Fixtures: load JSON and substitute {{now±Nu}} tokens (u in s|m|h|d) with ISO
+// timestamps relative to run time, so "5 min ago" style UI always looks fresh.
+// ---------------------------------------------------------------------------
+const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+
+function loadFixture(name) {
+  const raw = fs.readFileSync(path.join(FIXTURES, name), 'utf8');
+  const substituted = raw.replace(/\{\{now([+-]\d+)([smhd])\}\}/g, (_, amount, unit) =>
+    new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString(),
+  );
+  return substituted;
+}
+
+// ---------------------------------------------------------------------------
+// Mock API: method + pathname regex -> fixture body
+// ---------------------------------------------------------------------------
+function buildMockRoutes() {
+  return [
+    { method: 'GET', re: /^\/auth\/me$/, body: () => loadFixture('me.json') },
+    {
+      method: 'POST',
+      re: /^\/auth\/refresh$/,
+      body: () =>
+        JSON.stringify({
+          access_token: 'screenshotter-access-token',
+          refresh_token: 'screenshotter-refresh-token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        }),
+    },
+    { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/summary$/, body: () => loadFixture('summary.json') },
+    { method: 'GET', re: /^\/billing\/accounts\/[^/]+\/billing$/, body: () => loadFixture('billing.json') },
+    { method: 'GET', re: /^\/locations\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
+    { method: 'GET', re: /^\/accounts\/[^/]+\/members$/, body: () => loadFixture('members.json') },
+    { method: 'GET', re: /^\/access\/access-points$/, body: () => loadFixture('access-points.json') },
+    { method: 'GET', re: /^\/access\/access-points\/[^/]+$/, body: () => loadFixture('access-points.json'), pick: 'first-access-point' },
+    { method: 'GET', re: /^\/access\/grants(\?.*)?$/, body: () => loadFixture('grants.json') },
+    { method: 'GET', re: /^\/reference\/countries$/, body: () => JSON.stringify({ countries: [
+      { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}', currency_code: 'ZAR', msg_cost_zar: 0.55 },
+    ] }) },
+  ];
+}
+
+// API pathname prefixes (mirrors backend/src/routes/*). The app is pointed at the
+// Vite origin via VITE_API_BASE_URL, so these prefixes distinguish API calls from
+// Vite asset requests on the same origin.
+const API_PREFIX_RE =
+  /^\/(auth|accounts|access|analytics|billing|devices|locations|phones|reference|referrals|whatsapp)(\/|$)/;
+
+async function installApiMocks(context) {
+  const routes = buildMockRoutes();
+  await context.route(
+    (url) => API_PREFIX_RE.test(url.pathname),
+    async (route) => {
+      const req = route.request();
+      const url = new URL(req.url());
+      const pathWithQuery = url.pathname + url.search;
+      const match = routes.find(
+        (r) => r.method === req.method() && (r.re.test(url.pathname) || r.re.test(pathWithQuery)),
+      );
+      if (!match) {
+        console.warn(`  [mock] no fixture for ${req.method()} ${url.pathname} -> 404`);
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'not_found' }),
+        });
+        return;
+      }
+      let body = match.body();
+      if (match.pick === 'first-access-point') {
+        body = JSON.stringify(JSON.parse(body).access_points[0]);
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body });
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+async function waitForServer(url, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return;
+    } catch {
+      // not up yet
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new Error(`Vite dev server did not become ready at ${url} within ${timeoutMs}ms`);
+}
+
+function ensureChromium(chromium) {
+  const exe = chromium.executablePath();
+  if (exe && fs.existsSync(exe)) return;
+  console.log('Chromium for Playwright is not installed yet — downloading it now');
+  console.log('(one-time, ~150 MB; equivalent to `npx playwright install chromium`)...');
+  const r = spawnSync('npx', ['playwright', 'install', 'chromium'], {
+    cwd: ROOT,
+    stdio: 'inherit',
+  });
+  if (r.status !== 0) {
+    throw new Error(
+      'Failed to install Chromium. Run `npx playwright install chromium` manually and retry.',
+    );
+  }
+}
+
+const DETERMINISM_CSS = `
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.001s !important;
+    transition-delay: 0s !important;
+    caret-color: transparent !important;
+  }
+  html { scrollbar-width: none !important; }
+  ::-webkit-scrollbar { display: none !important; }
+`;
+
+const AUTH_SEED = `
+  try {
+    localStorage.setItem('whatsacc.access_token', 'screenshotter-access-token');
+    localStorage.setItem('whatsacc.refresh_token', 'screenshotter-refresh-token');
+  } catch {}
+`;
+
+async function capture(page, origin, shot, outFile) {
+  await page.goto(origin + shot.path, { waitUntil: 'networkidle', timeout: 45_000 });
+  await page.evaluate(() => document.fonts.ready);
+  // Let framer-motion entrances and layout settle (reducedMotion is emulated,
+  // but a few JS-driven animations still tween briefly).
+  await page.waitForTimeout(shot.settleMs ?? 900);
+
+  // Guard against error/empty states leaking into marketing assets.
+  const bodyText = await page.evaluate(() => document.body.innerText);
+  for (const bad of ['Failed to load', 'No account loaded', 'not_found:', 'http_4', 'http_5']) {
+    if (bodyText.includes(bad)) {
+      throw new Error(`page ${shot.path} shows error state ("${bad}") — fixtures incomplete?`);
+    }
+  }
+  if (shot.expectText && !bodyText.includes(shot.expectText)) {
+    throw new Error(`page ${shot.path} is missing expected text "${shot.expectText}"`);
+  }
+
+  await page.addStyleTag({ content: DETERMINISM_CSS });
+  await page.screenshot({
+    path: outFile,
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: false,
+  });
+
+  const bytes = fs.statSync(outFile).size;
+  if (bytes < MIN_BYTES) {
+    throw new Error(`screenshot ${path.basename(outFile)} is suspiciously small (${bytes} bytes)`);
+  }
+  console.log(`  ok ${path.basename(outFile)} (${Math.round(bytes / 1024)} KB)`);
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+async function main() {
+  let chromium;
+  try {
+    ({ chromium } = await import('playwright'));
+  } catch {
+    console.error('playwright is not installed. Run `npm install` first.');
+    process.exit(1);
+  }
+  ensureChromium(chromium);
+
+  fs.mkdirSync(OUT_DARK, { recursive: true });
+
+  const port = await getFreePort();
+  const origin = `http://127.0.0.1:${port}`;
+
+  console.log(`Starting Vite dev server on ${origin} ...`);
+  const vite = spawn(
+    'npm',
+    ['run', 'dev', '--', '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
+    {
+      cwd: ROOT,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        // Point the API client at the app's own origin so route mocks are
+        // same-origin (no CORS preflights) and nothing touches a real backend.
+        VITE_API_BASE_URL: origin,
+        BROWSER: 'none',
+        NO_COLOR: '1',
+      },
+    },
+  );
+  let viteLog = '';
+  vite.stdout.on('data', (d) => (viteLog += d));
+  vite.stderr.on('data', (d) => (viteLog += d));
+
+  const killVite = () => {
+    if (vite.pid && vite.exitCode === null) {
+      try {
+        process.kill(-vite.pid, 'SIGTERM');
+      } catch {}
+      setTimeout(() => {
+        try {
+          process.kill(-vite.pid, 'SIGKILL');
+        } catch {}
+      }, 2_000).unref();
+    }
+  };
+  process.on('SIGINT', () => {
+    killVite();
+    process.exit(130);
+  });
+
+  let browser;
+  try {
+    await waitForServer(origin + '/');
+    console.log('Vite is ready. Launching Chromium ...');
+    browser = await chromium.launch();
+
+    const desktopShots = [
+      { path: '/', file: 'landing-hero.png', settleMs: 1_400, expectText: 'whatsacc' },
+      { path: '/docs', file: 'docs.png' },
+      { path: '/pricing', file: 'pricing.png' },
+      { path: '/app', file: 'portal-dashboard.png', expectText: 'Recent activity' },
+      { path: '/app/locations', file: 'portal-locations.png', expectText: 'Silver Oaks Estate' },
+      { path: '/app/analytics', file: 'portal-analytics.png', expectText: 'Analytics' },
+    ];
+    const mobileShots = [
+      // No Tauri app exists yet: the tap-to-open gate view at phone size is the
+      // closest real "app" surface, standing in for the emergency/open flow.
+      { path: '/app/open', file: 'app-emergency.png', expectText: 'Main gate' },
+    ];
+
+    const contexts = [
+      {
+        label: 'desktop 1440x900@2x',
+        shots: desktopShots,
+        options: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
+      },
+      {
+        label: 'mobile 390x844@3x',
+        shots: mobileShots,
+        options: {
+          viewport: { width: 390, height: 844 },
+          deviceScaleFactor: 3,
+          isMobile: true,
+          hasTouch: true,
+          userAgent:
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        },
+      },
+    ];
+
+    const written = [];
+    for (const { label, shots, options } of contexts) {
+      console.log(`Capturing ${label} (light) ...`);
+      const context = await browser.newContext({
+        ...options,
+        colorScheme: 'light',
+        reducedMotion: 'reduce',
+        locale: 'en-ZA',
+        timezoneId: 'Africa/Johannesburg',
+      });
+      await context.addInitScript(AUTH_SEED);
+      await installApiMocks(context);
+      const page = await context.newPage();
+      page.on('pageerror', (err) => console.warn(`  [pageerror] ${err.message}`));
+      for (const shot of shots) {
+        const out = path.join(OUT_LIGHT, shot.file);
+        await capture(page, origin, shot, out);
+        written.push(out);
+      }
+      await context.close();
+    }
+
+    // Dark variants. The app has no dark theme (see APP_HAS_DARK_MODE above), so
+    // copy the light shots into dark/ to keep every documented path resolvable.
+    if (!APP_HAS_DARK_MODE) {
+      console.log('App has no dark mode — copying light shots into dark/ ...');
+      for (const file of written) {
+        const dst = path.join(OUT_DARK, path.basename(file));
+        fs.copyFileSync(file, dst);
+        console.log(`  ok dark/${path.basename(dst)}`);
+      }
+    }
+
+    console.log(`\nDone. ${written.length} light + ${written.length} dark PNGs in web/screenshots/`);
+  } catch (err) {
+    console.error('\nScreenshotter failed:', err.message ?? err);
+    if (viteLog.trim()) {
+      console.error('--- vite output (tail) ---');
+      console.error(viteLog.split('\n').slice(-25).join('\n'));
+    }
+    process.exitCode = 1;
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    killVite();
+  }
+}
+
+main();

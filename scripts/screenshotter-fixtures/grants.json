@@ -1,0 +1,58 @@
+{
+  "grants": [
+    {
+      "id": "grant_001",
+      "account_id": "acct_silveroaks",
+      "granted_by_user_id": "usr_thandi",
+      "phone_e164": "+27821234567",
+      "visitor_name": "Fastway courier",
+      "starts_at": "{{now-3h}}",
+      "ends_at": "{{now+5h}}",
+      "max_uses": 2,
+      "uses_count": 1,
+      "status": "active",
+      "effective_status": "active",
+      "revoked_at": null,
+      "notes": "Parcel drop for unit 14",
+      "last_used_at": "{{now-113m}}",
+      "access_point_ids": ["ap_maingate"],
+      "created_at": "{{now-3h}}"
+    },
+    {
+      "id": "grant_002",
+      "account_id": "acct_silveroaks",
+      "granted_by_user_id": "usr_sipho",
+      "phone_e164": "+27835550142",
+      "visitor_name": "Zanele Mbeki",
+      "starts_at": "{{now-1d}}",
+      "ends_at": "{{now+2d}}",
+      "max_uses": null,
+      "uses_count": 3,
+      "status": "active",
+      "effective_status": "active",
+      "revoked_at": null,
+      "notes": "Weekend visitor, unit 7",
+      "last_used_at": "{{now-6h}}",
+      "access_point_ids": ["ap_maingate", "ap_pedestrian"],
+      "created_at": "{{now-1d}}"
+    },
+    {
+      "id": "grant_003",
+      "account_id": "acct_silveroaks",
+      "granted_by_user_id": "usr_annelie",
+      "phone_e164": "+27794448821",
+      "visitor_name": "Pool maintenance",
+      "starts_at": "{{now-9d}}",
+      "ends_at": "{{now-2d}}",
+      "max_uses": 10,
+      "uses_count": 6,
+      "status": "active",
+      "effective_status": "expired",
+      "revoked_at": null,
+      "notes": null,
+      "last_used_at": "{{now-3d}}",
+      "access_point_ids": ["ap_maingate"],
+      "created_at": "{{now-9d}}"
+    }
+  ]
+}

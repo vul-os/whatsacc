@@ -1,0 +1,24 @@
+{
+  "user": {
+    "id": "usr_01hyx3f2m8q9vk4t7n2r5w8e1a",
+    "email": "thandi@silveroaks.co.za",
+    "status": "active",
+    "email_verified_at": "{{now-120d}}",
+    "is_platform_admin": false
+  },
+  "profile": {
+    "id": "prof_01hyx3f2m8q9vk4t7n2r5w8e1b",
+    "display_name": "Thandi Nkosi",
+    "avatar_url": null,
+    "locale": "en-ZA"
+  },
+  "accounts": [
+    {
+      "account_id": "acct_silveroaks",
+      "name": "Silver Oaks Estate",
+      "billing_type": "business",
+      "role": "owner",
+      "status": "active"
+    }
+  ]
+}
