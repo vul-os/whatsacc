@@ -20,8 +20,8 @@ const createLocationSchema = z
   .strict();
 
 // New top-level create: locations are first-class. Each one gets a fresh
-// account (1:1) so its members, billing wallet, and subscription are
-// isolated from any other location the same user owns.
+// account (1:1) so its members are isolated from any other location the
+// same user owns.
 const createTopLevelLocationSchema = z
   .object({
     name: z.string().min(1).max(120),
@@ -147,8 +147,8 @@ function locationsRouter() {
 
   // Top-level POST /locations — creates a fresh account + location pair
   // owned by the caller. Used when a user adds a NEW location ("invite my
-  // cleaner to a different house"); each one gets isolated billing, members,
-  // wallet. The caller is added as 'owner' of the new account.
+  // cleaner to a different house"); each one gets isolated members. The
+  // caller is added as 'owner' of the new account.
   app.post('/', zValidator('json', createTopLevelLocationSchema), async (c) => {
     const user = getUser(c);
     const body = c.req.valid('json');
@@ -157,7 +157,6 @@ function locationsRouter() {
         userId: user.sub,
         name: body.name,
         countryCode: body.country_code,
-        billingType: 'personal',
       });
       const rows = await tx<{ id: string }[]>`
         insert into locations
@@ -186,8 +185,8 @@ function locationsRouter() {
 
   // DELETE /locations/:id — drops the location and (since 1:1) its parent
   // account if no sibling locations remain. The cascade chain handles
-  // wallet, subscription, members, devices, access_points etc. RLS
-  // guarantees only an owner/admin of the parent account can do this.
+  // members, devices, access_points etc. RLS guarantees only an owner/admin
+  // of the parent account can do this.
   app.delete('/:id', async (c) => {
     const result = await withUserDb(c, async (tx) => {
       const found = await tx<{ id: string; account_id: string }[]>`
@@ -197,7 +196,7 @@ function locationsRouter() {
       const accountId = found[0].account_id;
       await tx`delete from locations where id = ${found[0].id}`;
       // If this account has no other locations, drop the account too so
-      // the user isn't left with an orphaned billing tenant.
+      // the user isn't left with an orphaned tenant.
       const remaining = await tx<{ count: string }[]>`
         select count(*)::text from locations where account_id = ${accountId}
       `;

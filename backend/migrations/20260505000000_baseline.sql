@@ -1,51 +1,56 @@
--- 20260505000000_foundation.sql
--- Folded foundation schema through 2026-05-05 patches.
--- Folded from:
---   - 20260505000000_init.sql
---   - 20260505010000_extensions.sql
---   - 20260505020000_auth.sql
---   - 20260505030000_tenancy.sql
---   - 20260505040000_access.sql
---   - 20260505050000_whatsapp.sql
---   - 20260505060000_billing.sql
---   - 20260505070000_rls.sql
---   - 20260505080000_geo_currency.sql
---   - 20260505090000_payments.sql
---   - 20260505100000_maintenance.sql
---   - 20260505110000_referrals.sql
---   - 20260505120000_monthly_payouts.sql
---   - 20260505130000_temp_access.sql
---   - 20260505140000_fix_referral_trigger.sql
---   - 20260505150000_force_rls.sql
---   - 20260505160000_internal_role_for_rls_functions.sql
---   - 20260505170000_payout_requests_updated_at.sql
-
+-- 20260505000000_baseline.sql
+-- Clean baseline schema for whatsacc: auth, tenancy, access control,
+-- WhatsApp / Telegram / Slack messaging, maintenance tracking, temporary
+-- access grants, and row-level security.
+--
+-- Folded from the previous ordered migration set:
+--   - 20260505000000_foundation.sql
+--   - 20260507000000_app_role_for_rls.sql
+--   - 20260511000000_telegram_slack.sql
+--   - 20260512000000_invites_whatsapp.sql
+--   - 20260516000000_profile_avatar_source.sql
 
 -- ============================================================================
--- 20260505000000_init.sql
+-- Extensions
 -- ============================================================================
-
--- 20260505000000_init.sql
--- Initial schema for whatsacc.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- ============================================================================
--- 20260505010000_extensions.sql
+-- Reference data: countries
 -- ============================================================================
 
--- 20260505010000_extensions.sql
--- Additional Postgres extensions.
+CREATE TABLE countries (
+    code text PRIMARY KEY CHECK (length(code) = 2 AND code = upper(code)),
+    name text NOT NULL,
+    flag_emoji text NOT NULL,
+    is_active boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE countries IS 'Supported countries. Reference data for signup and account region.';
 
-CREATE EXTENSION IF NOT EXISTS citext;
+INSERT INTO countries (code, name, flag_emoji) VALUES
+    ('ZA', 'South Africa',   '🇿🇦'),
+    ('NG', 'Nigeria',        '🇳🇬'),
+    ('KE', 'Kenya',          '🇰🇪'),
+    ('US', 'United States',  '🇺🇸'),
+    ('CA', 'Canada',         '🇨🇦'),
+    ('BR', 'Brazil',         '🇧🇷'),
+    ('MX', 'Mexico',         '🇲🇽'),
+    ('GB', 'United Kingdom', '🇬🇧'),
+    ('DE', 'Germany',        '🇩🇪'),
+    ('FR', 'France',         '🇫🇷'),
+    ('AE', 'UAE',            '🇦🇪'),
+    ('IN', 'India',          '🇮🇳'),
+    ('ID', 'Indonesia',      '🇮🇩'),
+    ('PH', 'Philippines',    '🇵🇭'),
+    ('AU', 'Australia',      '🇦🇺');
 
 -- ============================================================================
--- 20260505020000_auth.sql
+-- Authentication: users, profiles, oauth, tokens, phone numbers
 -- ============================================================================
-
--- 20260505020000_auth.sql
--- Authentication: users, profiles, oauth, tokens, phone numbers.
 
 CREATE TABLE users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -63,11 +68,32 @@ CREATE TABLE profiles (
     id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     display_name text,
     avatar_url text,
+    -- 'google'  — last set from the Google `picture` claim on sign-in;
+    --             refreshed on every subsequent Google sign-in.
+    -- 'user'    — last set by the account holder via PATCH /auth/me/profile;
+    --             sign-in MUST NOT overwrite this.
+    -- NULL      — no avatar set; treated as 'google' for refresh purposes.
+    avatar_source text NULL CHECK (avatar_source IS NULL OR avatar_source IN ('google', 'user')),
+    -- Forward-compatibility hook for a CDN-cached copy of avatar_url.
+    avatar_cdn_url text NULL,
     locale text NOT NULL DEFAULT 'en',
+    country_code text NULL REFERENCES countries(code),
+    -- Optional Slack identity fields for linking Slack bot users to profiles.
+    slack_user_id text,
+    slack_handle text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE profiles IS 'Per-user profile metadata, 1:1 with users.';
+COMMENT ON COLUMN profiles.slack_user_id IS 'Slack user ID, e.g. U123ABC, used to link bot messages to a profile.';
+COMMENT ON COLUMN profiles.slack_handle IS 'Optional Slack handle without @, used for display and support.';
+
+CREATE UNIQUE INDEX profiles_slack_user_id_unique
+    ON profiles (slack_user_id)
+    WHERE slack_user_id IS NOT NULL;
+CREATE INDEX profiles_slack_handle_idx
+    ON profiles (lower(slack_handle))
+    WHERE slack_handle IS NOT NULL;
 
 CREATE TABLE oauth_identities (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,22 +203,19 @@ FOR EACH ROW
 EXECUTE FUNCTION enforce_max_phones_per_profile();
 
 -- ============================================================================
--- 20260505030000_tenancy.sql
+-- Tenancy: accounts, members, invites, locations, overrides and settings
 -- ============================================================================
-
--- 20260505030000_tenancy.sql
--- Tenancy: accounts, members, invites, locations, location overrides and settings.
 
 CREATE TABLE accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
-    billing_type text NOT NULL CHECK (billing_type IN ('personal','business')),
-    billing_address jsonb NOT NULL DEFAULT '{}'::jsonb,
+    country_code text NOT NULL DEFAULT 'ZA' REFERENCES countries(code),
     status text NOT NULL DEFAULT 'active',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE accounts IS 'Top-level billing tenant owning locations and members.';
+COMMENT ON TABLE accounts IS 'Top-level tenant owning locations and members.';
+CREATE INDEX accounts_country_code_idx ON accounts (country_code);
 
 CREATE TABLE account_members (
     account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -218,10 +241,12 @@ CREATE TABLE account_invites (
     accepted_at timestamptz NULL,
     accepted_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
     revoked_at timestamptz NULL,
+    phone_e164 text CHECK (phone_e164 IS NULL OR phone_e164 ~ '^\+[1-9][0-9]{6,14}$'),
     created_at timestamptz NOT NULL DEFAULT now(),
     created_by uuid NULL REFERENCES users(id) ON DELETE SET NULL
 );
 COMMENT ON TABLE account_invites IS 'Pending invitations to join an account.';
+COMMENT ON COLUMN account_invites.phone_e164 IS 'Optional phone number to notify via WhatsApp when the invite is sent.';
 CREATE INDEX account_invites_account_id_idx ON account_invites (account_id);
 CREATE INDEX account_invites_email_idx ON account_invites (email);
 CREATE UNIQUE INDEX account_invites_token_hash_idx ON account_invites (token_hash);
@@ -269,11 +294,8 @@ CREATE TABLE location_settings (
 COMMENT ON TABLE location_settings IS 'Per-location operational tunables (geofence, channels, limits).';
 
 -- ============================================================================
--- 20260505040000_access.sql
+-- Access control: devices, access points, command queue, access logs
 -- ============================================================================
-
--- 20260505040000_access.sql
--- Devices, access points, command queue, access logs.
 
 CREATE TABLE devices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -354,11 +376,8 @@ CREATE INDEX access_logs_access_point_id_ts_idx ON access_logs (access_point_id,
 CREATE INDEX access_logs_user_id_ts_idx ON access_logs (user_id, ts DESC);
 
 -- ============================================================================
--- 20260505050000_whatsapp.sql
+-- WhatsApp (Meta Cloud API) chat threads and messages
 -- ============================================================================
-
--- 20260505050000_whatsapp.sql
--- WhatsApp (Meta Cloud API) chat threads and messages.
 
 CREATE TABLE whatsapp_chats (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -381,96 +400,82 @@ CREATE TABLE whatsapp_messages (
     provider_message_id text,
     status text,
     ts timestamptz NOT NULL DEFAULT now(),
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    -- Prevents duplicate processing when Meta retries webhook delivery.
+    CONSTRAINT whatsapp_messages_provider_message_id_unique UNIQUE (provider_message_id)
 );
 COMMENT ON TABLE whatsapp_messages IS 'Individual WhatsApp messages exchanged on a chat.';
 CREATE INDEX whatsapp_messages_chat_id_ts_idx ON whatsapp_messages (chat_id, ts DESC);
-CREATE INDEX whatsapp_messages_provider_message_id_idx
-    ON whatsapp_messages (provider_message_id)
-    WHERE provider_message_id IS NOT NULL;
 
 -- ============================================================================
--- 20260505060000_billing.sql
+-- Telegram and Slack chat threads and messages
 -- ============================================================================
 
--- 20260505060000_billing.sql
--- Plans, subscriptions, wallets and per-period usage counters.
-
-CREATE TABLE plans (
+CREATE TABLE telegram_chats (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    code text UNIQUE NOT NULL,
-    name text NOT NULL,
-    monthly_message_quota int NOT NULL,
-    included_devices int NOT NULL,
-    price_cents int NOT NULL,
-    currency text NOT NULL DEFAULT 'usd',
-    is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE plans IS 'Subscription plans available for accounts.';
-
-INSERT INTO plans (code, name, monthly_message_quota, included_devices, price_cents, currency) VALUES
-    ('free',    'Free',      100, 1,   0, 'usd'),
-    ('starter', 'Starter',  2000, 5, 900, 'usd'),
-    ('pro',     'Pro',     20000, 50, 4900, 'usd');
-
-CREATE TABLE account_subscriptions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id uuid UNIQUE NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    plan_id uuid NOT NULL REFERENCES plans(id),
-    status text NOT NULL DEFAULT 'active',
-    current_period_start timestamptz,
-    current_period_end timestamptz,
-    cancel_at timestamptz NULL,
-    stripe_subscription_id text NULL,
+    chat_id bigint UNIQUE NOT NULL, -- Telegram chat ID
+    profile_id uuid NULL REFERENCES profiles(id) ON DELETE SET NULL,
+    username text,
+    first_name text,
+    last_name text,
+    last_inbound_at timestamptz,
+    last_outbound_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE account_subscriptions IS 'Active subscription binding an account to a plan.';
-CREATE INDEX account_subscriptions_plan_id_idx ON account_subscriptions (plan_id);
-CREATE UNIQUE INDEX account_subscriptions_stripe_idx
-    ON account_subscriptions (stripe_subscription_id)
-    WHERE stripe_subscription_id IS NOT NULL;
+COMMENT ON TABLE telegram_chats IS 'Telegram conversation thread, one per chat/user.';
+CREATE INDEX telegram_chats_profile_id_idx ON telegram_chats (profile_id);
 
-CREATE TABLE wallets (
-    account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-    balance_cents bigint NOT NULL DEFAULT 0,
-    currency text NOT NULL DEFAULT 'usd',
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE wallets IS 'Prepaid balance held by an account.';
-
-CREATE TABLE wallet_transactions (
+CREATE TABLE telegram_messages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    delta_cents bigint NOT NULL,
-    reason text NOT NULL,
-    reference text NULL,
+    chat_id uuid NOT NULL REFERENCES telegram_chats(id) ON DELETE CASCADE,
+    direction text NOT NULL CHECK (direction IN ('in','out')),
+    kind text NOT NULL CHECK (kind IN ('text','location','photo','document','system')),
+    body jsonb NOT NULL,
+    provider_message_id text,
+    status text,
     ts timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE wallet_transactions IS 'Append-only ledger of wallet credits and debits.';
-CREATE INDEX wallet_transactions_account_id_ts_idx ON wallet_transactions (account_id, ts DESC);
+COMMENT ON TABLE telegram_messages IS 'Individual Telegram messages exchanged on a chat.';
+CREATE INDEX telegram_messages_chat_id_ts_idx ON telegram_messages (chat_id, ts DESC);
+CREATE INDEX telegram_messages_provider_message_id_idx
+    ON telegram_messages (provider_message_id)
+    WHERE provider_message_id IS NOT NULL;
 
-CREATE TABLE usage_counters (
-    account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    period text NOT NULL,
-    messages_used int NOT NULL DEFAULT 0,
-    opens int NOT NULL DEFAULT 0,
-    closes int NOT NULL DEFAULT 0,
+CREATE TABLE slack_chats (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_id text UNIQUE NOT NULL, -- Slack channel ID (C...) or DM (D...)
+    team_id text NOT NULL,
+    profile_id uuid NULL REFERENCES profiles(id) ON DELETE SET NULL,
+    last_inbound_at timestamptz,
+    last_outbound_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (account_id, period)
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE usage_counters IS 'Per-account per-month usage counters (yyyy-mm period).';
+COMMENT ON TABLE slack_chats IS 'Slack conversation thread, one per channel/DM.';
+CREATE INDEX slack_chats_profile_id_idx ON slack_chats (profile_id);
+
+CREATE TABLE slack_messages (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id uuid NOT NULL REFERENCES slack_chats(id) ON DELETE CASCADE,
+    direction text NOT NULL CHECK (direction IN ('in','out')),
+    kind text NOT NULL CHECK (kind IN ('text','file','system')),
+    body jsonb NOT NULL,
+    provider_message_id text,
+    status text,
+    ts timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE slack_messages IS 'Individual Slack messages exchanged on a chat.';
+CREATE INDEX slack_messages_chat_id_ts_idx ON slack_messages (chat_id, ts DESC);
+CREATE INDEX slack_messages_provider_message_id_idx
+    ON slack_messages (provider_message_id)
+    WHERE provider_message_id IS NOT NULL;
 
 -- ============================================================================
--- 20260505070000_rls.sql
+-- Row-level security: helper functions in `app` schema and per-table policies
 -- ============================================================================
-
--- 20260505070000_rls.sql
--- Row-level security: helper functions in `app` schema and per-table policies.
 
 CREATE SCHEMA IF NOT EXISTS app;
 GRANT USAGE ON SCHEMA app TO PUBLIC;
@@ -569,6 +574,15 @@ AS $$
               AND am.role IN ('owner','admin')
         );
 $$;
+
+-- =========================================================================
+-- countries (reference data: world-readable, platform-admin write)
+-- =========================================================================
+ALTER TABLE countries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY countries_read ON countries FOR SELECT USING (true);
+CREATE POLICY countries_insert ON countries FOR INSERT WITH CHECK (app.is_platform_admin());
+CREATE POLICY countries_update ON countries FOR UPDATE USING (app.is_platform_admin()) WITH CHECK (app.is_platform_admin());
+CREATE POLICY countries_delete ON countries FOR DELETE USING (app.is_platform_admin());
 
 -- =========================================================================
 -- users
@@ -910,246 +924,92 @@ CREATE POLICY whatsapp_messages_owner ON whatsapp_messages
     );
 
 -- =========================================================================
--- account_subscriptions
+-- telegram_chats
 -- =========================================================================
-ALTER TABLE account_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY account_subscriptions_admin ON account_subscriptions
+ALTER TABLE telegram_chats ENABLE ROW LEVEL SECURITY;
+CREATE POLICY telegram_chats_owner ON telegram_chats
     FOR ALL
-    USING (app.is_account_admin(account_id))
-    WITH CHECK (app.is_account_admin(account_id));
+    USING (
+        profile_id = app.current_user_id()
+        OR app.current_user_id() IS NULL
+        OR app.is_platform_admin()
+    )
+    WITH CHECK (
+        profile_id = app.current_user_id()
+        OR app.current_user_id() IS NULL
+        OR app.is_platform_admin()
+    );
 
 -- =========================================================================
--- wallets
+-- telegram_messages
 -- =========================================================================
-ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
-CREATE POLICY wallets_admin ON wallets
+ALTER TABLE telegram_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY telegram_messages_owner ON telegram_messages
     FOR ALL
-    USING (app.is_account_admin(account_id))
-    WITH CHECK (app.is_account_admin(account_id));
+    USING (
+        app.is_platform_admin()
+        OR app.current_user_id() IS NULL
+        OR EXISTS (
+            SELECT 1 FROM telegram_chats c
+            WHERE c.id = telegram_messages.chat_id
+              AND c.profile_id = app.current_user_id()
+        )
+    )
+    WITH CHECK (
+        app.is_platform_admin()
+        OR app.current_user_id() IS NULL
+        OR EXISTS (
+            SELECT 1 FROM telegram_chats c
+            WHERE c.id = telegram_messages.chat_id
+              AND c.profile_id = app.current_user_id()
+        )
+    );
 
 -- =========================================================================
--- wallet_transactions
+-- slack_chats
 -- =========================================================================
-ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY wallet_transactions_admin ON wallet_transactions
+ALTER TABLE slack_chats ENABLE ROW LEVEL SECURITY;
+CREATE POLICY slack_chats_owner ON slack_chats
     FOR ALL
-    USING (app.is_account_admin(account_id))
-    WITH CHECK (app.is_account_admin(account_id));
+    USING (
+        profile_id = app.current_user_id()
+        OR app.current_user_id() IS NULL
+        OR app.is_platform_admin()
+    )
+    WITH CHECK (
+        profile_id = app.current_user_id()
+        OR app.current_user_id() IS NULL
+        OR app.is_platform_admin()
+    );
 
 -- =========================================================================
--- usage_counters
+-- slack_messages
 -- =========================================================================
-ALTER TABLE usage_counters ENABLE ROW LEVEL SECURITY;
-CREATE POLICY usage_counters_admin ON usage_counters
+ALTER TABLE slack_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY slack_messages_owner ON slack_messages
     FOR ALL
-    USING (app.is_account_admin(account_id))
-    WITH CHECK (app.is_account_admin(account_id));
+    USING (
+        app.is_platform_admin()
+        OR app.current_user_id() IS NULL
+        OR EXISTS (
+            SELECT 1 FROM slack_chats c
+            WHERE c.id = slack_messages.chat_id
+              AND c.profile_id = app.current_user_id()
+        )
+    )
+    WITH CHECK (
+        app.is_platform_admin()
+        OR app.current_user_id() IS NULL
+        OR EXISTS (
+            SELECT 1 FROM slack_chats c
+            WHERE c.id = slack_messages.chat_id
+              AND c.profile_id = app.current_user_id()
+        )
+    );
 
 -- ============================================================================
--- 20260505080000_geo_currency.sql
+-- Maintenance tracking for access points
 -- ============================================================================
-
--- 20260505080000_geo_currency.sql
--- Currencies, countries, FX rates, and country binding for accounts/users.
--- All native pricing is stored in ZAR; currencies provide display conversion
--- via fx_rates (currency -> ZAR).
-
-CREATE TABLE currencies (
-    code text PRIMARY KEY CHECK (length(code) = 3 AND code = upper(code)),
-    name text NOT NULL,
-    symbol text NOT NULL,
-    decimals smallint NOT NULL DEFAULT 2 CHECK (decimals >= 0 AND decimals <= 4),
-    is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE currencies IS 'Supported display currencies. Native ledger is ZAR.';
-
-CREATE TABLE fx_rates (
-    currency_code text PRIMARY KEY REFERENCES currencies(code) ON DELETE CASCADE,
-    -- 1 unit of currency = `rate_to_zar` ZAR. Display = zar / rate_to_zar.
-    rate_to_zar numeric(18,8) NOT NULL CHECK (rate_to_zar > 0),
-    source text NOT NULL DEFAULT 'seed',
-    fetched_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE fx_rates IS 'Latest FX rate per currency relative to ZAR. Refreshed by cron.';
-
-CREATE TABLE countries (
-    code text PRIMARY KEY CHECK (length(code) = 2 AND code = upper(code)),
-    name text NOT NULL,
-    flag_emoji text NOT NULL,
-    currency_code text NOT NULL REFERENCES currencies(code),
-    -- WhatsApp business-initiated conversation cost in ZAR.
-    msg_cost_zar numeric(10,4) NOT NULL DEFAULT 0,
-    is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE countries IS 'Supported countries with WhatsApp conversation cost in ZAR.';
-CREATE INDEX countries_currency_code_idx ON countries (currency_code);
-
-INSERT INTO currencies (code, name, symbol, decimals) VALUES
-    ('ZAR', 'South African Rand',  'R',     2),
-    ('USD', 'US Dollar',           '$',     2),
-    ('EUR', 'Euro',                '€',     2),
-    ('GBP', 'British Pound',       '£',     2),
-    ('CAD', 'Canadian Dollar',     'C$',    2),
-    ('AUD', 'Australian Dollar',   'A$',    2),
-    ('BRL', 'Brazilian Real',      'R$',    2),
-    ('MXN', 'Mexican Peso',        'Mex$',  2),
-    ('INR', 'Indian Rupee',        '₹',     0),
-    ('IDR', 'Indonesian Rupiah',   'Rp',    0),
-    ('PHP', 'Philippine Peso',     '₱',     0),
-    ('NGN', 'Nigerian Naira',      '₦',     0),
-    ('KES', 'Kenyan Shilling',     'KSh',   2),
-    ('AED', 'UAE Dirham',          'د.إ',   2);
-
-INSERT INTO fx_rates (currency_code, rate_to_zar, source) VALUES
-    ('ZAR', 1.0,     'seed'),
-    ('USD', 18.5,    'seed'),
-    ('EUR', 20.0,    'seed'),
-    ('GBP', 24.0,    'seed'),
-    ('CAD', 13.5,    'seed'),
-    ('AUD', 12.0,    'seed'),
-    ('BRL', 3.2,     'seed'),
-    ('MXN', 1.0,     'seed'),
-    ('INR', 0.22,    'seed'),
-    ('IDR', 0.0012,  'seed'),
-    ('PHP', 0.32,    'seed'),
-    ('NGN', 0.012,   'seed'),
-    ('KES', 0.14,    'seed'),
-    ('AED', 5.0,     'seed');
-
-INSERT INTO countries (code, name, flag_emoji, currency_code, msg_cost_zar) VALUES
-    ('ZA', 'South Africa',   '🇿🇦', 'ZAR', 0.148),
-    ('NG', 'Nigeria',        '🇳🇬', 'NGN', 0.122),
-    ('KE', 'Kenya',          '🇰🇪', 'KES', 0.407),
-    ('US', 'United States',  '🇺🇸', 'USD', 0.463),
-    ('CA', 'Canada',         '🇨🇦', 'CAD', 0.463),
-    ('BR', 'Brazil',         '🇧🇷', 'BRL', 0.093),
-    ('MX', 'Mexico',         '🇲🇽', 'MXN', 0.113),
-    ('GB', 'United Kingdom', '🇬🇧', 'GBP', 0.407),
-    ('DE', 'Germany',        '🇩🇪', 'EUR', 0.407),
-    ('FR', 'France',         '🇫🇷', 'EUR', 0.407),
-    ('AE', 'UAE',            '🇦🇪', 'AED', 0.352),
-    ('IN', 'India',          '🇮🇳', 'INR', 0.065),
-    ('ID', 'Indonesia',      '🇮🇩', 'IDR', 0.191),
-    ('PH', 'Philippines',    '🇵🇭', 'PHP', 0.178),
-    ('AU', 'Australia',      '🇦🇺', 'AUD', 0.507);
-
--- Bind accounts and profiles to a country. Default to ZA (made in Durban).
-ALTER TABLE accounts
-    ADD COLUMN country_code text NOT NULL DEFAULT 'ZA' REFERENCES countries(code);
-CREATE INDEX accounts_country_code_idx ON accounts (country_code);
-
-ALTER TABLE profiles
-    ADD COLUMN country_code text NULL REFERENCES countries(code);
-
--- Reference tables are world-readable; writes restricted to platform admin.
-ALTER TABLE currencies ENABLE ROW LEVEL SECURITY;
-CREATE POLICY currencies_read ON currencies FOR SELECT USING (true);
-CREATE POLICY currencies_insert ON currencies FOR INSERT WITH CHECK (app.is_platform_admin());
-CREATE POLICY currencies_update ON currencies FOR UPDATE USING (app.is_platform_admin()) WITH CHECK (app.is_platform_admin());
-CREATE POLICY currencies_delete ON currencies FOR DELETE USING (app.is_platform_admin());
-
-ALTER TABLE fx_rates ENABLE ROW LEVEL SECURITY;
-CREATE POLICY fx_rates_read ON fx_rates FOR SELECT USING (true);
-CREATE POLICY fx_rates_insert ON fx_rates FOR INSERT WITH CHECK (app.is_platform_admin());
-CREATE POLICY fx_rates_update ON fx_rates FOR UPDATE USING (app.is_platform_admin()) WITH CHECK (app.is_platform_admin());
-CREATE POLICY fx_rates_delete ON fx_rates FOR DELETE USING (app.is_platform_admin());
-
-ALTER TABLE countries ENABLE ROW LEVEL SECURITY;
-CREATE POLICY countries_read ON countries FOR SELECT USING (true);
-CREATE POLICY countries_insert ON countries FOR INSERT WITH CHECK (app.is_platform_admin());
-CREATE POLICY countries_update ON countries FOR UPDATE USING (app.is_platform_admin()) WITH CHECK (app.is_platform_admin());
-CREATE POLICY countries_delete ON countries FOR DELETE USING (app.is_platform_admin());
-
--- ============================================================================
--- 20260505090000_payments.sql
--- ============================================================================
-
--- 20260505090000_payments.sql
--- Paystack payments: per-attempt intents and provider webhook event log.
--- Wallet ledger stays in ZAR; intents store the raw provider amount as ZAR-cents.
-
-ALTER TABLE accounts
-    ADD COLUMN paystack_customer_code text NULL;
-CREATE UNIQUE INDEX accounts_paystack_customer_code_idx
-    ON accounts (paystack_customer_code)
-    WHERE paystack_customer_code IS NOT NULL;
-
-ALTER TABLE wallets
-    ALTER COLUMN currency SET DEFAULT 'ZAR';
-
-CREATE TABLE payment_intents (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    initiated_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-    provider text NOT NULL CHECK (provider IN ('paystack')),
-    provider_reference text NOT NULL,
-    purpose text NOT NULL DEFAULT 'wallet_topup' CHECK (purpose IN ('wallet_topup','subscription')),
-    amount_cents bigint NOT NULL CHECK (amount_cents > 0),
-    currency text NOT NULL DEFAULT 'ZAR',
-    status text NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending','succeeded','failed','abandoned')),
-    authorization_url text NULL,
-    access_code text NULL,
-    raw_init jsonb NOT NULL DEFAULT '{}'::jsonb,
-    raw_verify jsonb NOT NULL DEFAULT '{}'::jsonb,
-    completed_at timestamptz NULL,
-    -- Set when this intent was credited to the wallet (idempotency anchor).
-    credited_tx_id uuid NULL REFERENCES wallet_transactions(id) ON DELETE SET NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE payment_intents IS 'One row per Paystack transaction attempt; resolves to a wallet credit on success.';
-CREATE UNIQUE INDEX payment_intents_provider_reference_idx
-    ON payment_intents (provider, provider_reference);
-CREATE INDEX payment_intents_account_id_created_at_idx
-    ON payment_intents (account_id, created_at DESC);
-CREATE INDEX payment_intents_status_idx ON payment_intents (status);
-
-CREATE TABLE webhook_events (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    provider text NOT NULL CHECK (provider IN ('paystack','whatsapp','stripe')),
-    -- For Paystack we use the body's `data.id` (numeric) as the dedupe key.
-    -- Falls back to a sha256 of the body if the provider omits an id.
-    event_id text NOT NULL,
-    event_type text NOT NULL,
-    signature text NULL,
-    payload jsonb NOT NULL,
-    processed_at timestamptz NULL,
-    error text NULL,
-    received_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE webhook_events IS 'Append-only inbound webhook log. Used for idempotency and audit.';
-CREATE UNIQUE INDEX webhook_events_provider_event_id_idx
-    ON webhook_events (provider, event_id);
-CREATE INDEX webhook_events_received_at_idx ON webhook_events (received_at DESC);
-
--- RLS: account-admin reads its own intents; webhooks bypass via anon db.
-ALTER TABLE payment_intents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY payment_intents_admin ON payment_intents
-    FOR ALL
-    USING (app.is_account_admin(account_id) OR app.current_user_id() IS NULL)
-    WITH CHECK (app.is_account_admin(account_id) OR app.current_user_id() IS NULL);
-
--- webhook_events: only platform admin or anon (server-side) can touch.
-ALTER TABLE webhook_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY webhook_events_admin ON webhook_events
-    FOR ALL
-    USING (app.is_platform_admin() OR app.current_user_id() IS NULL)
-    WITH CHECK (app.is_platform_admin() OR app.current_user_id() IS NULL);
-
--- ============================================================================
--- 20260505100000_maintenance.sql
--- ============================================================================
-
--- 20260505100000_maintenance.sql
--- Maintenance tracking for access points: cumulative meters, service events
--- log, and a derived next-due timestamp.
---
 -- Each access_logs insert advances the per-access-point meter using the gate
 -- movement constant from location_settings (meters per op). Service events
 -- snapshot the meter at service time and set a threshold for the next.
@@ -1375,294 +1235,12 @@ CREATE POLICY maintenance_events_update ON maintenance_events
     );
 
 -- ============================================================================
--- 20260505110000_referrals.sql
+-- Temporary access grants
 -- ============================================================================
-
--- 20260505110000_referrals.sql
--- Referral program: per-user slug, attribution, ongoing earnings ledger,
--- KYC profile (required before payout), and payout requests.
-
--- ---------------------------------------------------------------------------
--- users: slug + referrer pointer
--- ---------------------------------------------------------------------------
-ALTER TABLE users
-    ADD COLUMN referral_slug text NULL,
-    ADD COLUMN referral_slug_updated_at timestamptz NULL,
-    ADD COLUMN referred_by_user_id uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-    ADD COLUMN referral_attributed_at timestamptz NULL;
-
-ALTER TABLE users
-    ADD CONSTRAINT users_referral_slug_format CHECK (
-        referral_slug IS NULL
-        OR (
-            length(referral_slug) BETWEEN 3 AND 30
-            AND referral_slug ~ '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
-            AND referral_slug !~ '--'
-        )
-    );
-
-CREATE UNIQUE INDEX users_referral_slug_idx
-    ON users (referral_slug)
-    WHERE referral_slug IS NOT NULL;
-CREATE INDEX users_referred_by_user_id_idx ON users (referred_by_user_id);
-
--- ---------------------------------------------------------------------------
--- attribution: one row per referee, locks who they belong to
--- ---------------------------------------------------------------------------
-CREATE TABLE referral_attributions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    referrer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    referee_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    via_slug text NOT NULL,
-    landed_at timestamptz NULL,
-    attributed_at timestamptz NOT NULL DEFAULT now(),
-    created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (referee_user_id),
-    CHECK (referrer_user_id <> referee_user_id)
-);
-COMMENT ON TABLE referral_attributions IS 'Locks each referee to exactly one referrer for life.';
-CREATE INDEX referral_attributions_referrer_idx
-    ON referral_attributions (referrer_user_id);
-
--- ---------------------------------------------------------------------------
--- earnings ledger: one row per crediting event
--- ---------------------------------------------------------------------------
-CREATE TABLE referral_earnings (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    referrer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    referee_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    source_payment_intent_id uuid NULL REFERENCES payment_intents(id) ON DELETE SET NULL,
-    source_kind text NOT NULL CHECK (source_kind IN ('wallet_topup','subscription','adjustment')),
-    amount_zar_cents bigint NOT NULL CHECK (amount_zar_cents > 0),
-    rate_bps int NOT NULL CHECK (rate_bps >= 0 AND rate_bps <= 10000),
-    note text NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE referral_earnings IS 'Append-only ledger of referral credits.';
-CREATE INDEX referral_earnings_referrer_created_idx
-    ON referral_earnings (referrer_user_id, created_at DESC);
-CREATE UNIQUE INDEX referral_earnings_per_intent_idx
-    ON referral_earnings (source_payment_intent_id)
-    WHERE source_payment_intent_id IS NOT NULL;
-
--- ---------------------------------------------------------------------------
--- KYC profile: required before a payout can be requested
--- ---------------------------------------------------------------------------
-CREATE TABLE kyc_profiles (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    full_name text NULL,
-    contact_email citext NULL,
-    cellphone text NULL,
-    id_kind text NULL CHECK (id_kind IS NULL OR id_kind IN ('za_id','passport')),
-    id_number text NULL,
-    bank_name text NULL,
-    bank_branch_code text NULL,
-    bank_account_number text NULL,
-    bank_account_holder text NULL,
-    bank_account_type text NULL CHECK (
-        bank_account_type IS NULL OR bank_account_type IN ('cheque','savings','transmission')
-    ),
-    verified_at timestamptz NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE kyc_profiles IS 'KYC details captured before payout. One per user.';
-
--- ---------------------------------------------------------------------------
--- payout requests
--- ---------------------------------------------------------------------------
-CREATE TABLE payout_requests (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    amount_zar_cents bigint NOT NULL CHECK (amount_zar_cents > 0),
-    status text NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending','approved','paid','rejected','cancelled')),
-    -- KYC values frozen at request time so historical records stay accurate.
-    kyc_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
-    paystack_transfer_code text NULL,
-    notes text NULL,
-    requested_at timestamptz NOT NULL DEFAULT now(),
-    processed_at timestamptz NULL,
-    processed_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
-);
-COMMENT ON TABLE payout_requests IS 'User-initiated payout against earned referral balance.';
-CREATE INDEX payout_requests_user_status_idx ON payout_requests (user_id, status);
-CREATE INDEX payout_requests_status_idx ON payout_requests (status);
-
--- ---------------------------------------------------------------------------
--- trigger: when a payment intent flips to succeeded, write a referral earning
--- if the payer's user has a referrer. Idempotent via the unique-per-intent
--- index, so reruns are safe.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION app.payment_intents_attribute_referral()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-    referrer uuid;
-    rate_bps_val int := 1000;  -- 10%
-    payer uuid;
-BEGIN
-    IF NEW.status <> 'succeeded' THEN
-        RETURN NEW;
-    END IF;
-    IF TG_OP = 'UPDATE' AND OLD.status = 'succeeded' THEN
-        RETURN NEW;
-    END IF;
-    IF NEW.purpose <> 'wallet_topup' THEN
-        RETURN NEW;
-    END IF;
-
-    payer := NEW.initiated_by;
-    IF payer IS NULL THEN
-        RETURN NEW;
-    END IF;
-
-    SELECT referred_by_user_id INTO referrer FROM users WHERE id = payer;
-    IF referrer IS NULL OR referrer = payer THEN
-        RETURN NEW;
-    END IF;
-
-    INSERT INTO referral_earnings
-        (referrer_user_id, referee_user_id, source_payment_intent_id,
-         source_kind, amount_zar_cents, rate_bps)
-    VALUES
-        (referrer, payer, NEW.id, 'wallet_topup',
-         GREATEST(1, (NEW.amount_cents * rate_bps_val) / 10000),
-         rate_bps_val)
-    ON CONFLICT (source_payment_intent_id) DO NOTHING;
-
-    RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS payment_intents_attribute_referral_trg ON payment_intents;
-CREATE TRIGGER payment_intents_attribute_referral_trg
-AFTER INSERT OR UPDATE ON payment_intents
-FOR EACH ROW EXECUTE FUNCTION app.payment_intents_attribute_referral();
-
--- ---------------------------------------------------------------------------
--- RLS
--- ---------------------------------------------------------------------------
-
--- referral_attributions: visible to either side of the relationship + admin.
--- Writes only by the trigger / app via anon (current_user_id IS NULL).
-ALTER TABLE referral_attributions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY referral_attributions_select ON referral_attributions
-    FOR SELECT
-    USING (
-        referrer_user_id = app.current_user_id()
-        OR referee_user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    );
-CREATE POLICY referral_attributions_write ON referral_attributions
-    FOR INSERT
-    WITH CHECK (app.current_user_id() IS NULL OR app.is_platform_admin());
-
--- referral_earnings: a referrer reads their own. Writes only via system path.
-ALTER TABLE referral_earnings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY referral_earnings_select ON referral_earnings
-    FOR SELECT
-    USING (
-        referrer_user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    );
-CREATE POLICY referral_earnings_write ON referral_earnings
-    FOR INSERT
-    WITH CHECK (app.current_user_id() IS NULL OR app.is_platform_admin());
-
--- kyc_profiles: each user manages their own.
-ALTER TABLE kyc_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY kyc_profiles_self ON kyc_profiles
-    FOR ALL
-    USING (
-        user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    )
-    WITH CHECK (
-        user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    );
-
--- payout_requests: user reads/creates their own; user can cancel pending;
--- admin owns approve/pay/reject.
-ALTER TABLE payout_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY payout_requests_select ON payout_requests
-    FOR SELECT
-    USING (
-        user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    );
-CREATE POLICY payout_requests_insert ON payout_requests
-    FOR INSERT
-    WITH CHECK (
-        user_id = app.current_user_id()
-        OR app.current_user_id() IS NULL
-        OR app.is_platform_admin()
-    );
-CREATE POLICY payout_requests_cancel ON payout_requests
-    FOR UPDATE
-    USING (user_id = app.current_user_id() AND status = 'pending')
-    WITH CHECK (user_id = app.current_user_id() AND status IN ('pending','cancelled'));
-CREATE POLICY payout_requests_admin ON payout_requests
-    FOR UPDATE
-    USING (app.is_platform_admin() OR app.current_user_id() IS NULL)
-    WITH CHECK (app.is_platform_admin() OR app.current_user_id() IS NULL);
-
--- ============================================================================
--- 20260505120000_monthly_payouts.sql
--- ============================================================================
-
--- 20260505120000_monthly_payouts.sql
--- Convert payout_requests to a fully automatic monthly system. Adds a period
--- key (YYYY-MM) so the cron can dedupe per user per month, plus a Paystack
--- transfer recipient cache on kyc_profiles and the transfer-id / failure-
--- reason columns on the request itself.
-
-ALTER TABLE kyc_profiles
-    ADD COLUMN paystack_recipient_code text NULL,
-    ADD COLUMN paystack_recipient_synced_at timestamptz NULL;
-
-ALTER TABLE payout_requests
-    ADD COLUMN payout_period text NULL,
-    ADD COLUMN paystack_transfer_id text NULL,
-    ADD COLUMN failure_reason text NULL,
-    ADD COLUMN auto_generated boolean NOT NULL DEFAULT false;
-
--- Period key shape: 'YYYY-MM' (UTC). Validated when present.
-ALTER TABLE payout_requests
-    ADD CONSTRAINT payout_requests_period_format
-    CHECK (payout_period IS NULL OR payout_period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$');
-
--- One live payout per user per period. Failed/cancelled rows do not block
--- a future retry for the same period.
-CREATE UNIQUE INDEX payout_requests_user_period_live_idx
-    ON payout_requests (user_id, payout_period)
-    WHERE payout_period IS NOT NULL
-      AND status IN ('pending', 'approved', 'paid');
-
-CREATE INDEX payout_requests_period_idx ON payout_requests (payout_period);
-CREATE UNIQUE INDEX payout_requests_paystack_transfer_id_idx
-    ON payout_requests (paystack_transfer_id)
-    WHERE paystack_transfer_id IS NOT NULL;
-
--- ============================================================================
--- 20260505130000_temp_access.sql
--- ============================================================================
-
--- 20260505130000_temp_access.sql
--- Temporary access grants. A WhatsApp number can be authorised to operate one
--- or more access points for a defined time window, with an optional cap on
--- the number of uses. Membership of a registered user is NOT required — the
--- grant is keyed on the phone number itself.
+-- A WhatsApp number can be authorised to operate one or more access points
+-- for a defined time window, with an optional cap on the number of uses.
+-- Membership of a registered user is NOT required — the grant is keyed on
+-- the phone number itself.
 
 CREATE TABLE temporary_access_grants (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1827,72 +1405,11 @@ CREATE POLICY temporary_access_grant_access_points_write
     );
 
 -- ============================================================================
--- 20260505140000_fix_referral_trigger.sql
+-- Force row-level security
 -- ============================================================================
-
--- 20260505140000_fix_referral_trigger.sql
--- The referral attribution trigger writes referral_earnings with
--- ON CONFLICT (source_payment_intent_id), but that column has a partial
--- unique index (WHERE source_payment_intent_id IS NOT NULL). Postgres
--- requires the predicate be repeated on ON CONFLICT for inference; without
--- it Postgres raises 42P10 ("there is no unique or exclusion constraint
--- matching the ON CONFLICT specification") and the trigger aborts the
--- caller's UPDATE, blocking the wallet credit.
-
-CREATE OR REPLACE FUNCTION app.payment_intents_attribute_referral()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-    referrer uuid;
-    rate_bps_val int := 1000;  -- 10%
-    payer uuid;
-BEGIN
-    IF NEW.status <> 'succeeded' THEN
-        RETURN NEW;
-    END IF;
-    IF TG_OP = 'UPDATE' AND OLD.status = 'succeeded' THEN
-        RETURN NEW;
-    END IF;
-    IF NEW.purpose <> 'wallet_topup' THEN
-        RETURN NEW;
-    END IF;
-
-    payer := NEW.initiated_by;
-    IF payer IS NULL THEN
-        RETURN NEW;
-    END IF;
-
-    SELECT referred_by_user_id INTO referrer FROM users WHERE id = payer;
-    IF referrer IS NULL OR referrer = payer THEN
-        RETURN NEW;
-    END IF;
-
-    INSERT INTO referral_earnings
-        (referrer_user_id, referee_user_id, source_payment_intent_id,
-         source_kind, amount_zar_cents, rate_bps)
-    VALUES
-        (referrer, payer, NEW.id, 'wallet_topup',
-         GREATEST(1, (NEW.amount_cents * rate_bps_val) / 10000),
-         rate_bps_val)
-    ON CONFLICT (source_payment_intent_id)
-        WHERE source_payment_intent_id IS NOT NULL
-        DO NOTHING;
-
-    RETURN NEW;
-END;
-$$;
-
--- ============================================================================
--- 20260505150000_force_rls.sql
--- ============================================================================
-
--- 20260505150000_force_rls.sql
 -- ENABLE ROW LEVEL SECURITY only enforces RLS on non-owner roles. The app
 -- connects with the role that owns the schema (whatsacc_app), so without
--- this every policy was being silently bypassed. FORCE applies the policies
+-- this every policy would be silently bypassed. FORCE applies the policies
 -- to the owner too. Superusers still bypass — production must use a non-
 -- superuser role for the application connection.
 
@@ -1914,10 +1431,8 @@ END
 $$;
 
 -- ============================================================================
--- 20260505160000_internal_role_for_rls_functions.sql
+-- Internal role for RLS helper / trigger functions
 -- ============================================================================
-
--- 20260505160000_internal_role_for_rls_functions.sql
 -- With FORCE ROW LEVEL SECURITY on, SECURITY DEFINER helper functions like
 -- app.is_account_member recurse into the policies of the tables they read
 -- (account_members's SELECT policy calls is_account_member, which queries
@@ -1926,8 +1441,8 @@ $$;
 -- lets them read past the policies.
 --
 -- The same role owns trigger functions that write into system-managed
--- tables (meters, referral earnings, grant consumption) where there is no
--- direct write policy on purpose.
+-- tables (meters, grant consumption) where there is no direct write policy
+-- on purpose.
 --
 -- The whatsacc_internal role is created out-of-band by the DB bootstrap
 -- step (it requires CREATEROLE privilege, which the app role doesn't have).
@@ -1955,7 +1470,6 @@ ALTER FUNCTION app.is_account_admin(uuid)              OWNER TO whatsacc_interna
 ALTER FUNCTION app.access_points_init_meters()         OWNER TO whatsacc_internal;
 ALTER FUNCTION app.access_logs_advance_meter()         OWNER TO whatsacc_internal;
 ALTER FUNCTION app.maintenance_events_after_insert()   OWNER TO whatsacc_internal;
-ALTER FUNCTION app.payment_intents_attribute_referral() OWNER TO whatsacc_internal;
 ALTER FUNCTION app.try_consume_grant(text, uuid, timestamptz) OWNER TO whatsacc_internal;
 
 -- Make sure the app role can call them.
@@ -1964,12 +1478,39 @@ GRANT EXECUTE ON FUNCTION app.is_account_admin(uuid)  TO PUBLIC;
 GRANT EXECUTE ON FUNCTION app.try_consume_grant(text, uuid, timestamptz) TO PUBLIC;
 
 -- ============================================================================
--- 20260505170000_payout_requests_updated_at.sql
+-- Application role for per-request RLS (from 20260507000000_app_role_for_rls)
 -- ============================================================================
+-- Creates a NOLOGIN, non-BYPASSRLS role that the backend SET LOCAL ROLEs to
+-- inside every request transaction (see lib/db.ts withRLS). The connection
+-- itself still authenticates as the database owner (neondb_owner on Neon,
+-- whatsacc_app on local) — but on Neon that role has BYPASSRLS=true, which
+-- silently disables every RLS policy. Switching role per-transaction to a
+-- non-BYPASSRLS role re-arms the policies without burning a separate
+-- connection pool. Idempotent.
 
--- 20260505170000_payout_requests_updated_at.sql
--- The cron + webhook update payout_requests.updated_at, but the column was
--- never added. Add it now.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'whatsacc_app') THEN
+        CREATE ROLE whatsacc_app NOLOGIN;
+    END IF;
+    IF current_user <> 'whatsacc_app' THEN
+        EXECUTE format('GRANT whatsacc_app TO %I', current_user);
+    END IF;
+END $$;
 
-ALTER TABLE payout_requests
-    ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+-- Schema + table privileges. RLS will still filter rows; these grants only
+-- decide whether the role can see/touch the relations at all.
+GRANT USAGE ON SCHEMA public TO whatsacc_app;
+GRANT USAGE ON SCHEMA app TO whatsacc_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO whatsacc_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO whatsacc_app;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO whatsacc_app;
+
+-- Default privileges so future tables/sequences/functions are also reachable
+-- without re-running this migration. Run with neondb_owner / table owner.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO whatsacc_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO whatsacc_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA app
+    GRANT EXECUTE ON FUNCTIONS TO whatsacc_app;

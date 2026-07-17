@@ -46,8 +46,8 @@ export async function setupTestDb(): Promise<TestDb> {
 }
 
 /**
- * Truncate all tables that hold per-test data. Reference tables (countries,
- * currencies, fx_rates, plans) are repopulated below.
+ * Truncate all tables that hold per-test data. Reference tables (countries)
+ * are preserved.
  */
 export async function resetData(): Promise<void> {
   const { sql } = await setupTestDb();
@@ -55,10 +55,7 @@ export async function resetData(): Promise<void> {
   // migration tracker so we don't have to re-migrate between tests.
   const PRESERVE = new Set([
     'schema_migrations',
-    'currencies',
     'countries',
-    'fx_rates',
-    'plans',
   ]);
   const rows = await sql<{ tablename: string }[]>`
     select tablename from pg_tables where schemaname = 'public'

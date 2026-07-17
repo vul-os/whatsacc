@@ -75,7 +75,7 @@ async function register(email, displayName, locationName) {
   const r = await api('POST', '/auth/register', {
     json: {
       email, password: 'Test_Password_99', display_name: displayName,
-      location_name: locationName, country_code: 'ZA', account_type: 'personal',
+      location_name: locationName, country_code: 'ZA',
     },
   });
   if (r.status !== 201) throw new Error(`register ${email}: ${r.status} ${r.text}`);
@@ -135,7 +135,6 @@ ok('Bob created loc/dev/ap',   `loc ${bob.locId.slice(0,8)}…`);
 step('Bob tries to read Alice\'s tenant data');
 expectDenied('GET Alice\'s account details',         await api('GET', `/accounts/${aliceOrg}`,           { token: bobTok }));
 expectDenied('GET Alice\'s account members',         await api('GET', `/accounts/${aliceOrg}/members`,   { token: bobTok }));
-expectDenied('GET Alice\'s account billing',         await api('GET', `/billing/accounts/${aliceOrg}/billing`, { token: bobTok }));
 expectDenied('LIST Alice\'s locations (by accountId)', await api('GET', `/locations/accounts/${aliceOrg}/locations`, { token: bobTok }));
 expectDenied('GET Alice\'s location by id',          await api('GET', `/locations/${alice.locId}`,       { token: bobTok }));
 expectDenied('GET Alice\'s access-point by id',      await api('GET', `/access/access-points/${alice.apId}`, { token: bobTok }));
@@ -168,7 +167,6 @@ expectDenied('INVITE someone to Alice\'s org',
 step('Alice tries to read Bob\'s tenant data (mirror — same pattern)');
 expectDenied('GET Bob\'s account details',     await api('GET', `/accounts/${bobOrg}`,           { token: aliceTok }));
 expectDenied('GET Bob\'s account members',     await api('GET', `/accounts/${bobOrg}/members`,   { token: aliceTok }));
-expectDenied('GET Bob\'s account billing',     await api('GET', `/billing/accounts/${bobOrg}/billing`, { token: aliceTok }));
 expectDenied('GET Bob\'s location by id',      await api('GET', `/locations/${bob.locId}`,       { token: aliceTok }));
 expectDenied('GET Bob\'s access-point by id',  await api('GET', `/access/access-points/${bob.apId}`, { token: aliceTok }));
 

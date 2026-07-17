@@ -18,7 +18,6 @@ import {
 } from '../lib/google.ts';
 import { BadRequest, Conflict, Forbidden, NotFound, Unauthorized } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
-import { isValidSlug, randomSlug } from '../lib/slug.ts';
 import type { TxSql } from '../lib/db.ts';
 
 const ACCESS_TTL = 15 * 60; // 15 min
@@ -30,22 +29,17 @@ const registerSchema = z
     display_name: z.string().min(1).max(120),
     phone_e164: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
     // The user names their first physical place ("Home", "Sunset Apartments",
-    // etc.). Each location is its own billing tenant — bootstrap creates an
-    // account and a location of the same name, both owned by the new user.
+    // etc.). Each location is its own tenant — bootstrap creates an account
+    // and a location of the same name, both owned by the new user.
     location_name: z.string().min(1).max(120).optional(),
     country_code: z
       .string()
       .length(2)
       .transform((v) => v.toUpperCase())
       .default('ZA'),
+    // Accepted for client compatibility; carries no behaviour server-side.
     account_type: z.enum(['personal', 'business']).default('personal'),
     invite_token: z.string().min(1).optional(),
-    referral_slug: z
-      .string()
-      .min(3)
-      .max(30)
-      .transform((v) => v.toLowerCase())
-      .optional(),
   })
   .strict();
 
@@ -98,50 +92,6 @@ type RefreshRow = {
   replaced_by: string | null;
 };
 
-async function assignNewUserSlug(tx: TxSql, userId: string): Promise<string> {
-  for (let i = 0; i < 5; i++) {
-    const candidate = randomSlug(8);
-    if (!isValidSlug(candidate)) continue;
-    const rows = await tx<{ id: string }[]>`
-      update users set referral_slug = ${candidate}
-      where id = ${userId} and referral_slug is null
-      returning id
-    `;
-    if (rows.length > 0) return candidate;
-    // Conflict path: slug taken; loop and try again.
-    const existing = await tx<{ referral_slug: string | null }[]>`
-      select referral_slug from users where id = ${userId}
-    `;
-    if (existing[0]?.referral_slug) return existing[0].referral_slug;
-  }
-  throw new Error('failed_to_mint_slug');
-}
-
-async function attributeReferral(
-  tx: TxSql,
-  refereeUserId: string,
-  rawSlug: string,
-): Promise<void> {
-  const slug = rawSlug.toLowerCase();
-  if (!isValidSlug(slug)) return;
-  const rows = await tx<{ id: string }[]>`
-    select id from users where referral_slug = ${slug}
-  `;
-  const referrer = rows[0];
-  if (!referrer || referrer.id === refereeUserId) return;
-  await tx`
-    update users
-    set referred_by_user_id = ${referrer.id},
-        referral_attributed_at = now()
-    where id = ${refereeUserId} and referred_by_user_id is null
-  `;
-  await tx`
-    insert into referral_attributions (referrer_user_id, referee_user_id, via_slug)
-    values (${referrer.id}, ${refereeUserId}, ${slug})
-    on conflict (referee_user_id) do nothing
-  `;
-}
-
 // Generate a URL-safe slug for a new location row. Locations are unique
 // per (account_id, slug); we always tack on a short timestamp suffix so two
 // locations called "Home" under the same account never collide.
@@ -158,7 +108,7 @@ export function makeLocationSlug(name: string): string {
 
 export async function bootstrapPersonalAccount(
   tx: TxSql,
-  opts: { userId: string; name: string; countryCode: string; billingType?: 'personal' | 'business' },
+  opts: { userId: string; name: string; countryCode: string },
 ): Promise<string> {
   const country = await tx<{ code: string }[]>`
     select code from countries where code = ${opts.countryCode}
@@ -166,8 +116,8 @@ export async function bootstrapPersonalAccount(
   const code = country[0]?.code ?? 'ZA';
 
   const [acct] = await tx<{ id: string }[]>`
-    insert into accounts (name, billing_type, status, country_code)
-    values (${opts.name}, ${opts.billingType ?? 'personal'}, 'active', ${code})
+    insert into accounts (name, status, country_code)
+    values (${opts.name}, 'active', ${code})
     returning id
   `;
   const accountId = acct!.id;
@@ -177,15 +127,6 @@ export async function bootstrapPersonalAccount(
     values (${accountId}, ${opts.userId}, 'owner', 'active')
   `;
 
-  await tx`insert into wallets (account_id, currency) values (${accountId}, 'ZAR')`;
-
-  const [plan] = await tx<{ id: string }[]>`select id from plans where code = 'free' limit 1`;
-  if (plan) {
-    await tx`
-      insert into account_subscriptions (account_id, plan_id, status)
-      values (${accountId}, ${plan.id}, 'active')
-    `;
-  }
   return accountId;
 }
 
@@ -236,7 +177,7 @@ function authRouter() {
 
   app.post('/register', zValidator('json', registerSchema), async (c) => {
     const {
-      email, password, display_name, phone_e164, location_name, country_code, account_type, referral_slug, invite_token,
+      email, password, display_name, phone_e164, location_name, country_code, invite_token,
     } = c.req.valid('json');
     if (!invite_token && !location_name) {
       throw BadRequest('location_required', 'Location name is required');
@@ -336,7 +277,6 @@ function authRouter() {
           userId,
           name: location_name!,
           countryCode: country_code,
-          billingType: account_type,
         });
 
         // Each account is anchored to exactly one location of the same name —
@@ -360,12 +300,6 @@ function authRouter() {
           values (${location!.id}, ${userId}, 'owner')
           on conflict (location_id, user_id) do update set role = excluded.role, updated_at = now()
         `;
-      }
-
-      await assignNewUserSlug(tx, userId);
-
-      if (referral_slug) {
-        await attributeReferral(tx, userId, referral_slug);
       }
 
       const userRows = await tx<UserRow[]>`
@@ -709,10 +643,9 @@ function authRouter() {
         status: string;
         email_verified_at: Date | null;
         is_platform_admin: boolean;
-        referral_slug: string | null;
         has_password: boolean;
       }[]>`
-        select id, email, status, email_verified_at, is_platform_admin, referral_slug,
+        select id, email, status, email_verified_at, is_platform_admin,
                (password_hash is not null) as has_password
         from users where id = ${user.sub}
       `;
@@ -749,11 +682,10 @@ function authRouter() {
       const accounts = await tx<{
         account_id: string;
         name: string;
-        billing_type: string;
         role: string;
         status: string;
       }[]>`
-        select a.id as account_id, a.name, a.billing_type, am.role, am.status
+        select a.id as account_id, a.name, am.role, am.status
         from account_members am
         join accounts a on a.id = am.account_id
         where am.user_id = ${user.sub}
@@ -866,12 +798,10 @@ function authRouter() {
   app.get('/google/start', async (c) => {
     const { codeVerifier, codeChallenge } = await makePkce();
     const state = randomToken(16);
-    const refSlug = c.req.query('ref');
     const cookieJwt = await signShortToken(
       {
         code_verifier: codeVerifier,
         state,
-        ref_slug: refSlug && isValidSlug(refSlug.toLowerCase()) ? refSlug.toLowerCase() : null,
       },
       600,
     );
@@ -966,13 +896,7 @@ function authRouter() {
           userId,
           name: idClaims.name ?? idClaims.email,
           countryCode: 'ZA',
-          billingType: 'personal',
         });
-        await assignNewUserSlug(tx, userId);
-        const refSlug = stateClaims.ref_slug;
-        if (typeof refSlug === 'string') {
-          await attributeReferral(tx, userId, refSlug);
-        }
       }
 
       const userRows = await tx<UserRow[]>`

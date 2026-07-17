@@ -9,11 +9,7 @@ import {
   sendWhatsAppInteractive,
   type WhatsAppInteractive,
 } from '../lib/whatsapp.ts';
-import { tryConsumeGrant, logAccess, WHATSAPP_ACCESS_PRICE_CENTS } from './access.ts';
-
-// Send a "running low" hint the user has at most this many WhatsApp opens
-// left before the wallet can't cover the next operation.
-const LOW_BALANCE_OPS_THRESHOLD = 5;
+import { tryConsumeGrant, logAccess } from './access.ts';
 import { getAvailableAccessPoints, type AvailableAP } from '../lib/access-lookup.ts';
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -153,39 +149,14 @@ function pushLocationMenu(
   });
 }
 
-function lowBalanceMessage(balanceCents: number | null): string | null {
-  if (balanceCents === null) return null;
-  const opsLeft = Math.floor(balanceCents / WHATSAPP_ACCESS_PRICE_CENTS);
-  if (opsLeft > LOW_BALANCE_OPS_THRESHOLD) return null;
-  const portal = `${getEnv().APP_PUBLIC_URL.replace(/\/$/, '')}/app/billing`;
-  if (opsLeft <= 0) {
-    return `⚠ Wallet empty after this. Top up at ${portal} or use the web portal — the next WhatsApp open/close won't go through.`;
-  }
-  return `⚠ You have ${opsLeft} WhatsApp open${opsLeft === 1 ? '' : 's'} left. Top up at ${portal} or contact the system admin to avoid being locked out. The web portal still works at no charge.`;
-}
-
-async function gateFooter(tx: TxSql, gate: AvailableAP): Promise<string | undefined> {
+function gateFooter(gate: AvailableAP): string | undefined {
   if (gate.type === 'visitor') {
     return `You have ${gate.max_uses === null ? 'unlimited' : (gate.max_uses ?? 0) - (gate.uses_count ?? 0)} uses remaining.`;
   }
-  const apData = await tx<{ account_id: string }[]>`
-    select l.account_id
-    from access_points ap
-    join locations l on l.id = ap.location_id
-    where ap.id = ${gate.ap_id}
-  `;
-  if (!apData[0]) return undefined;
-  const wallet = await tx<{ balance_cents: string; currency: string }[]>`
-    select balance_cents::text as balance_cents, currency
-    from wallets
-    where account_id = ${apData[0].account_id}
-  `;
-  const bal = (Number(wallet[0]?.balance_cents ?? 0) / 100).toFixed(2);
-  return `Wallet: ${wallet[0]?.currency ?? 'ZAR'} ${bal} | WhatsApp open/close: ZAR 0.50`;
+  return undefined;
 }
 
-async function pushGateMenu(
-  tx: TxSql,
+function pushGateMenu(
   replies: PendingReply[],
   to: string,
   chatId: string,
@@ -194,7 +165,7 @@ async function pushGateMenu(
 ) {
   if (gates.length === 1) {
     const gate = gates[0]!;
-    const footer = await gateFooter(tx, gate);
+    const footer = gateFooter(gate);
     replies.push({
       type: 'interactive',
       to,
@@ -211,7 +182,7 @@ async function pushGateMenu(
     return;
   }
 
-  const footer = gates[0] ? await gateFooter(tx, gates[0]) : undefined;
+  const footer = gates[0] ? gateFooter(gates[0]) : undefined;
   replies.push({
     type: 'interactive',
     to,
@@ -281,30 +252,18 @@ async function pushAccessCommandResult(
     return;
   }
 
-  const result = await logAccess(tx, {
+  await logAccess(tx, {
     user_id: memberProfileId,
     access_point_id: accessPointId,
     command,
     source: 'whatsapp',
   });
 
-  if (!result.ok) {
-    replies.push({
-      type: 'text',
-      to,
-      chatId,
-      body: `Sorry, gate could not be ${command === 'close' ? 'closed' : 'opened'}: ${result.error === 'insufficient_wallet_balance' || result.error === 'quota_exhausted' ? 'Insufficient wallet balance. Please top up or contact the admin.' : 'System error.'}`,
-    });
-    return;
-  }
-
-  const baseLine = `${command === 'close' ? 'Closing' : 'Opening'} ${gateName}...`;
-  const lowBalanceHint = lowBalanceMessage(result.wallet_balance_cents);
   replies.push({
     type: 'text',
     to,
     chatId,
-    body: lowBalanceHint ? `${baseLine}\n\n${lowBalanceHint}` : baseLine,
+    body: `${command === 'close' ? 'Closing' : 'Opening'} ${gateName}...`,
   });
 
   if (command === 'open') {
@@ -490,7 +449,7 @@ function whatsappRouter() {
                 }
 
                 if (mentionedLocation) {
-                  await pushGateMenu(tx, replies, msg.from, chat.id, mentionedLocation.name, locationFiltered);
+                  pushGateMenu(replies, msg.from, chat.id, mentionedLocation.name, locationFiltered);
                   continue;
                 }
 
@@ -499,7 +458,7 @@ function whatsappRouter() {
                   continue;
                 }
 
-                await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
+                pushGateMenu(replies, msg.from, chat.id, locations[0]!.name, allGrants);
                 continue;
               }
 
@@ -507,14 +466,14 @@ function whatsappRouter() {
                 if (locations.length > 1) {
                   pushLocationMenu(replies, msg.from, chat.id, locations);
                 } else {
-                  await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
+                  pushGateMenu(replies, msg.from, chat.id, locations[0]!.name, allGrants);
                 }
                 continue;
               }
 
               // Fallback: Show welcome menu
               if (locations.length === 1) {
-                await pushGateMenu(tx, replies, msg.from, chat.id, locations[0]!.name, allGrants);
+                pushGateMenu(replies, msg.from, chat.id, locations[0]!.name, allGrants);
               } else {
                 pushLocationMenu(replies, msg.from, chat.id, locations);
               }
@@ -535,7 +494,7 @@ function whatsappRouter() {
                       body: 'That location has no active gates or doors ready yet.',
                     });
                   } else {
-                    await pushGateMenu(tx, replies, msg.from, chat.id, locGates[0]!.loc_name, locGates);
+                    pushGateMenu(replies, msg.from, chat.id, locGates[0]!.loc_name, locGates);
                   }
                   continue;
                 }

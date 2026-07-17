@@ -41,7 +41,6 @@ export async function bootTestApp(): Promise<AppHandle> {
   // Force APP_ENV=test even when .env sets APP_ENV=local — sendEmail() uses
   // this flag to skip real Resend calls and avoid burning the daily quota.
   process.env.APP_ENV = 'test';
-  if (!process.env.PAYSTACK_SECRET_KEY) process.env.PAYSTACK_SECRET_KEY = 'sk_test_dummy';
   // Ensure test DB is migrated and DATABASE_URL is pointed at it.
   await setupTestDb();
   setEnv(process.env as Record<string, string | undefined>);

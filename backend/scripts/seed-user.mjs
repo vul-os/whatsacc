@@ -85,7 +85,7 @@ try {
     console.log(`created user ${email} (${userId})`);
   }
 
-  // Ensure user has a personal account, membership, wallet, subscription.
+  // Ensure user has a personal account and membership.
   const memberRows = await client.query(
     'select account_id from account_members where user_id = $1 limit 1',
     [userId],
@@ -95,8 +95,8 @@ try {
     const code = countryRow.rows[0]?.code ?? 'ZA';
 
     const acct = await client.query(
-      `insert into accounts (name, billing_type, status, country_code)
-       values ($1, 'personal', 'active', $2)
+      `insert into accounts (name, status, country_code)
+       values ($1, 'active', $2)
        returning id`,
       [locationName, code],
     );
@@ -107,16 +107,6 @@ try {
        values ($1, $2, 'owner', 'active')`,
       [accountId, userId],
     );
-    await client.query("insert into wallets (account_id, currency) values ($1, 'ZAR')", [accountId]);
-
-    const planRows = await client.query("select id from plans where code = 'free' limit 1");
-    if (planRows.rows[0]) {
-      await client.query(
-        `insert into account_subscriptions (account_id, plan_id, status)
-         values ($1, $2, 'active')`,
-        [accountId, planRows.rows[0].id],
-      );
-    }
     // Each account anchors exactly one location of the same name. Mirrors
     // what /auth/register does so the seed produces an identical shape.
     const locSlug = locationName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
@@ -127,24 +117,6 @@ try {
       [accountId, locationName, `${locSlug}-${Date.now().toString(36)}`],
     );
     console.log(`bootstrapped account "${locationName}" (${accountId}) + matching location`);
-  }
-
-  // Ensure a referral slug.
-  const slugRows = await client.query('select referral_slug from users where id = $1', [userId]);
-  if (!slugRows.rows[0]?.referral_slug) {
-    for (let i = 0; i < 5; i++) {
-      const candidate = randomSlug(8);
-      const updated = await client.query(
-        `update users set referral_slug = $1
-         where id = $2 and referral_slug is null
-         returning id`,
-        [candidate, userId],
-      );
-      if (updated.rows[0]) {
-        console.log(`assigned referral_slug ${candidate}`);
-        break;
-      }
-    }
   }
 
   await client.query('COMMIT');
@@ -188,12 +160,4 @@ async function hashPassword(plain) {
 
 function b64encode(buf) {
   return Buffer.from(buf).toString('base64').replace(/=+$/, '');
-}
-
-function randomSlug(len = 8) {
-  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const bytes = randomBytes(len);
-  let out = '';
-  for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length];
-  return out;
 }

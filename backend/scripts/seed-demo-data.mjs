@@ -119,7 +119,7 @@ try {
   const meRes = await api('GET', '/auth/me', { token });
   // The first location ("Home") is auto-created during register and is its
   // own account. We add two more — "Sunset Apartments" and "Garden Cottage"
-  // — each as a separate top-level location with its own billing.
+  // — each as a separate top-level location with its own account.
   const homeAccountId = meRes.body.accounts[0].account_id;
   const homeLocations = await api('GET', `/locations/accounts/${homeAccountId}/locations`, { token });
   const homeId = homeLocations.body.locations[0]?.id;
@@ -213,25 +213,6 @@ try {
     if (expect2xx(`grant ${g.name}`, r)) ok(`${g.name} (${g.hours}h, ${g.ap.length} access point(s))`);
   }
 
-  // ─── 8. Referrals KYC ──────────────────────────────────────────────────
-  step('Referrals (KYC)');
-  const kycRes = await api('PUT', '/referrals/kyc', {
-    token,
-    json: {
-      full_name: DEMO_NAME,
-      contact_email: DEMO_EMAIL,
-      cellphone: '+27821234567',
-      id_kind: 'za_id',
-      id_number: '9001015432087',
-      bank_name: 'Standard Bank',
-      bank_branch_code: '051001',
-      bank_account_number: '0000000000',
-      bank_account_holder: DEMO_NAME,
-      bank_account_type: 'cheque',
-    },
-  });
-  if (expect2xx('set referral KYC', kycRes)) ok('KYC details saved');
-
   // ─── 7. Pending invites — to the Sunset Apartments location ──────────
   step('Invites to Sunset Apartments (email send may fail; DB rows still created)');
   for (const email of ['partner@example.com', 'tenant.alex@example.com']) {
@@ -251,21 +232,9 @@ try {
     }
   }
 
-  // ─── 8. Wallet topup intent — Sunset Apartments wallet ───────────────
-  step('Billing — Sunset Apartments wallet topup (real Paystack)');
-  const topup = await api('POST', '/billing/wallet/topup', {
-    token,
-    json: { account_id: sunsetAccountId, amount_cents: 250_00 },
-  });
-  if (expect2xx('init wallet topup', topup)) {
-    ok('topup intent created');
-    ok(`hosted checkout URL: ${topup.body.authorization_url}`);
-  }
-
   // ─── Summary ───────────────────────────────────────────────────────────
   console.log(`\n\x1b[1m─── Done ───\x1b[0m\n`);
   console.log(`Frontend:  http://localhost:5173`);
-  void cottageAccountId; // (unused; reserved if we want to seed billing here too)
   console.log(`Email:     ${DEMO_EMAIL}`);
   console.log(`Password:  ${DEMO_PASSWORD}\n`);
   console.log(`Locations seeded: Home (${homeAccountId.slice(0, 8)}…), Sunset Apartments (${sunsetAccountId.slice(0, 8)}…), Garden Cottage (${cottageAccountId.slice(0, 8)}…)`);

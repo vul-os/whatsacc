@@ -14,7 +14,6 @@ import { sendWhatsAppText } from '../lib/whatsapp.ts';
 const createAccountSchema = z
   .object({
     name: z.string().min(1).max(120),
-    billing_type: z.enum(['personal', 'business']).default('personal'),
     country_code: z.string().length(2).transform((v) => v.toUpperCase()).default('ZA'),
   })
   .strict();
@@ -49,11 +48,10 @@ function accountsRouter() {
       return await tx<{
         id: string;
         name: string;
-        billing_type: string;
         role: string;
         status: string;
       }[]>`
-        select a.id, a.name, a.billing_type, am.role, am.status
+        select a.id, a.name, am.role, am.status
         from account_members am
         join accounts a on a.id = am.account_id
         where am.user_id = ${user.sub}
@@ -65,18 +63,16 @@ function accountsRouter() {
 
   app.post('/', zValidator('json', createAccountSchema), async (c) => {
     const user = getUser(c);
-    const { name, billing_type, country_code } = c.req.valid('json');
+    const { name, country_code } = c.req.valid('json');
     // Account creation must run with elevated privilege: the accounts RLS
     // WITH CHECK clause requires is_account_admin(id), but at INSERT time no
     // membership row exists yet. requireAuth() above already verified the
-    // caller; bootstrapPersonalAccount also wires up the wallet + free-plan
-    // subscription so the new account is fully usable.
+    // caller.
     const accountId = await withAnonDb(async (tx) => {
       return await bootstrapPersonalAccount(tx, {
         userId: user.sub,
         name,
         countryCode: country_code,
-        billingType: billing_type,
       });
     });
     return c.json({ id: accountId }, 201);
@@ -88,11 +84,9 @@ function accountsRouter() {
       const rows = await tx<{
         id: string;
         name: string;
-        billing_type: string;
-        billing_address: unknown;
         status: string;
       }[]>`
-        select id, name, billing_type, billing_address, status
+        select id, name, status
         from accounts where id = ${id}
       `;
       return rows[0] ?? null;

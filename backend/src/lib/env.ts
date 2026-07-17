@@ -32,17 +32,6 @@ export interface Env {
   SLACK_BOT_TOKEN?: string;
   SLACK_SIGNING_SECRET?: string;
   SLACK_APP_ID?: string;
-  // Paystack
-  PAYSTACK_SECRET_KEY?: string;
-  PAYSTACK_PUBLIC_KEY?: string;
-  PAYSTACK_CALLBACK_URL?: string;
-  COMPANY_NAME?: string;
-  COMPANY_REGISTRATION?: string;
-  COMPANY_VAT_NUMBER?: string;
-  COMPANY_ADDRESS?: string;
-  COMPANY_EMAIL?: string;
-  COMPANY_PHONE?: string;
-  VAT_RATE_BPS?: number;
   // Local-dev port (unused on Workers — we listen on platform-managed port)
   PORT?: number;
 }
@@ -77,16 +66,6 @@ function buildEnv(raw: RawEnv): Env {
     SLACK_BOT_TOKEN: raw['SLACK_BOT_TOKEN'],
     SLACK_SIGNING_SECRET: raw['SLACK_SIGNING_SECRET'],
     SLACK_APP_ID: raw['SLACK_APP_ID'],
-    PAYSTACK_SECRET_KEY: raw['PAYSTACK_SECRET_KEY'],
-    PAYSTACK_PUBLIC_KEY: raw['PAYSTACK_PUBLIC_KEY'],
-    PAYSTACK_CALLBACK_URL: raw['PAYSTACK_CALLBACK_URL'],
-    COMPANY_NAME: raw['COMPANY_NAME'] ?? 'whatsacc',
-    COMPANY_REGISTRATION: raw['COMPANY_REGISTRATION'],
-    COMPANY_VAT_NUMBER: raw['COMPANY_VAT_NUMBER'],
-    COMPANY_ADDRESS: raw['COMPANY_ADDRESS'],
-    COMPANY_EMAIL: raw['COMPANY_EMAIL'],
-    COMPANY_PHONE: raw['COMPANY_PHONE'],
-    VAT_RATE_BPS: raw['VAT_RATE_BPS'] ? Number(raw['VAT_RATE_BPS']) : 1500,
     PORT: raw['PORT'] ? Number(raw['PORT']) : undefined,
   };
 }

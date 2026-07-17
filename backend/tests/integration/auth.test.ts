@@ -5,7 +5,6 @@ import { bootTestApp } from '../helpers/app.ts';
 import { resetData } from '../helpers/db.ts';
 import { registerUser } from '../helpers/fixtures.ts';
 import { dbTest } from '../helpers/test.ts';
-import { isValidSlug } from '@/lib/slug.ts';
 
 async function markActive(userId: string): Promise<void> {
   await withRLS(
@@ -16,7 +15,7 @@ async function markActive(userId: string): Promise<void> {
   );
 }
 
-dbTest('register: creates user, account, slug, and returns 201', async () => {
+dbTest('register: creates user, account, and returns 201', async () => {
   await resetData();
   const app = await bootTestApp();
   const res = await app.request('POST', '/auth/register', {
@@ -26,7 +25,6 @@ dbTest('register: creates user, account, slug, and returns 201', async () => {
       display_name: 'Alice',
       location_name: 'Alice HQ',
       country_code: 'ZA',
-      account_type: 'personal',
     },
   });
   assertEquals(res.status, 201);
@@ -35,7 +33,6 @@ dbTest('register: creates user, account, slug, and returns 201', async () => {
   assertExists(body.account_id);
   await markActive(body.id);
 
-  // /me should resolve and have an auto-minted slug.
   const login = await app.request('POST', '/auth/login', {
     json: { email: 'alice@test.local', password: 'Pa55word_test' },
   });
@@ -43,12 +40,10 @@ dbTest('register: creates user, account, slug, and returns 201', async () => {
   const me = await app.request('GET', '/auth/me', { token: tokens.access_token });
   assertEquals(me.status, 200);
   const meBody = me.body as {
-    user: { email: string; referral_slug: string | null };
+    user: { email: string };
     accounts: { account_id: string; role: string }[];
   };
   assertEquals(meBody.user.email, 'alice@test.local');
-  assertExists(meBody.user.referral_slug);
-  assert(isValidSlug(meBody.user.referral_slug!));
   assertEquals(meBody.accounts.length, 1);
   assertEquals(meBody.accounts[0]!.role, 'owner');
 });

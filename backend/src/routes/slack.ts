@@ -4,7 +4,6 @@ import type { AppEnv } from '../middleware/auth.ts';
 import { withAnonDb } from '../middleware/rls.ts';
 import { Forbidden, BadRequest } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
-import { getAccountQuotaStatus } from '../lib/billing/quota.ts';
 import { sendSlackText, sendSlackBlocks } from '../lib/slack.ts';
 import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 import { logAccess } from './access.ts';
@@ -57,7 +56,7 @@ function slackMenu(profileName?: string): string {
   ].join('\n');
 }
 
-function accessBlocks(profileName: string, gates: any[], quotaWarning?: string) {
+function accessBlocks(profileName: string, gates: any[]) {
   const blocks: any[] = [
     {
       type: 'section',
@@ -67,13 +66,6 @@ function accessBlocks(profileName: string, gates: any[], quotaWarning?: string) 
       },
     },
   ];
-
-  if (quotaWarning) {
-    blocks.push({
-      type: 'context',
-      elements: [{ type: 'mrkdwn', text: quotaWarning }],
-    });
-  }
 
   for (const g of gates) {
     blocks.push({
@@ -194,22 +186,12 @@ function slackRouter() {
                   body: "You don't have any active gate access. Please contact the administrator.",
                 });
               } else {
-                // Check quota for the first gate's account
-                let quotaWarning: string | undefined;
-                const apData = await tx<{ account_id: string }[]>`
-                  select l.account_id from access_points ap join locations l on l.id = ap.location_id where ap.id = ${gates[0]!.ap_id}
-                `;
-                if (apData[0]) {
-                  const status = await getAccountQuotaStatus(tx, apData[0].account_id);
-                  quotaWarning = status.warning;
-                }
-
                 replies.push({
                   type: 'blocks',
                   to: channelId,
                   chatId: chat.id,
                   text: 'Select a gate to open',
-                  blocks: accessBlocks(profile.display_name ?? 'there', gates, quotaWarning),
+                  blocks: accessBlocks(profile.display_name ?? 'there', gates),
                 });
               }
             } else {

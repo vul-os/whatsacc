@@ -123,7 +123,6 @@ try {
   // ─── Reference ──────────────────────────────────────────────────────────
   step('Reference');
   expect('GET /reference/countries', await api('GET', '/reference/countries'));
-  expect('GET /reference/currencies', await api('GET', '/reference/currencies'));
 
   // ─── Setup users ────────────────────────────────────────────────────────
   step('Setup (seed-user.mjs)');
@@ -150,7 +149,7 @@ try {
   expect('list accounts', await api('GET', '/accounts', { token: aliceTok }));
   const newAcct = await api('POST', '/accounts', {
     token: aliceTok,
-    json: { name: 'Alice Business', billing_type: 'business', country_code: 'ZA' },
+    json: { name: 'Alice Business', country_code: 'ZA' },
   });
   let businessAcctId = null;
   if (newAcct.status === 201) { ok('create business account', newAcct.status.toString()); businessAcctId = newAcct.body?.id; }
@@ -244,22 +243,6 @@ try {
       if (rows.rows[0]) warn('invite (email send failed)', 'DB row created — Resend domain unverified is expected');
       else bad('invite', `${invite.status}: ${invite.text.slice(0, 200)}`);
     }
-  }
-
-  // ─── Referrals ──────────────────────────────────────────────────────────
-  step('Referrals');
-  expect('GET /referrals/me', await api('GET', '/referrals/me', { token: aliceTok }));
-  expect('GET /referrals/kyc', await api('GET', '/referrals/kyc', { token: aliceTok }));
-
-  // ─── Billing ────────────────────────────────────────────────────────────
-  step('Billing');
-  if (businessAcctId) {
-    expect('GET account billing', await api('GET', `/billing/accounts/${businessAcctId}/billing`, { token: aliceTok }));
-    const topup = await api('POST', '/billing/wallet/topup', {
-      token: aliceTok,
-      json: { account_id: businessAcctId, amount_cents: 10_00 },
-    });
-    if (expect('init wallet topup', topup, [201])) ok(`got reference`, topup.body?.reference?.slice(0, 16));
   }
 
   // ─── Done ───────────────────────────────────────────────────────────────

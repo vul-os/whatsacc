@@ -72,12 +72,6 @@ const maintenanceSchema = z
   })
   .strict();
 
-export const WHATSAPP_ACCESS_PRICE_CENTS = 50;
-
-export type LogAccessResult =
-  | { ok: true; wallet_balance_cents: number | null }
-  | { ok: false; error: string };
-
 export async function logAccess(
   tx: TxSql,
   args: {
@@ -88,7 +82,7 @@ export async function logAccess(
     lat?: number;
     long?: number;
   },
-): Promise<LogAccessResult> {
+): Promise<void> {
   const apRows = await tx<{
     location_id: string;
     account_id: string;
@@ -100,44 +94,6 @@ export async function logAccess(
   const ap = apRows[0];
   if (!ap) throw NotFound('access_point_not_found');
 
-  let newBalance: number | null = null;
-  if (args.source === 'whatsapp') {
-    const walletRows = await tx<{ balance_cents: string }[]>`
-      select balance_cents::text as balance_cents
-      from wallets
-      where account_id = ${ap.account_id}
-      for update
-    `;
-    const balance = Number(walletRows[0]?.balance_cents ?? 0);
-    if (balance < WHATSAPP_ACCESS_PRICE_CENTS) {
-      await tx`
-        insert into access_logs
-          (access_point_id, location_id, account_id, user_id, command, source, lat, long, success, error)
-        values
-          (${args.access_point_id}, ${ap.location_id}, ${ap.account_id}, ${args.user_id},
-           ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, false, 'insufficient_wallet_balance')
-      `;
-      return { ok: false, error: 'insufficient_wallet_balance' };
-    }
-
-    await tx`
-      update wallets
-      set balance_cents = balance_cents - ${WHATSAPP_ACCESS_PRICE_CENTS},
-          updated_at = now()
-      where account_id = ${ap.account_id}
-    `;
-    await tx`
-      insert into wallet_transactions (account_id, delta_cents, reason, reference)
-      values (
-        ${ap.account_id},
-        ${-WHATSAPP_ACCESS_PRICE_CENTS},
-        ${args.command === 'open' ? 'whatsapp_open' : 'whatsapp_close'},
-        ${args.access_point_id}
-      )
-    `;
-    newBalance = balance - WHATSAPP_ACCESS_PRICE_CENTS;
-  }
-
   await tx`
     insert into access_logs
       (access_point_id, location_id, account_id, user_id, command, source, lat, long, success)
@@ -146,7 +102,6 @@ export async function logAccess(
        ${args.command}, ${args.source}, ${args.lat ?? null}, ${args.long ?? null}, true)
   `;
   // TODO: enqueue device_command and dispatch via Durable Object.
-  return { ok: true, wallet_balance_cents: newBalance };
 }
 
 type AccessPointWithMeter = {
