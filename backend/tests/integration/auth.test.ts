@@ -324,7 +324,7 @@ async function plantVerifyToken(
 }
 
 dbTest(
-  'verify-email: full flow — register starts pending, verify activates, login succeeds',
+  'verify-email: full flow — register is active immediately, verify stamps email_verified_at',
   async () => {
     await resetData();
     const app = await bootTestApp();
@@ -336,12 +336,21 @@ dbTest(
     });
     assertEquals(reg.status, 201);
 
-    // Pre-verify: account is pending and login is forbidden.
-    const blocked = await app.request('POST', '/auth/login', {
+    // Pre-verify: status is already 'active' (verification is a nudge, not a
+    // login gate — see /auth/register), so login works but email_verified_at
+    // is still null.
+    const preVerify = await app.request('POST', '/auth/login', {
       json: { email, password },
     });
-    assertEquals(blocked.status, 403);
-    assertEquals((blocked.body as { error: string }).error, 'account_not_active');
+    assertEquals(preVerify.status, 200);
+    const preMe = await app.request('GET', '/auth/me', {
+      token: (preVerify.body as { access_token: string }).access_token,
+    });
+    assertEquals(preMe.status, 200);
+    assertEquals(
+      (preMe.body as { user: { email_verified_at: string | null } }).user.email_verified_at,
+      null,
+    );
 
     const plain = 'verify-happy-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     await plantVerifyToken(email, new Date(Date.now() + 60 * 60 * 1000), plain);

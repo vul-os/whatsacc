@@ -7,6 +7,11 @@ import { newReference, verifyWebhookSignature } from '@/lib/paystack.ts';
 const SECRET = 'sk_test_dummy';
 
 function setTestEnv() {
+  if (!process.env.DATABASE_URL) {
+    // Stand-alone runs with no DB configured: buildEnv requires the var but
+    // the paystack module never opens a connection, so any value works.
+    process.env.DATABASE_URL = 'postgres://localhost/__no_connect__';
+  }
   if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'unused';
   process.env.PAYSTACK_SECRET_KEY = SECRET;
   resetEnvCache();

@@ -101,6 +101,14 @@ export function setEnv(raw: RawEnv): void {
 
 export function getEnv(): Env {
   if (!_activeEnv) {
+    // In the Worker runtime the fetch/scheduled handlers always call
+    // setEnv(env) first. Outside it (vitest, node scripts) there is no
+    // per-request binding — lazily build from process.env, preserving the
+    // legacy "mutate process.env then resetEnvCache()" pattern the tests use.
+    if (typeof process !== 'undefined' && process.env) {
+      _activeEnv = buildEnv(process.env as RawEnv);
+      return _activeEnv;
+    }
     throw new Error('Env not initialized — call setEnv(env) before getEnv()');
   }
   return _activeEnv;
