@@ -244,6 +244,77 @@ dbTest('sec: chat flood throttle goes quiet but still 200s to Meta', async () =>
   }
 });
 
+dbTest('sec: rate_limit functions reject forged scopes from the request role', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const a = await registerUser(app);
+  const asUser = { user_id: a.user_id, account_id: a.account_id, is_platform_admin: false };
+
+  // The SECURITY DEFINER functions execute as whatsacc_internal (BYPASSRLS),
+  // so a forged scope would let the request role plant/read counters in an
+  // arbitrary namespace. The allowlist inside the functions must raise.
+  // Each probe runs in its own transaction (the raise aborts it).
+  const probes: Array<(tx: Parameters<Parameters<typeof withRLS>[1]>[0]) => Promise<unknown>> = [
+    async (tx) => await tx`select app.rate_limit_bump('sneaky_scope', 'acct:forged', now(), 999999)`,
+    async (tx) => await tx`select app.rate_limit_get('sneaky_scope', 'acct:forged', now())`,
+    async (tx) => await tx`select app.rate_limit_last('sneaky_scope', 'acct:forged')`,
+    async (tx) => await tx`select app.rate_limit_try_bump('sneaky_scope', 'acct:forged', now(), 1)`,
+  ];
+  for (const probe of probes) {
+    let rejected = false;
+    try {
+      await withRLS(asUser, probe);
+    } catch (err) {
+      rejected = true;
+      assert(
+        String(err).includes('rate_limit_unknown_scope'),
+        `expected the scope allowlist to raise, got: ${String(err)}`,
+      );
+    }
+    assert(rejected, 'forged scope must be rejected');
+  }
+
+  // The legit path still works through the very same request role: bump a
+  // real scope, read it back.
+  const windowStart = new Date(Math.floor(Date.now() / 3600_000) * 3600_000);
+  const count = await withRLS(asUser, async (tx) => {
+    const rows = await tx<{ count: number }[]>`
+      select app.rate_limit_bump('opens_1h', ${'user:' + a.user_id}, ${windowStart}, 1) as count
+    `;
+    return Number(rows[0]!.count);
+  });
+  assert(count >= 1, 'legit scope bump must still work for the request role');
+  const readBack = await withRLS(asUser, async (tx) => {
+    const rows = await tx<{ count: number }[]>`
+      select app.rate_limit_get('opens_1h', ${'user:' + a.user_id}, ${windowStart}) as count
+    `;
+    return Number(rows[0]!.count);
+  });
+  assertEquals(readBack, count);
+});
+
+dbTest('sec: rate_limit functions are no longer executable by PUBLIC', async () => {
+  const { sql } = await setupTestDb();
+  const rows = await sql<
+    { proname: string; default_acl: boolean; has_public: boolean }[]
+  >`
+    select p.proname,
+           p.proacl is null as default_acl,
+           coalesce(bool_or(a.grantee = 0), false) as has_public
+    from pg_proc p
+    left join lateral aclexplode(coalesce(p.proacl, '{}'::aclitem[])) a on true
+    where p.pronamespace = 'app'::regnamespace
+      and p.proname like 'rate_limit%'
+    group by p.oid, p.proname, p.proacl
+  `;
+  assert(rows.length >= 5, `expected all rate_limit functions, got ${rows.length}`);
+  for (const r of rows) {
+    // NULL ACL would mean the implicit default — which includes PUBLIC.
+    assert(!r.default_acl, `${r.proname} must have an explicit ACL`);
+    assert(!r.has_public, `${r.proname} must not be executable by PUBLIC`);
+  }
+});
+
 dbTest('sec: no quota bypass via alternate open paths (portal → whatsapp → api)', async () => {
   await resetData();
   const app = await bootTestApp();

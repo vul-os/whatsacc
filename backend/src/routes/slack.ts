@@ -9,6 +9,52 @@ import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 import { logAccess } from './access.ts';
 import { noteChatMessage, chatDenialMessage } from '../lib/rate-limit.ts';
 
+// Slack's standard replay window: reject requests whose timestamp is more
+// than this many seconds away from now, so a captured (validly signed)
+// request cannot be replayed later.
+const SLACK_REPLAY_WINDOW_S = 300;
+
+// Log the missing-secret refusal once per isolate, not per request.
+let warnedMissingSlackSecret = false;
+
+/**
+ * Fail-closed Slack request authentication, shared by the events and
+ * interactions endpoints.
+ *
+ * - SLACK_SIGNING_SECRET configured: the X-Slack-Request-Timestamp and
+ *   X-Slack-Signature headers are REQUIRED. Missing header, stale timestamp
+ *   (outside the 300s replay window), or bad HMAC → 403 bad_signature.
+ *   Omitting the headers must never skip verification (that was the bypass:
+ *   unauthenticated block_actions could reach gate actuation).
+ * - SLACK_SIGNING_SECRET not configured: refuse to process entirely (403
+ *   slack_not_configured, logged once). Deliberate choice: processing
+ *   unauthenticated webhooks would let anyone actuate gates, so the Slack
+ *   integration simply does not work until the operator sets the secret.
+ */
+async function requireSlackSignature(
+  timestamp: string | undefined,
+  signature: string | undefined,
+  rawBody: string,
+): Promise<void> {
+  const secret = getEnv().SLACK_SIGNING_SECRET;
+  if (!secret) {
+    if (!warnedMissingSlackSecret) {
+      console.error(
+        'SLACK_SIGNING_SECRET is not configured — refusing all Slack webhooks (fail closed).',
+      );
+      warnedMissingSlackSecret = true;
+    }
+    throw Forbidden('slack_not_configured');
+  }
+  if (!timestamp || !signature) throw Forbidden('bad_signature');
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > SLACK_REPLAY_WINDOW_S) {
+    throw Forbidden('bad_signature');
+  }
+  const isValid = await verifySlackSignature(secret, timestamp, rawBody, signature);
+  if (!isValid) throw Forbidden('bad_signature');
+}
+
 async function verifySlackSignature(secret: string, timestamp: string, body: string, signature: string): Promise<boolean> {
   const base = `v0:${timestamp}:${body}`;
   const key = await crypto.subtle.importKey(
@@ -103,14 +149,11 @@ function slackRouter() {
 
   app.post('/webhooks/slack', async (c) => {
     const rawBody = await c.req.text();
-    const timestamp = c.req.header('X-Slack-Request-Timestamp');
-    const signature = c.req.header('X-Slack-Signature');
-    const secret = getEnv().SLACK_SIGNING_SECRET;
-
-    if (secret && timestamp && signature) {
-      const isValid = await verifySlackSignature(secret, timestamp, rawBody, signature);
-      if (!isValid) throw Forbidden('bad_signature');
-    }
+    await requireSlackSignature(
+      c.req.header('X-Slack-Request-Timestamp'),
+      c.req.header('X-Slack-Signature'),
+      rawBody,
+    );
 
     let payload: SlackPayload;
     try {
@@ -244,6 +287,13 @@ function slackRouter() {
 
   app.post('/webhooks/slack/interactions', async (c) => {
     const rawBody = await c.req.text();
+    // Authenticate BEFORE parsing anything attacker-controlled.
+    await requireSlackSignature(
+      c.req.header('X-Slack-Request-Timestamp'),
+      c.req.header('X-Slack-Signature'),
+      rawBody,
+    );
+
     const params = new URLSearchParams(rawBody);
     const payloadStr = params.get('payload');
     if (!payloadStr) throw BadRequest('missing_payload');
@@ -253,14 +303,6 @@ function slackRouter() {
       payload = JSON.parse(payloadStr);
     } catch {
       throw BadRequest('bad_json');
-    }
-
-    const timestamp = c.req.header('X-Slack-Request-Timestamp');
-    const signature = c.req.header('X-Slack-Signature');
-    const secret = getEnv().SLACK_SIGNING_SECRET;
-    if (secret && timestamp && signature) {
-      const isValid = await verifySlackSignature(secret, timestamp, rawBody, signature);
-      if (!isValid) throw Forbidden('bad_signature');
     }
 
     if (payload.type === 'block_actions') {

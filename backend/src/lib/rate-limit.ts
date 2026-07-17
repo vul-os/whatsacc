@@ -30,10 +30,15 @@
 //     direction and should never be refused.
 //   - Denied attempts do NOT consume counters — counters track successful
 //     opens only, so they double as honest usage numbers for the UI.
+//     Enforcement is EXACT under concurrency: every limit is consumed via an
+//     atomic increment-if-under-cap (app.rate_limit_try_bump) and the
+//     cooldown via an atomic sentinel claim (app.rate_limit_claim_cooldown),
+//     so N simultaneous opens can never land a counter past its cap.
 //   - FAILURE MODE: if the counter store errors, the open is ALLOWED and the
 //     success audit row is tagged error='rate_limit_check_failed'. A gate is
 //     physical access — availability wins for enforcement, visibility is
-//     preserved through the audit tag.
+//     preserved through the audit tag. (Fail-open reviewed 2026-07-17:
+//     accepted — physical access availability wins; audit-tagged.)
 
 import type { TxSql } from './db.ts';
 import { getEnv } from './env.ts';
@@ -245,34 +250,65 @@ function openSubject(input: OpenLimitInput): string | null {
   return null;
 }
 
-async function bump(tx: TxSql, scope: string, subject: string, windowStart: Date): Promise<number> {
-  const rows = await tx<{ count: number }[]>`
-    select app.rate_limit_bump(${scope}, ${subject}, ${windowStart}, 1) as count
-  `;
-  return Number(rows[0]?.count ?? 0);
-}
-
-async function getCount(
+async function bump(
   tx: TxSql,
   scope: string,
   subject: string,
   windowStart: Date,
+  amount = 1,
 ): Promise<number> {
   const rows = await tx<{ count: number }[]>`
-    select app.rate_limit_get(${scope}, ${subject}, ${windowStart}) as count
+    select app.rate_limit_bump(${scope}, ${subject}, ${windowStart}, ${amount}) as count
   `;
   return Number(rows[0]?.count ?? 0);
 }
 
 /**
+ * Atomically consume one unit of a capped counter. Returns the
+ * post-increment count when consumed, or null when the cap would be
+ * exceeded — in which case NOTHING was consumed. cap === null means
+ * uncapped (plain increment).
+ */
+async function tryBump(
+  tx: TxSql,
+  scope: string,
+  subject: string,
+  windowStart: Date,
+  cap: number | null,
+): Promise<number | null> {
+  const rows = await tx<{ count: number | null }[]>`
+    select app.rate_limit_try_bump(${scope}, ${subject}, ${windowStart}, ${cap}) as count
+  `;
+  const v = rows[0]?.count;
+  return v === null || v === undefined ? null : Number(v);
+}
+
+/**
+ * Atomically claim the cooldown sentinel: true iff the previous successful
+ * open is at least cooldownS old (the sentinel is then refreshed). A failed
+ * claim leaves the sentinel untouched. cooldownS <= 0 always claims.
+ */
+async function claimCooldown(tx: TxSql, subject: string, cooldownS: number): Promise<boolean> {
+  const rows = await tx<{ ok: boolean }[]>`
+    select app.rate_limit_claim_cooldown(${subject}, ${cooldownS}) as ok
+  `;
+  return rows[0]?.ok === true;
+}
+
+/**
  * Check every open limit and, when allowed, consume the counters.
  *
- * Check-then-increment: all limits are verified read-only first, and the
- * counters are only incremented when the open is allowed. Increments
- * themselves are atomic upserts; two truly concurrent opens can both pass a
- * check and land the count one over the cap — acceptable for abuse
- * protection, and in exchange the counters exactly equal successful opens
- * (denials never consume quota).
+ * Increment-then-check, one atomic statement per limit: each counter is
+ * consumed via app.rate_limit_try_bump, which increments ONLY when the
+ * post-increment count stays within the cap (ON CONFLICT DO UPDATE ...
+ * WHERE count < cap). Concurrent opens serialize on the counter row, so the
+ * bound is EXACT — N simultaneous requests at count = cap-1 admit exactly
+ * one, never cap+N. The cooldown is claimed the same way (atomic
+ * conditional UPDATE on the sentinel row), so two simultaneous opens cannot
+ * both pass it. When a later limit denies the attempt, counters already
+ * consumed for THIS attempt are handed back (bump -1), preserving the
+ * documented semantics: denials never consume, and counters exactly equal
+ * successful opens.
  *
  * Throws on counter-store failure — use guardedCheckOpenLimits() for the
  * fail-open wrapper.
@@ -315,10 +351,20 @@ export async function checkAndConsumeOpenLimits(
   `;
   const quota = cfgRows[0] ?? { member_quota: null, location_quota: null, is_admin: false };
 
-  // --- Rate limits (everyone, admins included) -----------------------------
+  const cdSubject = subject ? `${subject}|ap:${input.accessPointId}` : null;
 
-  if (subject && cfg.openCooldownS > 0) {
-    const cdSubject = `${subject}|ap:${input.accessPointId}`;
+  // Counters consumed for THIS attempt so far — handed back if a later
+  // limit denies it (denials must never consume).
+  const consumed: Array<{ scope: string; subject: string; windowStart: Date }> = [];
+  const handBack = async (): Promise<void> => {
+    for (const c of consumed) await bump(tx, c.scope, c.subject, c.windowStart, -1);
+  };
+
+  // --- Cooldown fast-path (read-only) --------------------------------------
+  // Cheap early deny with a precise Retry-After. The AUTHORITATIVE check is
+  // the atomic sentinel claim at the end — this read alone would race.
+
+  if (cdSubject && cfg.openCooldownS > 0) {
     const rows = await tx<{ last: Date | null }[]>`
       select app.rate_limit_last('open_cd', ${cdSubject}) as last
     `;
@@ -331,9 +377,12 @@ export async function checkAndConsumeOpenLimits(
     }
   }
 
+  // --- Rate limits (everyone, admins included) -----------------------------
+
   if (subject) {
-    const memberHour = await getCount(tx, 'opens_1h', subject, hourStart);
-    if (memberHour >= cfg.opensPerHour) {
+    const memberHour = await tryBump(tx, 'opens_1h', subject, hourStart, cfg.opensPerHour);
+    if (memberHour === null) {
+      await handBack();
       return {
         allowed: false,
         reason: 'rate_limited',
@@ -341,10 +390,12 @@ export async function checkAndConsumeOpenLimits(
         limit: 'member_opens_per_hour',
       };
     }
+    consumed.push({ scope: 'opens_1h', subject, windowStart: hourStart });
   }
 
-  const acctHour = await getCount(tx, 'acct_opens_1h', acctSubject, hourStart);
-  if (acctHour >= cfg.accountOpensPerHour) {
+  const acctHour = await tryBump(tx, 'acct_opens_1h', acctSubject, hourStart, cfg.accountOpensPerHour);
+  if (acctHour === null) {
+    await handBack();
     return {
       allowed: false,
       reason: 'rate_limited',
@@ -352,45 +403,68 @@ export async function checkAndConsumeOpenLimits(
       limit: 'account_opens_per_hour',
     };
   }
+  consumed.push({ scope: 'acct_opens_1h', subject: acctSubject, windowStart: hourStart });
 
   // --- Quotas (admin policy; owners/admins exempt) -------------------------
-
-  if (!quota.is_admin) {
-    if (subject && quota.member_quota !== null) {
-      const memberDay = await getCount(tx, 'opens_1d', `${subject}|loc:${input.locationId}`, dayStart);
-      if (memberDay >= Number(quota.member_quota)) {
-        return {
-          allowed: false,
-          reason: 'quota_exceeded',
-          retryAfterS: secondsUntilWindowEnd(now, DAY_S),
-          limit: 'member_opens_per_day',
-        };
-      }
-    }
-    if (quota.location_quota !== null) {
-      const locDay = await getCount(tx, 'loc_opens_1d', locSubject, dayStart);
-      if (locDay >= Number(quota.location_quota)) {
-        return {
-          allowed: false,
-          reason: 'quota_exceeded',
-          retryAfterS: secondsUntilWindowEnd(now, DAY_S),
-          limit: 'location_opens_per_day',
-        };
-      }
-    }
-  }
-
-  // --- Allowed: consume ----------------------------------------------------
+  // Admin-exempt opens still increment the daily counters (they are real
+  // gate movements) — cap null = uncapped increment.
 
   if (subject) {
-    await bump(tx, 'opens_1h', subject, hourStart);
-    await bump(tx, 'opens_1d', `${subject}|loc:${input.locationId}`, dayStart);
-    // Sentinel window row: updated_at records the last successful open for
-    // the precise (sliding) cooldown check.
-    await bump(tx, 'open_cd', `${subject}|ap:${input.accessPointId}`, new Date(0));
+    const mdSubject = `${subject}|loc:${input.locationId}`;
+    const memberDayCap =
+      !quota.is_admin && quota.member_quota !== null ? Number(quota.member_quota) : null;
+    const memberDay = await tryBump(tx, 'opens_1d', mdSubject, dayStart, memberDayCap);
+    if (memberDay === null) {
+      await handBack();
+      return {
+        allowed: false,
+        reason: 'quota_exceeded',
+        retryAfterS: secondsUntilWindowEnd(now, DAY_S),
+        limit: 'member_opens_per_day',
+      };
+    }
+    consumed.push({ scope: 'opens_1d', subject: mdSubject, windowStart: dayStart });
   }
-  await bump(tx, 'acct_opens_1h', acctSubject, hourStart);
-  await bump(tx, 'loc_opens_1d', locSubject, dayStart);
+
+  const locDayCap =
+    !quota.is_admin && quota.location_quota !== null ? Number(quota.location_quota) : null;
+  const locDay = await tryBump(tx, 'loc_opens_1d', locSubject, dayStart, locDayCap);
+  if (locDay === null) {
+    await handBack();
+    return {
+      allowed: false,
+      reason: 'quota_exceeded',
+      retryAfterS: secondsUntilWindowEnd(now, DAY_S),
+      limit: 'location_opens_per_day',
+    };
+  }
+  consumed.push({ scope: 'loc_opens_1d', subject: locSubject, windowStart: dayStart });
+
+  // --- Cooldown claim (authoritative, atomic) ------------------------------
+  // Last on purpose: the sentinel's updated_at is only refreshed when the
+  // open is fully allowed, so a denied attempt never restarts anyone's
+  // cooldown. With cooldown disabled (0) the claim always succeeds and
+  // still records the last successful open.
+
+  if (cdSubject) {
+    const claimed = await claimCooldown(tx, cdSubject, cfg.openCooldownS);
+    if (!claimed) {
+      await handBack();
+      // Lost a concurrent race for the sentinel — recompute Retry-After
+      // from the winner's refreshed timestamp.
+      const rows = await tx<{ last: Date | null }[]>`
+        select app.rate_limit_last('open_cd', ${cdSubject}) as last
+      `;
+      const last = rows[0]?.last ? new Date(rows[0].last) : null;
+      const remaining = last ? cooldownRemainingS(last, now, cfg.openCooldownS) : cfg.openCooldownS;
+      return {
+        allowed: false,
+        reason: 'rate_limited',
+        retryAfterS: Math.max(1, remaining),
+        limit: 'open_cooldown',
+      };
+    }
+  }
 
   return { allowed: true };
 }
@@ -401,7 +475,8 @@ export async function checkAndConsumeOpenLimits(
  * caller's audit-log insert would otherwise fail too) and ALLOW the open,
  * flagged degraded so logAccess records error='rate_limit_check_failed'.
  * A gate is physical access — availability wins for enforcement,
- * visibility is preserved.
+ * visibility is preserved. (Fail-open reviewed 2026-07-17: accepted —
+ * physical access availability wins; audit-tagged.)
  */
 export async function guardedCheckOpenLimits(
   tx: TxSql,

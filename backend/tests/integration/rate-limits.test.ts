@@ -172,6 +172,107 @@ dbTest('rate: counter-store failure fails OPEN with a rate_limit_check_failed au
   }
 });
 
+dbTest('rate: 10 concurrent opens against cap=1 admit exactly one (atomic consume)', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const { sql } = await setupTestDb();
+  const restore = setRate({ RATE_OPEN_COOLDOWN_S: '0', RATE_OPENS_PER_HOUR: '1' });
+  try {
+    const u = await registerUser(app);
+    const seeded = await seedLocationWithAccessPoint(u.account_id, { withAccessPoint: true });
+    const apId = seeded.access_point_id!;
+
+    // Old check-then-increment would let several concurrent requests all
+    // pass at count < cap. The atomic increment-if-under-cap admits EXACTLY
+    // one, no matter the concurrency.
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => openAp(app, u, apId)),
+    );
+    const okCount = results.filter((r) => r.status === 200).length;
+    const deniedCount = results.filter((r) => r.status === 429).length;
+    assertEquals(okCount, 1, 'exactly one concurrent open may pass a cap of 1');
+    assertEquals(deniedCount, 9);
+
+    // Counters equal successful opens: denials handed their consume back.
+    const counter = await sql<{ count: number }[]>`
+      select count from rate_limit_counters
+      where scope = 'opens_1h' and subject = ${'user:' + u.user_id}
+    `;
+    assertEquals(Number(counter[0]!.count), 1);
+
+    // Audit trail: 1 success + 9 distinct denials.
+    const logs = await accessLogRows(apId);
+    assertEquals(logs.filter((l) => l.success).length, 1);
+    assertEquals(logs.filter((l) => !l.success && l.error === 'rate_limited').length, 9);
+  } finally {
+    restore();
+  }
+});
+
+dbTest('rate: concurrent opens cannot all pass the cooldown (atomic sentinel claim)', async () => {
+  await resetData();
+  const app = await bootTestApp();
+  const { sql } = await setupTestDb();
+  const restore = setRate({ RATE_OPEN_COOLDOWN_S: '30' });
+  try {
+    const u = await registerUser(app);
+    const seeded = await seedLocationWithAccessPoint(u.account_id, { withAccessPoint: true });
+    const apId = seeded.access_point_id!;
+
+    // All start before any sentinel exists, so the read-only fast-path lets
+    // everyone through — only the atomic UPDATE ... WHERE updated_at <=
+    // now() - cooldown claim decides, and exactly one can win it.
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => openAp(app, u, apId)),
+    );
+    assertEquals(results.filter((r) => r.status === 200).length, 1);
+    assertEquals(results.filter((r) => r.status === 429).length, 9);
+
+    // Denied attempts handed back their hourly consume.
+    const counter = await sql<{ count: number }[]>`
+      select count from rate_limit_counters
+      where scope = 'opens_1h' and subject = ${'user:' + u.user_id}
+    `;
+    assertEquals(Number(counter[0]!.count), 1);
+  } finally {
+    restore();
+  }
+});
+
+dbTest('rate: stale cooldown sentinels get pruned, fresh ones survive', async () => {
+  await resetData();
+  await bootTestApp();
+  const { sql } = await setupTestDb();
+
+  // Seed one stale sentinel (no successful open for 2 days — it can no
+  // longer influence any cooldown decision) and one fresh sentinel.
+  await sql`
+    insert into rate_limit_counters (scope, subject, window_start, count, updated_at)
+    values
+      ('open_cd', 'user:stale|ap:a', to_timestamp(0), 3, now() - interval '2 days'),
+      ('open_cd', 'user:fresh|ap:b', to_timestamp(0), 3, now())
+  `;
+
+  // A claim for a brand-new subject (insert path) triggers the opportunistic
+  // sentinel prune. Run it through the request role like production does.
+  const claimed = await withRLS(null, async (tx) => {
+    const rows = await tx<{ ok: boolean }[]>`
+      select app.rate_limit_claim_cooldown('user:new|ap:c', 10) as ok
+    `;
+    return rows[0]!.ok;
+  });
+  assertEquals(claimed, true);
+
+  const remaining = await sql<{ subject: string }[]>`
+    select subject from rate_limit_counters
+    where scope = 'open_cd' order by subject
+  `;
+  const subjects = remaining.map((r) => r.subject);
+  assert(!subjects.includes('user:stale|ap:a'), 'stale sentinel must be pruned');
+  assert(subjects.includes('user:fresh|ap:b'), 'fresh sentinel must survive');
+  assert(subjects.includes('user:new|ap:c'), 'newly claimed sentinel must exist');
+});
+
 // ---------------------------------------------------------------------------
 // Quotas (admin policy, off by default)
 // ---------------------------------------------------------------------------

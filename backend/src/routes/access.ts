@@ -157,6 +157,8 @@ export async function logAccess(
     }
     // Counter store failed: the open proceeds (physical access availability
     // wins), but the audit row is tagged so the failure stays visible.
+    // (Fail-open reviewed 2026-07-17: accepted — physical access
+    // availability wins; audit-tagged.)
     if (decision.degraded) degradedNote = 'rate_limit_check_failed';
   }
 
