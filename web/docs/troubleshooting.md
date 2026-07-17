@@ -36,6 +36,14 @@ This applies to every channel — chat, portal and API alike — so switching ch
 won't help. Ask an admin: they can raise or clear it under the location's **Limits**
 page, and admins themselves are exempt from quotas, so they can always let you in.
 
+**The bot says "This account has been suspended by the gateway operator."**
+The *instance admin* — the person running the gateway, not your account's admin —
+suspended the whole account. Opens are denied on every channel (chat, portal, API
+all return `account_suspended`), but `close` still works and you can still log in
+to the portal and see your account's state. Only the operator can lift it; there is
+nothing an account admin can change from inside. See
+[Instance admin](admin.md).
+
 **I sent several messages and the bot just went quiet.**
 The chat flood throttle (default 10 messages/min per sender). It resets within a
 minute; slow down. Gate state was never touched — this only silences replies.
@@ -92,6 +100,26 @@ app is signed into.
 **"Grant expired."**
 Grants are short-lived on purpose. Open the app anywhere with connectivity and it
 refreshes silently; then the offline path works again.
+
+## Instance admin
+
+**My claim token isn't working.**
+`POST /admin/claim` fails closed, and the error code says why: `claim_closed` —
+an instance admin already exists (or a claim was already redeemed once); the token
+is burned forever and cannot be re-armed by changing the env. `claim_disabled` —
+`ADMIN_CLAIM_TOKEN` isn't set in the gateway's environment; set it and restart.
+`invalid_claim_token` — the token doesn't match; check for stray whitespace or an
+old value. Also note the claim promotes an existing **active, signed-in** user —
+sign up first, then redeem. `GET /admin/claim` tells you where you stand:
+`{"claimed":…,"claimable":…}`. Details in [Instance admin](admin.md).
+
+**I'm locked out of the only admin account.**
+The API refuses to disable or demote the *last* active instance admin precisely so
+this can't happen through whatsacc itself — but it can't protect you from a lost
+password or a lost 2FA device. Honestly: there is no in-band recovery. Regaining
+the seat requires direct access to the gateway's database (set the admin flag on
+another active user yourself) — which is also why "who can touch the host" *is*
+your real admin list. Grant a second admin early and this note stays theoretical.
 
 ## Gateway
 

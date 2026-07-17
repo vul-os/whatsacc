@@ -72,6 +72,11 @@
       "file": "channels.md"
     },
     {
+      "id": "admin",
+      "title": "Instance admin",
+      "file": "admin.md"
+    },
+    {
       "id": "limits",
       "title": "Rate limits & quotas",
       "file": "limits.md"
@@ -125,7 +130,13 @@
       "title": "Run a gateway",
       "pages": [
         "self-host",
-        "channels",
+        "channels"
+      ]
+    },
+    {
+      "title": "Operate",
+      "pages": [
+        "admin",
         "limits"
       ]
     },

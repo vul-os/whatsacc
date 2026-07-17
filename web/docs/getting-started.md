@@ -29,7 +29,9 @@ detail.
    Or grab the release binary — `./whatsacc-gateway --data /var/lib/whatsacc`. Details,
    reachability options and backups in [Run a gateway](self-host.md).
 2. **Claim the admin account.** On first boot the gateway prints a one-time URL; open
-   it and the embedded portal walks you through creating the owner account.
+   it and the embedded portal walks you through creating the owner account. If you're
+   also the person *running* the gateway, claim the **instance admin** seat too —
+   redeem your `ADMIN_CLAIM_TOKEN` once, as described in [Instance admin](admin.md).
 3. **Name your location** — house, complex, building or other. Give it a name residents
    will recognise, and optionally drop a map pin: that pin anchors the geofence if you
    enable it later. Then add an access point under **Access points → New** — main gate,

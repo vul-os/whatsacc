@@ -77,6 +77,27 @@ counters. If the counter store itself fails, opens are allowed but tagged in the
 audit log (availability wins for a physical gate; visibility is preserved). The
 full design, defaults and tuning live in [Rate limits & quotas](limits.md).
 
+## The instance admin
+
+The operator seat ([Instance admin](admin.md)) is powerful, so its trust model is
+deliberately narrow:
+
+- **One-shot claim.** The seat is bootstrapped by redeeming `ADMIN_CLAIM_TOKEN`
+  exactly once; the mechanism burns permanently after any successful claim, and
+  with the variable unset nobody can claim at all — fail-closed, no default.
+- **Constant-time token check.** The claim comparison leaks neither length nor
+  first-differing-byte through timing.
+- **Per-request revocation.** Admin status is re-read from the live user record on
+  every request — never trusted from a token — so a revoked admin (or a disabled
+  user) is cut off on their very next request, not at token expiry.
+- **Everything is audited.** Every admin action — claims, suspensions, disables,
+  grants, limit changes — and every *denied* attempt to reach an admin route lands
+  in an append-only trail that only admins can read and nothing in the request
+  path can write to directly.
+- **Tenant isolation is never weakened.** Admin cross-account reads are an explicit
+  context evaluated by the *same* row-level policies as every tenant query; normal
+  users' scoping is untouched by the admin machinery existing.
+
 ## What we deliberately don't claim
 
 - whatsacc is not end-to-end encrypted messaging — chat channels are WhatsApp's and

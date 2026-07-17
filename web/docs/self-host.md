@@ -44,6 +44,17 @@ On first boot the gateway:
 - generates its **signing keypair** — the key controllers will pin,
 - prints a one-time URL to claim the admin account in the embedded portal.
 
+## Claim your admin account
+
+A fresh gateway has no operator yet. Set `ADMIN_CLAIM_TOKEN` to a long random
+secret *before* first boot, sign up as an ordinary user, then redeem the token once
+against `POST /admin/claim` — that user becomes the **instance admin**: the operator
+seat above every account, with the overview, moderation, runtime-limits and audit
+surfaces. The token works exactly once and is burned forever after any successful
+claim; with the variable unset, nobody can claim at all (fail-closed). The exact
+`curl`, the guarantees and everything the seat can do are in
+[Instance admin](admin.md). Once claimed, remove the variable from your env.
+
 ## Configuration
 
 Configuration is environment variables (or an `.env` next to the binary). The important
@@ -54,6 +65,7 @@ ones:
 | `WACC_PUBLIC_URL` | The URL the world reaches you at. Used for webhooks, invite links, the app. |
 | `WACC_DATA_DIR` | Where `whatsacc.db` and keys live. Back this directory up. |
 | `WACC_CHANNEL_*` | Per-channel credentials — see [Chat channels](channels.md). |
+| `ADMIN_CLAIM_TOKEN` | One-time secret to claim the **instance admin** seat on first run — redeemable exactly once, dead forever after; unset = nobody can claim. See [Instance admin](admin.md). |
 | `RATE_OPEN_COOLDOWN_S` | Minimum seconds between successful opens per person per access point (default 10; `0` disables). |
 | `RATE_OPENS_PER_HOUR` | Successful opens per member per hour (default 30; `0` = kill switch). |
 | `RATE_CHAT_MSGS_PER_MIN` | Inbound chat messages per sender per minute before the bot goes quiet (default 10). |
