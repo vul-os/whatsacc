@@ -399,15 +399,39 @@ function whatsappRouter() {
                 : await linkedLocationsForPhone(tx, from);
 
               if (allGrants.length === 0) {
-                const linkedRows = await tx<{ exists: boolean }[]>`
-                  select exists (
-                    select 1
-                    from profile_phone_numbers
-                    where phone_e164 = ${from}
-                      and verified_at is not null
-                  ) as "exists"
+                // One query, two facts: is this number linked at all, and is
+                // any linked user still active? Disabled users are filtered
+                // out of every access/location lookup above, so without the
+                // second flag they would fall through to the misleading
+                // "no location set up yet" nudge. Honest copy instead — the
+                // portal already tells them the account is disabled.
+                const linkedRows = await tx<{ linked: boolean; active_linked: boolean }[]>`
+                  select
+                    exists (
+                      select 1
+                      from profile_phone_numbers
+                      where phone_e164 = ${from}
+                        and verified_at is not null
+                    ) as linked,
+                    exists (
+                      select 1
+                      from profile_phone_numbers ppn
+                      join users u on u.id = ppn.profile_id
+                      where ppn.phone_e164 = ${from}
+                        and ppn.verified_at is not null
+                        and u.status = 'active'
+                    ) as active_linked
                 `;
-                if (!linkedRows[0]?.exists) {
+                if (linkedRows[0]?.linked && !linkedRows[0]?.active_linked) {
+                  replies.push({
+                    type: 'text',
+                    to: msg.from,
+                    chatId: chat.id,
+                    body: 'This account is disabled — contact your admin.',
+                  });
+                  continue;
+                }
+                if (!linkedRows[0]?.linked) {
                   replies.push({
                     type: 'text',
                     to: msg.from,

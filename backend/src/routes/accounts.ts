@@ -113,6 +113,12 @@ function accountsRouter() {
 
   app.get('/:id/members', async (c) => {
     const id = c.req.param('id');
+    // Cross-row read: the users/profiles RLS policies only expose the
+    // caller's own rows, so a direct JOIN would filter every co-member out.
+    // app.account_member_list is the house-pattern SECURITY DEFINER helper
+    // (owned by whatsacc_internal, self-gated on app.is_account_member) that
+    // returns the full member list for accounts the caller belongs to and
+    // zero rows for everyone else.
     const rows = await withUserDb(c, async (tx) => {
       return await tx<{
         user_id: string;
@@ -121,11 +127,8 @@ function accountsRouter() {
         email: string;
         display_name: string | null;
       }[]>`
-        select am.user_id, am.role, am.status, u.email, p.display_name
-        from account_members am
-        join users u on u.id = am.user_id
-        left join profiles p on p.id = u.id
-        where am.account_id = ${id}
+        select user_id, role, status, email, display_name
+        from app.account_member_list(${id}::uuid)
       `;
     });
     return c.json({ members: rows });

@@ -3,12 +3,18 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { requireAuth, getUser, type AppEnv } from '../middleware/auth.ts';
 import { withAnonDb, withUserDb } from '../middleware/rls.ts';
-import { BadRequest, NotFound } from '../lib/errors.ts';
+import { BadRequest, Conflict, NotFound, TooManyRequests } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
+import { randomCode } from '../lib/random.ts';
+import { hashToken } from '../lib/refresh.ts';
 import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 import { sendWhatsAppInteractive, sendWhatsAppText, type WhatsAppInteractive } from '../lib/whatsapp.ts';
 
 const e164 = z.string().regex(/^\+[1-9]\d{6,14}$/, 'invalid_e164');
+
+// OTP challenge parameters: 6-digit code, 10-minute expiry, 5 attempts.
+const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
+const VERIFICATION_MAX_ATTEMPTS = 5;
 
 const addPhoneSchema = z
   .object({
@@ -135,41 +141,109 @@ function phonesRouter() {
   app.post('/me/phones', zValidator('json', addPhoneSchema), async (c) => {
     const user = getUser(c);
     const { phone_e164, is_primary } = c.req.valid('json');
+
+    // A verified phone is the WhatsApp webhook's identity root, so a phone
+    // NEVER becomes verified just by being typed in: new numbers start
+    // unverified, get an OTP challenge over WhatsApp, and only /verify (or
+    // the invite-accept flow, which proves control by delivering the accept
+    // token to that number) flips verified_at. Unverified phones also cannot
+    // be made primary.
+    const codePlain = randomCode(6);
+    const codeHash = await hashToken(codePlain);
     const result = await withUserDb(c, async (tx) => {
-      const existing = await tx<{ id: string; verified_at: Date | null }[]>`
-        select id, verified_at
-        from profile_phone_numbers
-        where profile_id = ${user.sub}
-          and phone_e164 = ${phone_e164}
-        limit 1
-      `;
-      const [row] = await tx<{ id: string }[]>`
+      const [row] = await tx<{ id: string; verified_at: Date | null }[]>`
         insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
-        values (${user.sub}, ${phone_e164}, ${is_primary}, now())
+        values (${user.sub}, ${phone_e164}, false, null)
         on conflict (profile_id, phone_e164)
-        do update set is_primary = excluded.is_primary, verified_at = coalesce(profile_phone_numbers.verified_at, now())
-        returning id
+        do update set is_primary = (${is_primary} and profile_phone_numbers.verified_at is not null)
+        returning id, verified_at
       `;
-      return { id: row!.id, shouldNotify: existing.length === 0 || existing[0]!.verified_at === null };
+      const verified = row!.verified_at !== null;
+      let challenge = false;
+      if (!verified) {
+        const expires = new Date(Date.now() + VERIFICATION_CODE_TTL_MS);
+        const started = await tx<{ ok: boolean }[]>`
+          select app.phone_verification_start(${row!.id}::uuid, ${codeHash}, ${expires}) as ok
+        `;
+        challenge = started[0]?.ok === true;
+      }
+      return { id: row!.id, verified, challenge };
     });
-    if (result.shouldNotify) await sendConnectedWhatsAppMessage(user.sub, phone_e164);
-    return c.json({ id: result.id }, 201);
+
+    if (result.challenge) {
+      // Send the code to the number being verified. When WHATSAPP_* creds
+      // are unset (local/dev/tests) this is a fast no-op — the code row
+      // still exists so the flow can be completed out-of-band. The code is
+      // deliberately never logged and never returned in the response.
+      const to = phone_e164.startsWith('+') ? phone_e164.slice(1) : phone_e164;
+      try {
+        const sent = await sendWhatsAppText(
+          to,
+          `Your whatsacc verification code is ${codePlain}. It expires in 10 minutes. If you didn't request this, ignore this message.`,
+        );
+        if (!sent.ok && sent.error !== 'whatsapp_credentials_unset') {
+          console.warn('[whatsapp-send] verification code failed:', sent.error ?? 'unknown_error');
+        }
+      } catch (err) {
+        console.warn('[whatsapp-send] verification code failed:', (err as Error).message);
+      }
+    }
+    return c.json({ id: result.id, verification_required: !result.verified }, 201);
   });
 
   app.post('/me/phones/:id/verify', zValidator('json', verifyPhoneSchema), async (c) => {
     const user = getUser(c);
     const id = c.req.param('id');
-    // TODO: validate code against stored hash; placeholder accepts any 6-digit code
     const { code } = c.req.valid('json');
     if (!/^\d{6}$/.test(code)) throw BadRequest('invalid_code');
-    await withUserDb(c, async (tx) => {
-      const r = await tx<{ id: string }[]>`
-        update profile_phone_numbers set verified_at = now()
+    const codeHash = await hashToken(code);
+
+    // The failure branches must NOT throw inside the transaction — a throw
+    // rolls the tx back and would undo the attempt-counter increment that
+    // makes the 5-attempt lockout real. Map to HTTP errors after commit.
+    const outcome = await withUserDb(c, async (tx) => {
+      const rows = await tx<{ id: string; phone_e164: string; verified_at: Date | null }[]>`
+        select id, phone_e164, verified_at
+        from profile_phone_numbers
         where id = ${id} and profile_id = ${user.sub}
-        returning id
+        limit 1
       `;
-      if (r.length === 0) throw NotFound('phone_not_found');
+      const phone = rows[0];
+      if (!phone) return { status: 'not_found' as string, verifiedNow: false, phone_e164: '' };
+      if (phone.verified_at) return { status: 'already_verified', verifiedNow: false, phone_e164: phone.phone_e164 };
+
+      const consumed = await tx<{ status: string }[]>`
+        select app.phone_verification_consume(
+          ${id}::uuid, ${codeHash}, ${VERIFICATION_MAX_ATTEMPTS}
+        ) as status
+      `;
+      const status = consumed[0]?.status ?? 'no_code';
+      return { status, verifiedNow: status === 'ok', phone_e164: phone.phone_e164 };
     });
+
+    switch (outcome.status) {
+      case 'ok':
+      case 'already_verified':
+        break;
+      case 'not_found':
+        throw NotFound('phone_not_found');
+      case 'locked':
+        throw TooManyRequests('too_many_attempts', VERIFICATION_CODE_TTL_MS / 1000);
+      case 'expired':
+        throw BadRequest('code_expired');
+      case 'phone_taken':
+        throw Conflict('phone_in_use', 'This number is already verified on another account');
+      case 'no_code':
+        throw BadRequest('no_pending_code');
+      default:
+        throw BadRequest('invalid_code');
+    }
+
+    // The "connected to whatsacc" rundown only makes sense once the number
+    // is actually proven — send it after first successful verification.
+    if (outcome.verifiedNow) {
+      await sendConnectedWhatsAppMessage(user.sub, outcome.phone_e164);
+    }
     return c.body(null, 204);
   });
 

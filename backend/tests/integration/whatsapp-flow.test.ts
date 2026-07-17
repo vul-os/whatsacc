@@ -562,7 +562,7 @@ dbTest('wa flow: suspended account replies with the suspension message and does 
   }
 });
 
-dbTest('wa flow: a disabled user is filtered out of chat lookups (never reaches the disabled denial copy)', async () => {
+dbTest('wa flow: a disabled user is filtered out of access lookups and gets the honest disabled copy', async () => {
   await resetData();
   const app = await bootTestApp();
   const restore = setWhatsAppEnv();
@@ -576,17 +576,17 @@ dbTest('wa flow: a disabled user is filtered out of chat lookups (never reaches 
       await tx`update users set status = 'disabled' where id = ${u.user_id}`;
     });
 
-    // Pinned current behavior: the access lookups filter u.status = 'active',
-    // so a disabled user's "open" resolves zero gates AND zero locations and
-    // draws the "no location set up yet" nudge — chatDenialMessage's
-    // user_disabled copy is unreachable via WhatsApp text (it only fires for
-    // paths that reach logAccess with a resolved member, which the earlier
-    // filters prevent). Documented, not fixed, per test-only mandate.
+    // FIXED (was pinned): the access lookups filter u.status = 'active', so
+    // a disabled user's "open" resolves zero gates AND zero locations — and
+    // used to fall through to the misleading "no location set up yet" nudge.
+    // The webhook now detects "linked but no active linked user" in the same
+    // single query and answers honestly (the portal says the same thing, so
+    // nothing new is leaked to the phone). The gate still never opens.
     assertEquals((await postText(app, phone, 'open')).status, 200);
     const out = await outboundBodies(`+${phone}`);
     assertEquals(out.length, 1);
     const text = (out[0]!.body as { text: { body: string } }).text.body;
-    assert(text.includes("You don't have a location set up yet."), text);
+    assertEquals(text, 'This account is disabled — contact your admin.');
     assertEquals((await accessLogsFor(seeded.access_point_id!)).length, 0, 'gate must not open');
   } finally {
     outbound.restore();

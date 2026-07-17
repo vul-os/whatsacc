@@ -32,15 +32,29 @@ type TelegramUpdate = {
   };
 };
 
+// Log the missing-secret refusal once per isolate, not per request.
+let warnedMissingTelegramSecret = false;
+
 function telegramRouter() {
   const app = new Hono<AppEnv>();
 
   app.post('/webhooks/telegram', async (c) => {
+    // Fail closed, mirroring the Slack webhook: without a configured secret
+    // token we refuse to process entirely instead of accepting ANY
+    // unauthenticated POST (chat rows + bot replies for anyone — and a real
+    // gate bypass the day this handler grows access logic).
     const secret = getEnv().TELEGRAM_WEBHOOK_SECRET;
-    if (secret) {
-      const headerSecret = c.req.header('X-Telegram-Bot-Api-Secret-Token');
-      if (headerSecret !== secret) throw Forbidden('bad_secret_token');
+    if (!secret) {
+      if (!warnedMissingTelegramSecret) {
+        console.error(
+          'TELEGRAM_WEBHOOK_SECRET is not configured — refusing all Telegram webhooks (fail closed).',
+        );
+        warnedMissingTelegramSecret = true;
+      }
+      throw Forbidden('telegram_not_configured');
     }
+    const headerSecret = c.req.header('X-Telegram-Bot-Api-Secret-Token');
+    if (headerSecret !== secret) throw Forbidden('bad_secret_token');
 
     let update: TelegramUpdate;
     try {
@@ -71,14 +85,21 @@ function telegramRouter() {
       const chat = chatRows[0]!;
       
       const kind = msg.text ? 'text' : 'system'; // simplistic for now
-      await tx`
+      const inboundRows = await tx<{ id: string }[]>`
         insert into telegram_messages
           (chat_id, direction, kind, body, provider_message_id, status, ts)
         values
           (${chat.id}, 'in', ${kind}, ${tx.json(msg as unknown as JSONValue)},
            ${msg.message_id.toString()}, 'received', to_timestamp(${msg.date}))
         on conflict do nothing
+        returning id
       `;
+      if (inboundRows.length === 0) {
+        // Redelivered update (telegram_messages_inbound_provider_unique
+        // arbitrated the conflict) — already processed, don't reply twice.
+        console.log('TG duplicate update ignored:', { chatId: msg.chat.id, messageId: msg.message_id });
+        return;
+      }
 
       // Webhook flood throttle — same policy as WhatsApp/Slack: go quiet
       // past the per-minute cap but still 200 so Telegram doesn't retry.

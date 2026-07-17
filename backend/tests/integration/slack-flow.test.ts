@@ -88,21 +88,18 @@ dbTest('slack flow: "open" DM from a linked user answers with the gate-picker bl
 
     const r = await postEvent(app, 'U-LINKED-1', 'D-CHAN-1', 'open');
 
-    // TODO(REAL BUG — documented, not fixed; tests must not touch src/):
-    // src/routes/slack.ts persists the outbound blocks reply with
-    // kind = 'interactive', but slack_messages.kind has
-    // CHECK (kind IN ('text','file','system'))
-    // (migrations/20260505000000_baseline.sql, slack_messages). The INSERT
-    // fails with 23514 AFTER the blocks were already posted to Slack, so the
-    // webhook answers 500 — and a 500 makes Slack retry the event, re-sending
-    // the picker each time (retry amplification). The correct behavior would
-    // be a 200 with the outbound row persisted. Pinned here so the docs stay
-    // honest until src/routes/slack.ts (or the CHECK) is fixed.
-    assertEquals(r.status, 500);
+    // FIXED (was pinned): slack_messages.kind used to reject 'interactive'
+    // (CHECK allowed only text/file/system), so the outbound INSERT blew up
+    // 23514 AFTER the blocks were posted → 500 → Slack retried → duplicate
+    // pickers, and the outbound row was never logged. The CHECK now includes
+    // 'interactive' (migrations/20260505050000_fixes.sql): the webhook 200s
+    // and the picker is persisted exactly once.
+    assertEquals(r.status, 200);
 
-    // The reply DID go to chat.postMessage with one open_gate button per gate.
+    // The reply went to chat.postMessage ONCE with one open_gate button per
+    // gate — no retry amplification.
     const calls = outbound.to('slack.com/api/chat.postMessage');
-    assertEquals(calls.length, 1);
+    assertEquals(calls.length, 1, 'exactly one picker sent');
     const sent = calls[0]!.body as {
       channel: string;
       text: string;
@@ -118,12 +115,18 @@ dbTest('slack flow: "open" DM from a linked user answers with the gate-picker bl
     assertEquals((await accessLogsFor(seeded.access_point_id!)).length, 0);
     assertEquals((await accessLogsFor(sideApId)).length, 0);
 
-    // The inbound message is logged, but the outbound blocks reply is LOST
-    // (its INSERT is the statement that violates the CHECK) — the audit trail
-    // is silently missing the picker the user actually received.
+    // Both sides of the exchange are in the audit trail now: the inbound
+    // text AND the outbound interactive picker (status 'sent').
     const rows = await slackMessagesFor('D-CHAN-1');
     assert(rows.some((m) => m.direction === 'in' && m.kind === 'text'));
-    assertEquals(rows.filter((m) => m.direction === 'out').length, 0, 'outbound row lost (see TODO above)');
+    const outRows = rows.filter((m) => m.direction === 'out');
+    assertEquals(outRows.length, 1, 'outbound picker logged exactly once');
+    assertEquals(outRows[0]!.kind, 'interactive');
+    assertEquals(outRows[0]!.status, 'sent');
+    assert(
+      JSON.stringify(outRows[0]!.body).includes(`open_gate:${seeded.access_point_id!}`),
+      'logged body must carry the blocks',
+    );
   } finally {
     outbound.restore();
     restore();

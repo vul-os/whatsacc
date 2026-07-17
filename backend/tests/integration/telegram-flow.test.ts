@@ -4,8 +4,10 @@
 // conversational gate bot yet. What it actually does — and what these tests
 // pin so the docs stay true:
 //
-//   - X-Telegram-Bot-Api-Secret-Token is verified WHEN a secret is
-//     configured (403 bad_secret_token otherwise);
+//   - X-Telegram-Bot-Api-Secret-Token is REQUIRED: with a secret configured
+//     a wrong/missing header is 403 bad_secret_token, and with NO secret
+//     configured the webhook fails closed (403 telegram_not_configured);
+//   - redelivered updates are deduped on (chat_id, telegram message id);
 //   - the chat is upserted into telegram_chats (username/name refreshed);
 //   - inbound and outbound messages are logged in telegram_messages;
 //   - the per-chat flood throttle applies (bot goes quiet, still 200s);
@@ -104,28 +106,32 @@ dbTest('tg flow: secret token is verified when configured — wrong or missing h
   }
 });
 
-dbTest('tg flow: without a configured secret the webhook processes unauthenticated requests', async () => {
+dbTest('tg flow: without a configured secret the webhook fails CLOSED (403 telegram_not_configured)', async () => {
   await resetData();
   const app = await bootTestApp();
   const restore = setEnvVars({ TELEGRAM_WEBHOOK_SECRET: undefined, TELEGRAM_BOT_TOKEN: TG_TOKEN });
   const outbound = interceptOutbound();
   try {
-    // TODO(REAL FINDING — documented, not fixed; tests must not touch src/):
-    // src/routes/telegram.ts only checks the secret token `if (secret)` is
-    // configured — with TELEGRAM_WEBHOOK_SECRET unset, ANY unauthenticated
-    // POST is processed (chat rows created, replies sent through the bot
-    // token). Contrast src/routes/slack.ts, which fails CLOSED with 403
-    // slack_not_configured when its secret is missing. Today the blast
-    // radius is spam/DB-writes only because the handler is a stub that never
-    // opens gates (asserted below) — but the fail-open becomes a real gate
-    // bypass the day the stub grows access logic. Pinned so the gap stays
-    // visible.
+    // FIXED (was pinned): the route used to skip auth entirely when
+    // TELEGRAM_WEBHOOK_SECRET was unset — any unauthenticated POST was
+    // processed (chat rows created, replies sent through the bot token),
+    // and the fail-open would have become a real gate bypass the day the
+    // stub grew access logic. It now mirrors src/routes/slack.ts: without
+    // the secret the integration refuses to work at all (403, logged once).
     const r = await postUpdate(app, tgUpdate(202, 'open'));
-    assertEquals(r.status, 200);
-    const rows = await telegramMessagesFor(202);
-    assertEquals(rows.filter((m) => m.direction === 'in').length, 1);
-    assertEquals(rows.filter((m) => m.direction === 'out').length, 1);
-    assertEquals(await accessLogCount(), 0, 'stub must never actuate a gate');
+    assertEquals(r.status, 403);
+    assertEquals((r.body as { error: string }).error, 'telegram_not_configured');
+
+    // Even presenting SOME header changes nothing — there is no secret to
+    // compare against, so processing is refused outright.
+    const withHeader = await postUpdate(app, tgUpdate(202, 'open'), 'guessed-secret');
+    assertEquals(withHeader.status, 403);
+    assertEquals((withHeader.body as { error: string }).error, 'telegram_not_configured');
+
+    // Nothing was processed: no chat rows, no messages, no bot replies.
+    assertEquals((await telegramMessagesFor(202)).length, 0);
+    assertEquals(outbound.calls.length, 0);
+    assertEquals(await accessLogCount(), 0);
   } finally {
     outbound.restore();
     restore();
@@ -225,25 +231,32 @@ dbTest('tg flow: bot senders and message-less updates are ignored', async () => 
   }
 });
 
-dbTest('tg flow: redelivered updates are NOT deduplicated (documented current behavior)', async () => {
+dbTest('tg flow: redelivered updates are processed once (single inbound row, single reply)', async () => {
   await resetData();
   const app = await bootTestApp();
   const restore = setTelegramEnv();
   const outbound = interceptOutbound();
   try {
-    // Pinned current behavior: the inbound INSERT carries ON CONFLICT DO
-    // NOTHING, but telegram_messages has NO unique constraint on
-    // provider_message_id (plain index only — compare whatsapp_messages'
-    // UNIQUE constraint), so the clause never fires: a redelivered update is
-    // processed twice and replied to twice.
+    // FIXED (was pinned): the inbound INSERT carried ON CONFLICT DO NOTHING
+    // but telegram_messages had NO unique constraint on the natural key, so
+    // the clause never fired and a redelivered update was processed and
+    // replied to twice. telegram_messages_inbound_provider_unique
+    // (chat_id, provider_message_id) WHERE direction='in' now arbitrates
+    // the conflict, and the route skips the reply when the insert is a
+    // no-op — the retry still 200s so Telegram stops redelivering.
     const chatId = 606;
     const update = tgUpdate(chatId, 'open', { messageId: 7777 });
     assertEquals((await postUpdate(app, update, TG_SECRET)).status, 200);
-    assertEquals((await postUpdate(app, update, TG_SECRET)).status, 200);
+    assertEquals((await postUpdate(app, update, TG_SECRET)).status, 200, 'retry still 200s');
 
     const rows = await telegramMessagesFor(chatId);
-    assertEquals(rows.filter((m) => m.direction === 'in').length, 2, 'duplicate inbound rows (no dedupe)');
-    assertEquals(rows.filter((m) => m.direction === 'out').length, 2, 'duplicate replies (no dedupe)');
+    assertEquals(rows.filter((m) => m.direction === 'in').length, 1, 'one inbound row (deduped)');
+    assertEquals(rows.filter((m) => m.direction === 'out').length, 1, 'one reply, not two');
+    assertEquals(outbound.to('api.telegram.org').length, 1);
+
+    // A DIFFERENT message in the same chat is of course still processed.
+    assertEquals((await postUpdate(app, tgUpdate(chatId, 'open', { messageId: 7778 }), TG_SECRET)).status, 200);
+    assertEquals((await telegramMessagesFor(chatId)).filter((m) => m.direction === 'in').length, 2);
   } finally {
     outbound.restore();
     restore();
