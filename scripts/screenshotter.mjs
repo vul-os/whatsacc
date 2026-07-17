@@ -7,7 +7,7 @@
 // request with Playwright route mocks (fixtures in scripts/screenshotter-fixtures/),
 // seeds an authenticated session, and captures polished PNGs into:
 //   web/screenshots/          (light)
-//   web/screenshots/dark/     (dark; copies of light while the app has no dark theme)
+//   web/screenshots/dark/     (dark)
 //
 // No backend (Deno, port 8787/8000) is required. Exits non-zero on any failure.
 
@@ -24,10 +24,10 @@ const OUT_LIGHT = path.join(ROOT, 'web', 'screenshots');
 const OUT_DARK = path.join(OUT_LIGHT, 'dark');
 const MIN_BYTES = 30_000; // a real 2x/3x product shot is far bigger than this
 
-// The app's CSS has a single light `:root` palette (src/styles/tokens.css) and no
-// `prefers-color-scheme: dark` rules, so a real dark render is impossible today.
-// We copy the light shots into dark/ so documentation references never 404.
-const APP_HAS_DARK_MODE = false;
+// The app ships a real dark theme (src/lib/theme.tsx toggles :root[data-theme]);
+// both schemes are captured natively. If the theme is ever removed, flip the flag
+// below and light shots get copied into dark/ so references never 404.
+const APP_HAS_DARK_MODE = true; // real dark theme via :root[data-theme] (src/lib/theme.tsx)
 
 // ---------------------------------------------------------------------------
 // Fixtures: load JSON and substitute {{now±Nu}} tokens (u in s|m|h|d) with ISO
@@ -37,9 +37,10 @@ const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 function loadFixture(name) {
   const raw = fs.readFileSync(path.join(FIXTURES, name), 'utf8');
-  const substituted = raw.replace(/\{\{now([+-]\d+)([smhd])\}\}/g, (_, amount, unit) =>
-    new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString(),
-  );
+  const substituted = raw.replace(/\{\{now([+-]\d+)([smhd])(:date)?\}\}/g, (_, amount, unit, asDate) => {
+    const iso = new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString();
+    return asDate ? iso.slice(0, 10) : iso;
+  });
   return substituted;
 }
 
@@ -61,6 +62,7 @@ function buildMockRoutes() {
         }),
     },
     { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/summary$/, body: () => loadFixture('summary.json') },
+    { method: 'GET', re: /^\/analytics\/accounts\/[^/]+\/insights$/, body: () => loadFixture('insights.json') },
     { method: 'GET', re: /^\/billing\/accounts\/[^/]+\/billing$/, body: () => loadFixture('billing.json') },
     { method: 'GET', re: /^\/locations\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
     { method: 'GET', re: /^\/accounts\/[^/]+\/members$/, body: () => loadFixture('members.json') },
@@ -272,7 +274,7 @@ async function main() {
       { path: '/docs', file: 'docs.png' },
       { path: '/pricing', file: 'pricing.png' },
       { path: '/app', file: 'portal-dashboard.png', expectText: 'Recent activity' },
-      { path: '/app/locations', file: 'portal-locations.png', expectText: 'Silver Oaks Estate' },
+      { path: '/app/access-points', file: 'portal-locations.png', expectText: 'Main gate' },
       { path: '/app/analytics', file: 'portal-analytics.png', expectText: 'Analytics' },
     ];
     const mobileShots = [
@@ -302,32 +304,37 @@ async function main() {
     ];
 
     const written = [];
-    for (const { label, shots, options } of contexts) {
-      console.log(`Capturing ${label} (light) ...`);
-      const context = await browser.newContext({
-        ...options,
-        colorScheme: 'light',
-        reducedMotion: 'reduce',
-        locale: 'en-ZA',
-        timezoneId: 'Africa/Johannesburg',
-      });
-      await context.addInitScript(AUTH_SEED);
-      await installApiMocks(context);
-      const page = await context.newPage();
-      page.on('pageerror', (err) => console.warn(`  [pageerror] ${err.message}`));
-      for (const shot of shots) {
-        const out = path.join(OUT_LIGHT, shot.file);
-        await capture(page, origin, shot, out);
-        written.push(out);
+    for (const scheme of ['light', 'dark']) {
+      if (scheme === 'dark' && !APP_HAS_DARK_MODE) break;
+      for (const { label, shots, options } of contexts) {
+        console.log(`Capturing ${label} (${scheme}) ...`);
+        const context = await browser.newContext({
+          ...options,
+          colorScheme: scheme,
+          reducedMotion: 'reduce',
+          locale: 'en-ZA',
+          timezoneId: 'Africa/Johannesburg',
+        });
+        await context.addInitScript(AUTH_SEED);
+        await context.addInitScript(`window.localStorage.setItem('whatsacc.theme', '${scheme}');`);
+        await installApiMocks(context);
+        const page = await context.newPage();
+        page.on('pageerror', (err) => console.warn(`  [pageerror] ${err.message}`));
+        const outDir = scheme === 'dark' ? OUT_DARK : OUT_LIGHT;
+        for (const shot of shots) {
+          const out = path.join(outDir, shot.file);
+          await capture(page, origin, shot, out);
+          written.push(out);
+        }
+        await context.close();
       }
-      await context.close();
     }
 
-    // Dark variants. The app has no dark theme (see APP_HAS_DARK_MODE above), so
-    // copy the light shots into dark/ to keep every documented path resolvable.
+    // Fallback: if the app has no dark theme, copy the light shots into dark/
+    // so every documented path stays resolvable.
     if (!APP_HAS_DARK_MODE) {
       console.log('App has no dark mode — copying light shots into dark/ ...');
-      for (const file of written) {
+      for (const file of written.slice()) {
         const dst = path.join(OUT_DARK, path.basename(file));
         fs.copyFileSync(file, dst);
         console.log(`  ok dark/${path.basename(dst)}`);

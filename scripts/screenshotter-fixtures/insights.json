@@ -1,0 +1,111 @@
+{
+  "account_id": "acct_silveroaks",
+  "days": [
+    {
+      "day": "{{now-13d:date}}",
+      "opens": 48,
+      "denied": 1
+    },
+    {
+      "day": "{{now-12d:date}}",
+      "opens": 53,
+      "denied": 0
+    },
+    {
+      "day": "{{now-11d:date}}",
+      "opens": 32,
+      "denied": 4
+    },
+    {
+      "day": "{{now-10d:date}}",
+      "opens": 34,
+      "denied": 2
+    },
+    {
+      "day": "{{now-9d:date}}",
+      "opens": 31,
+      "denied": 4
+    },
+    {
+      "day": "{{now-8d:date}}",
+      "opens": 41,
+      "denied": 0
+    },
+    {
+      "day": "{{now-7d:date}}",
+      "opens": 33,
+      "denied": 3
+    },
+    {
+      "day": "{{now-6d:date}}",
+      "opens": 54,
+      "denied": 0
+    },
+    {
+      "day": "{{now-5d:date}}",
+      "opens": 43,
+      "denied": 0
+    },
+    {
+      "day": "{{now-4d:date}}",
+      "opens": 55,
+      "denied": 0
+    },
+    {
+      "day": "{{now-3d:date}}",
+      "opens": 35,
+      "denied": 1
+    },
+    {
+      "day": "{{now-2d:date}}",
+      "opens": 31,
+      "denied": 4
+    },
+    {
+      "day": "{{now-1d:date}}",
+      "opens": 53,
+      "denied": 0
+    },
+    {
+      "day": "{{now-0d:date}}",
+      "opens": 42,
+      "denied": 0
+    }
+  ],
+  "breakdown": [
+    {
+      "access_point_id": "ap_main",
+      "access_point_name": "Main gate",
+      "location_name": "Silver Oaks Estate",
+      "opens": 214
+    },
+    {
+      "access_point_id": "ap_ped",
+      "access_point_name": "Pedestrian gate",
+      "location_name": "Silver Oaks Estate",
+      "opens": 97
+    },
+    {
+      "access_point_id": "ap_park",
+      "access_point_name": "Parking barrier",
+      "location_name": "Silver Oaks Estate",
+      "opens": 66
+    },
+    {
+      "access_point_id": "ap_club",
+      "access_point_name": "Clubhouse door",
+      "location_name": "Silver Oaks Estate",
+      "opens": 31
+    }
+  ],
+  "totals": {
+    "opens_7d": 408,
+    "denied_7d": 9,
+    "closes_7d": 122,
+    "opens_prev_7d": 371
+  },
+  "members": {
+    "member_count": 193,
+    "active_members_7d": 121
+  }
+}
