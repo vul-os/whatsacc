@@ -1,0 +1,44 @@
+# whatsacc documentation
+
+**Texts that open gates.** whatsacc is a decentralized access-control system: a chat
+message — WhatsApp or Slack today, Discord soon — opens a physical gate, door or barrier.
+
+There is no cloud center. whatsacc is a network of independent **gateways**. Anyone can
+run one; whatsacc runs the flagship at whatsacc.com. Every line of code is MIT-licensed,
+including the billing code. The only private thing about the hosted gateway is its `.env`.
+
+## The pieces
+
+| Piece | What it is |
+| --- | --- |
+| **Gateway** | One Go binary with an embedded SQLite database. It receives chat webhooks, runs your access rules, serves the management portal and the app's API, keeps the audit log, and pushes signed commands to controllers. |
+| **Controller** | The small device wired to your gate's relay. It dials *out* to the gateway over a persistent connection, verifies command signatures against a pinned key, and pulses the motor. Wi-Fi or GSM. |
+| **App** | Desktop and mobile app (Tauri). It is the admin console — and the way to open your gate when the internet is down, using an offline-verifiable signed grant. |
+| **Portal** | The web dashboard, embedded inside the gateway binary. No separate deployment. |
+
+## The three ways in
+
+1. **Chat — the primary path.** Residents text `open` from the channel they already use.
+   The gateway resolves who they are, runs the rules, signs a command, replies in-thread.
+2. **The app — emergency access.** Works with no internet at all: the app holds a
+   short-lived grant signed by the gateway and proves itself to the controller directly
+   over LAN or Bluetooth. See [Emergency access](emergency-access.md).
+3. **The web portal — the fallback.** Unlimited opens through the gateway's own dashboard.
+
+## Hosted or self-hosted?
+
+Both run the **same binary**.
+
+- **The flagship** (whatsacc.com): residents text *our* WhatsApp number; we carry the
+  Meta business verification, hosting and uptime. Free and paid tiers. Start with
+  [Getting started](getting-started.md).
+- **Your own gateway**: bring your own channel credentials and a public URL — a VPS, a
+  vulos-relay tunnel, or cloudflared. Start with [Run a gateway](self-host.md).
+
+## Where to go next
+
+- New here, want the fastest path? → [Getting started](getting-started.md)
+- Self-hosting on your own hardware? → [Run a gateway](self-host.md)
+- Wiring a gate? → [Controllers](controllers.md)
+- Evaluating for a complex or a security review? → [Security](security.md) and
+  [Architecture](architecture.md)

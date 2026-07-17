@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>whatsacc — texts that open gates</title>
+<meta name="description" content="whatsacc is a decentralized access network: one MIT-licensed gateway binary that turns a WhatsApp, Discord or Slack message into a signed command at your gate. Self-host it, or use the flagship we run.">
+<meta name="author" content="whatsacc">
+<meta name="application-name" content="whatsacc">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#141210">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="whatsacc">
+<meta property="og:title" content="whatsacc — texts that open gates">
+<meta property="og:description" content="A decentralized access network. One MIT gateway binary, three chat channels, zero cloud lock-in.">
+<meta name="robots" content="index,follow">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231A1F36'/%3E%3Cpath d='M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z' fill='none' stroke='%23F4EDE2' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='42' r='3' fill='%23D6624D'/%3E%3C/svg%3E">
+<script>
+/* theme boot — runs before paint; key shared with docs/ */
+(function(){
+  var t;
+  try { t = localStorage.getItem('whatsacc.theme'); } catch(e){}
+  if (t !== 'light' && t !== 'dark')
+    t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<style>
+/* ————————————————————————— fonts (vendored, relative) ————————————————————————— */
+@font-face{font-family:'Fraunces';font-style:normal;font-weight:100 900;font-stretch:normal;font-display:swap;
+  src:url('fonts/fraunces-var.woff2') format('woff2');}
+@font-face{font-family:'Fraunces';font-style:italic;font-weight:100 900;font-display:swap;
+  src:url('fonts/fraunces-italic-var.woff2') format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;
+  src:url('fonts/inter-var.woff2') format('woff2');}
+@font-face{font-family:'Inter';font-style:italic;font-weight:100 900;font-display:swap;
+  src:url('fonts/inter-italic-var.woff2') format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;
+  src:url('fonts/jetbrains-mono-var.woff2') format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:italic;font-weight:100 800;font-display:swap;
+  src:url('fonts/jetbrains-mono-italic-var.woff2') format('woff2');}
+
+/* ————————————————————————— tokens —————————————————————————
+   aligned with src/styles/tokens.css (the app's official palette):
+   warm neutrals + copper accent; dark = true near-black, not brownish. */
+:root{
+  color-scheme:light;
+  --ink:#141210;
+  --ink-soft:#302c28;
+  --ink-faint:rgba(20,18,16,.55);
+  --ink-whisper:rgba(20,18,16,.09);
+  --paper:#fafaf8;
+  --paper-warm:#f2ede6;
+  --paper-cool:#fdfdfc;
+  --paper-edge:rgba(20,18,16,.07);
+  --terracotta:#c86848;
+  --terracotta-deep:#a24f32;
+  --terracotta-soft:#e8a48a;
+  --gold:#b8914a;
+  --gold-soft:#dec07a;
+  --slate:#7c746c;
+  --moss:#5c7258;
+  --clay:#c2a88c;
+  --signal:#3a6e56;                 /* successful gate-open green — not whatsapp */
+  --signal-wash:rgba(58,110,86,.12);
+  --band:#141210;                   /* the dark editorial band (aside surface) */
+  --band-text:#fafaf8;
+  --band-edge:rgba(250,250,248,.15);
+  --shadow-paper:0 1px 2px rgba(14,12,10,.04),0 8px 24px -8px rgba(14,12,10,.10);
+  --shadow-deep:0 20px 40px -14px rgba(14,12,10,.20);
+  --glow-a:color-mix(in srgb,var(--terracotta) 9%,transparent);
+  --glow-b:color-mix(in srgb,var(--gold) 10%,transparent);
+  --font-display:'Fraunces','Iowan Old Style','Apple Garamond',serif;
+  --font-sans:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+  --radius-arch:999px 999px 4px 4px;
+}
+:root[data-theme='dark']{
+  color-scheme:dark;
+  --ink:#f5efe6;
+  --ink-soft:#d8cfbf;
+  --ink-faint:rgba(245,239,230,.55);
+  --ink-whisper:rgba(245,239,230,.10);
+  --paper:#0f0e0c;
+  --paper-warm:#181614;
+  --paper-cool:#131210;
+  --paper-edge:rgba(245,239,230,.08);
+  --terracotta:#e0896a;
+  --terracotta-deep:#f0a484;
+  --terracotta-soft:#8a4a38;
+  --gold:#d4ae6a;
+  --gold-soft:#8a6e40;
+  --slate:#b4a89c;
+  --moss:#8aaa84;
+  --clay:#6e5a48;
+  --signal:#88b89c;
+  --signal-wash:rgba(136,184,156,.14);
+  --band:#1a1714;                   /* aside surface, dark — a touch warmer than --paper */
+  --band-text:#f5efe6;
+  --band-edge:rgba(245,239,230,.12);
+  --shadow-paper:0 1px 0 rgba(255,255,255,.03),0 16px 48px -16px rgba(0,0,0,.55);
+  --shadow-deep:0 32px 64px -24px rgba(0,0,0,.80);
+  --glow-a:color-mix(in srgb,var(--terracotta) 15%,transparent);
+  --glow-b:color-mix(in srgb,var(--gold) 9%,transparent);
+}
+
+/* ————————————————————————— base ————————————————————————— */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--font-sans);font-size:16px;line-height:1.6;
+  font-feature-settings:"ss01","cv11";
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  background-image:
+    radial-gradient(1200px 600px at 90% -10%,var(--glow-a),transparent 60%),
+    radial-gradient(800px 400px at -10% 30%,var(--glow-b),transparent 60%);
+  background-attachment:fixed;
+}
+::selection{background:var(--ink);color:var(--paper)}
+img{max-width:100%;height:auto}
+a{color:inherit}
+h1,h2,h3,h4{margin:0;font-weight:inherit}
+p{margin:0}
+.display{font-family:var(--font-display);font-optical-sizing:auto;font-variation-settings:"SOFT" 30;font-weight:420}
+.display-tight{font-family:var(--font-display);font-optical-sizing:auto;font-variation-settings:"SOFT" 0;letter-spacing:-.02em;font-weight:440}
+.numeral{font-family:var(--font-display);font-feature-settings:"lnum","tnum";font-variation-settings:"SOFT" 100}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint);font-weight:500}
+.wrap{max-width:1280px;margin:0 auto;padding-left:24px;padding-right:24px}
+@media(min-width:1024px){.wrap{padding-left:40px;padding-right:40px}}
+.rule{height:1px;background-image:linear-gradient(to right,transparent,var(--ink-whisper) 20%,var(--ink-whisper) 80%,transparent)}
+
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1)}
+.reveal.is-in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+  .pulse-dot::after,.drift{animation:none!important}
+}
+
+/* ————————————————————————— topbar ————————————————————————— */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:color-mix(in srgb,var(--paper) 86%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--paper-edge);
+}
+.topbar-in{display:flex;align-items:center;gap:16px;height:64px}
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.brand-mark{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--band);color:var(--band-text)}
+:root[data-theme='dark'] .brand-mark{background:var(--paper-warm);border:1px solid var(--paper-edge)}
+.brand-name{font-family:var(--font-display);font-style:italic;font-variation-settings:"SOFT" 60;font-size:22px;letter-spacing:-.01em}
+.nav{display:none;align-items:center;gap:26px;margin-left:auto}
+.nav a{font-size:14px;text-decoration:none;color:var(--ink-faint);transition:color .18s}
+.nav a:hover{color:var(--ink)}
+.nav a.nav-cta{
+  color:var(--paper);background:var(--ink);padding:8px 16px;border-radius:999px;font-weight:500;
+}
+:root[data-theme='dark'] .nav a.nav-cta{color:#141210;background:#f5efe6}
+.nav a.nav-cta:hover{background:var(--terracotta);color:#fafaf8}
+@media(min-width:880px){.nav{display:flex}}
+.theme-btn,.menu-btn{
+  display:grid;place-items:center;width:36px;height:36px;border-radius:999px;
+  border:1px solid var(--ink-whisper);background:transparent;color:var(--ink-faint);cursor:pointer;
+  transition:color .18s,border-color .18s;
+}
+.theme-btn:hover,.menu-btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.theme-btn{margin-left:auto}
+@media(min-width:880px){.theme-btn{margin-left:0}}
+.theme-btn .ic-moon{display:none}
+:root[data-theme='dark'] .theme-btn .ic-sun{display:none}
+:root[data-theme='dark'] .theme-btn .ic-moon{display:block}
+.menu-btn{display:grid}
+@media(min-width:880px){.menu-btn{display:none}}
+.mobile-nav{display:none;border-top:1px solid var(--paper-edge);padding:10px 0 18px}
+.mobile-nav.open{display:block}
+.mobile-nav a{display:block;padding:10px 4px;text-decoration:none;color:var(--ink-soft);font-size:15px}
+.mobile-nav a:hover{color:var(--terracotta)}
+
+/* ————————————————————————— hero ————————————————————————— */
+.hero{position:relative;overflow:hidden}
+/* starfield — after dark at the gate (mirrors the app's night sky) */
+.starfield{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .9s ease .1s;z-index:0}
+:root[data-theme='dark'] .starfield{opacity:1}
+.starfield circle{fill:#f5efe6;filter:drop-shadow(0 0 1.5px rgba(245,239,230,.55))}
+@media(prefers-reduced-motion:no-preference){
+  @keyframes sf-twinkle{0%,100%{opacity:.95}50%{opacity:.2}}
+  .starfield .tw{animation:sf-twinkle 3.4s ease-in-out infinite}
+  .starfield .tw:nth-of-type(2n){animation-duration:4.1s;animation-delay:.4s}
+  .starfield .tw:nth-of-type(3n){animation-duration:4.6s;animation-delay:1.3s}
+  .starfield .tw:nth-of-type(5n){animation-duration:3.2s;animation-delay:1.7s}
+  .starfield .tw:nth-of-type(7n){animation-duration:5s;animation-delay:2.1s}
+}
+.hero .wrap,.hero .strip{position:relative;z-index:1}
+.hero-grid{display:grid;grid-template-columns:1fr;gap:56px;padding:64px 0 72px;align-items:end}
+@media(min-width:1024px){.hero-grid{grid-template-columns:7fr 5fr;gap:48px;padding:88px 0 104px}}
+.pulse-dot{position:relative;display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--terracotta);flex:none}
+.pulse-dot::after{content:"";position:absolute;inset:-4px;border-radius:999px;background:var(--terracotta);opacity:.35;animation:pulseping 2.2s ease-out infinite}
+@keyframes pulseping{0%{transform:scale(.5);opacity:.5}70%{transform:scale(1.6);opacity:0}100%{transform:scale(1.6);opacity:0}}
+.hero-eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:34px}
+.hero h1{font-size:clamp(2.9rem,10.5vw,7.6rem);line-height:.92;color:var(--ink)}
+.hero h1 em{font-style:italic;color:var(--terracotta);font-variation-settings:"SOFT" 100;font-weight:430}
+.gates-underline{position:relative;display:inline-block}
+.gates-underline svg{pointer-events:none;position:absolute;left:0;right:0;bottom:-.13em;width:100%;height:.14em;color:var(--terracotta)}
+.hero-tag{margin-top:36px;max-width:32rem;font-size:18px;line-height:1.65;color:var(--ink-soft)}
+.hero-tag b{font-weight:600}
+.hero-sub{margin-top:14px;max-width:34rem;font-size:15px;line-height:1.7;color:var(--ink-faint)}
+.cta-row{margin-top:32px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 24px;border-radius:999px;font-size:15px;font-weight:500;text-decoration:none;border:1px solid transparent;transition:background .18s,color .18s,border-color .18s,transform .18s;cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.btn-ink{background:var(--ink);color:var(--paper)}
+.btn-ink:hover{background:var(--terracotta);color:#fafaf8}
+:root[data-theme='dark'] .btn-ink{background:#f5efe6;color:#141210}
+:root[data-theme='dark'] .btn-ink:hover{background:var(--terracotta);color:#fafaf8}
+.btn-outline{border-color:var(--ink-whisper);color:var(--ink-soft);background:transparent}
+.btn-outline:hover{border-color:var(--terracotta);color:var(--terracotta)}
+.btn-ghost{color:var(--ink-faint);background:transparent;padding:0 14px}
+.btn-ghost:hover{color:var(--terracotta)}
+.stat-row{margin-top:52px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px 24px;max-width:34rem;border-top:1px solid var(--ink-whisper);padding-top:24px}
+@media(min-width:640px){.stat-row{grid-template-columns:repeat(4,1fr)}}
+.stat-row dt{font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)}
+.stat-row dd{margin:6px 0 0;font-family:var(--font-display);font-variation-settings:"SOFT" 100;font-size:26px;line-height:1}
+.stat-row dd small{font-size:14px;color:var(--ink-faint);font-family:var(--font-sans)}
+
+/* browser frame */
+.browser{position:relative;border-radius:14px;background:var(--band);padding:6px;box-shadow:var(--shadow-deep)}
+.browser-bar{display:flex;align-items:center;gap:8px;padding:8px 12px}
+.tl{width:11px;height:11px;border-radius:999px}
+.tl-r{background:#ff5f57}.tl-y{background:#febc2e}.tl-g{background:#28c840}
+.addr{flex:1;margin-left:8px;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border-radius:8px;background:rgba(250,250,248,.09);color:rgba(250,250,248,.66);font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;min-width:0}
+.addr .lock{flex:none;opacity:.7}
+.addr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot{position:relative;overflow:hidden;border-radius:8px;aspect-ratio:1440/900;background:
+  radial-gradient(120% 90% at 50% -20%,var(--paper-cool),var(--paper-warm));}
+.shot::before{ /* placeholder arch, shows if the PNG 404s */
+  content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:38%;height:62%;border:2px solid var(--ink-whisper);border-bottom:none;border-radius:var(--radius-arch);
+}
+.shot::after{content:"";position:absolute;left:50%;bottom:24%;transform:translateX(-50%);width:8px;height:8px;border-radius:999px;background:var(--terracotta);opacity:.7}
+.shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.shot img.missing{display:none}
+:root[data-theme='light'] .shot .shot-dark{display:none}
+:root[data-theme='dark'] .shot .shot-light{display:none}
+.hero-visual{position:relative}
+.hero-visual .corner{position:absolute;width:16px;height:16px;border-color:var(--ink-faint);display:none}
+@media(min-width:1024px){.hero-visual .corner{display:block}}
+.corner-tl{left:-12px;top:-12px;border-left:2px solid;border-top:2px solid}
+.corner-br{right:-12px;bottom:-12px;border-right:2px solid;border-bottom:2px solid}
+.drift{animation:drift 7s ease-in-out infinite}
+@keyframes drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.shot-caption{margin-top:12px;display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint)}
+
+/* editorial strip */
+.strip{border-top:1px solid var(--paper-edge);border-bottom:1px solid var(--paper-edge);background:color-mix(in srgb,var(--paper-warm) 55%,transparent)}
+.strip-in{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint)}
+.strip-in .mid{display:none}
+@media(min-width:768px){.strip-in .mid{display:inline}}
+
+/* ————————————————————————— sections ————————————————————————— */
+.section{padding:88px 0}
+@media(min-width:1024px){.section{padding:120px 0}}
+.section-warm{background:var(--paper-warm)}
+.section-head{display:grid;gap:24px;margin-bottom:56px}
+@media(min-width:1024px){.section-head{grid-template-columns:7fr 5fr;align-items:end}}
+.section-head h2{font-size:clamp(2.2rem,5.4vw,4.2rem);line-height:.98}
+.section-head h2 em{font-style:italic;color:var(--terracotta);font-variation-settings:"SOFT" 100}
+.section-head .lede{max-width:28rem;color:var(--ink-faint);line-height:1.7;justify-self:start}
+@media(min-width:1024px){.section-head .lede{justify-self:end}}
+.kicker{display:block;margin-bottom:16px}
+
+/* chat demo */
+.chat-grid{display:grid;gap:56px;align-items:center}
+@media(min-width:1024px){.chat-grid{grid-template-columns:5fr 7fr}}
+.chat-copy h2{font-size:clamp(2.2rem,5vw,3.6rem);line-height:1.02}
+.chat-copy h2 em{font-style:italic;color:var(--terracotta);font-variation-settings:"SOFT" 100}
+.tick-list{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:12px}
+.tick-list li{display:flex;gap:12px;font-size:14.5px;color:var(--ink-soft);line-height:1.6}
+.tick-list li::before{content:"";flex:none;margin-top:10px;width:12px;height:4px;background:var(--terracotta)}
+.phone{position:relative;margin:0 auto;max-width:390px;border-radius:40px;background:var(--band);padding:6px;box-shadow:var(--shadow-deep);transform:rotate(-1.4deg)}
+.phone-screen{border-radius:34px;background:var(--paper-cool);overflow:hidden;border:1px solid var(--paper-edge)}
+.phone-head{display:flex;align-items:center;gap:10px;padding:16px 14px 12px;background:var(--band);color:var(--band-text)}
+.phone-head .avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:999px;background:var(--band-text);color:#141210}
+.phone-head .who{line-height:1.25}
+.phone-head .who b{display:block;font-size:13.5px;font-weight:600}
+.phone-head .who span{font-size:11px;opacity:.65;display:inline-flex;align-items:center;gap:5px}
+.phone-head .who span i{width:6px;height:6px;border-radius:999px;background:var(--signal);display:inline-block;font-style:normal}
+.chat-body{position:relative;display:flex;flex-direction:column;gap:8px;padding:18px 12px 20px;min-height:430px;
+  background-image:radial-gradient(var(--ink-whisper) 1px,transparent 1.2px);background-size:16px 16px}
+.day-chip{align-self:center;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);background:var(--paper);border:1px solid var(--paper-edge);border-radius:8px;padding:3px 10px;margin-bottom:4px}
+.msg{position:relative;max-width:80%;padding:9px 12px 7px;font-size:13.5px;line-height:1.45;border-radius:12px;box-shadow:0 1px 0 var(--ink-whisper)}
+.msg-in{align-self:flex-start;background:var(--paper);border:1px solid var(--paper-edge);border-top-left-radius:3px}
+.msg-out{align-self:flex-end;background:var(--band);color:var(--band-text);border-top-right-radius:3px}
+.msg .t{display:block;margin-top:3px;text-align:right;font-family:var(--font-mono);font-size:9.5px;opacity:.5;letter-spacing:.04em}
+.msg-ok{border-left:3px solid var(--signal)}
+.msg-ok .ok-line{display:flex;align-items:center;gap:8px}
+.ok-badge{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:999px;background:var(--signal-wash);color:var(--signal)}
+.msg .meta{display:block;margin-top:5px;font-family:var(--font-mono);font-size:10px;color:var(--ink-faint)}
+.picker{align-self:flex-start;width:80%;overflow:hidden;border-radius:12px;border:1px solid var(--paper-edge);background:var(--paper);box-shadow:0 1px 0 var(--ink-whisper)}
+.picker .p-head{padding:9px 12px 7px;font-size:13.5px;border-bottom:1px solid var(--paper-edge)}
+.picker button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:13px;font-weight:500;cursor:default;border-bottom:1px solid var(--paper-edge)}
+.picker button:last-child{border-bottom:0}
+.picker button .n{font-family:var(--font-mono);font-size:11px;color:var(--terracotta);width:16px;text-align:center}
+.typing{align-self:flex-end;font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);letter-spacing:.06em}
+
+/* how it works */
+.how-illo{border-radius:24px;background:var(--paper-warm);border:1px solid var(--paper-edge);padding:28px}
+.section .how-illo svg{display:block;width:100%;height:auto}
+.steps{list-style:none;margin:72px 0 0;padding:0;display:grid;gap:44px}
+@media(min-width:768px){.steps{grid-template-columns:repeat(3,1fr);gap:32px}}
+.steps li{position:relative}
+.step-top{display:flex;align-items:center;gap:12px}
+.step-top .n{font-family:var(--font-display);font-variation-settings:"SOFT" 100;font-feature-settings:"lnum","tnum";font-size:30px;color:var(--terracotta);line-height:1}
+.step-top .dot{width:6px;height:6px;border-radius:999px;background:var(--ink)}
+.step-top .line{flex:1;height:1px;background:var(--ink-whisper);display:none}
+@media(min-width:768px){.steps li:not(:last-child) .line{display:block}}
+.steps h3{margin-top:18px;font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:24px}
+.steps p{margin-top:10px;color:var(--ink-faint);line-height:1.65;font-size:15px;max-width:30ch}
+.steps p code{font-family:var(--font-mono);font-size:.85em;background:var(--paper-warm);border:1px solid var(--paper-edge);padding:1px 5px;border-radius:5px}
+
+/* three ways in */
+.ways{display:grid;gap:16px}
+@media(min-width:900px){.ways{grid-template-columns:5fr 4fr 3fr}}
+.way{border-radius:24px;border:1px solid var(--paper-edge);background:var(--paper-cool);padding:32px;display:flex;flex-direction:column;gap:14px;transition:background .25s}
+.way:hover{background:var(--paper-warm)}
+.way .w-tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)}
+.way .w-tag i{font-style:normal;width:8px;height:8px;border-radius:999px}
+.way h3{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:26px}
+.way h3 em{font-style:italic;color:var(--terracotta)}
+.way p{color:var(--ink-faint);font-size:14.5px;line-height:1.65}
+.way .w-foot{margin-top:auto;padding-top:14px;font-family:var(--font-mono);font-size:11px;color:var(--ink-faint)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ink-whisper);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:500;color:var(--ink-soft)}
+.chip svg{flex:none}
+.chip .soon{font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 4px;margin-left:2px}
+
+/* self-host band */
+.selfhost{background:var(--band);color:var(--band-text)}
+.selfhost .eyebrow{color:rgba(250,250,248,.55)}
+.selfhost-grid{display:grid;gap:48px}
+@media(min-width:1024px){.selfhost-grid{grid-template-columns:6fr 6fr;align-items:start}}
+.selfhost h2{font-size:clamp(2.2rem,5.4vw,4rem);line-height:.98;color:var(--band-text)}
+.selfhost h2 em{font-style:italic;color:var(--terracotta-soft);font-variation-settings:"SOFT" 100}
+:root[data-theme='dark'] .selfhost h2 em{color:var(--terracotta)}
+.selfhost .lede{color:rgba(250,250,248,.7);max-width:30rem;line-height:1.7;margin-top:20px}
+.codeblock{border-radius:14px;background:#0e0c0a;border:1px solid var(--band-edge);overflow:hidden;box-shadow:var(--shadow-deep)}
+.codeblock .cb-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--band-edge);font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(250,250,248,.45)}
+.codeblock .cb-bar i{width:8px;height:8px;border-radius:999px;background:var(--terracotta);font-style:normal}
+.codeblock pre{margin:0;padding:18px 18px 20px;overflow-x:auto;font-family:var(--font-mono);font-size:12.5px;line-height:1.75;color:#efe8db}
+.codeblock .c{color:rgba(250,250,248,.4)}
+.codeblock .g{color:#8fd0b2}
+.codeblock .o{color:var(--gold-soft)}
+.selfhost-points{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:22px}
+.selfhost-points li{display:flex;gap:14px}
+.selfhost-points .pt-ic{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;border:1px solid var(--band-edge);color:var(--terracotta-soft)}
+:root[data-theme='dark'] .selfhost-points .pt-ic{color:var(--terracotta)}
+.selfhost-points b{display:block;font-size:15px;font-weight:600;color:var(--band-text)}
+.selfhost-points span{display:block;margin-top:3px;font-size:13.5px;line-height:1.6;color:rgba(250,250,248,.65)}
+.mit-badge{display:inline-flex;align-items:center;gap:9px;margin-top:34px;border:1px solid var(--band-edge);border-radius:999px;padding:9px 18px;font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(250,250,248,.75)}
+.mit-badge i{font-style:normal;width:8px;height:8px;border-radius:999px;background:var(--gold)}
+
+/* features */
+.feat-grid{display:grid;gap:14px}
+@media(min-width:768px){.feat-grid{grid-template-columns:repeat(3,1fr)}}
+.feat{border-radius:20px;border:1px solid var(--paper-edge);background:var(--paper-cool);padding:26px;transition:background .25s}
+.feat:hover{background:var(--paper-warm)}
+.feat .f-ic{display:grid;place-items:center;width:42px;height:42px;border-radius:var(--radius-arch);border:1.5px solid var(--ink-whisper);color:var(--terracotta);margin-bottom:16px}
+.feat h3{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.feat .soon{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:2px 6px}
+.feat p{margin-top:8px;font-size:14px;line-height:1.65;color:var(--ink-faint)}
+
+/* screenshots band */
+.shots-grid{display:grid;gap:24px}
+@media(min-width:900px){.shots-grid{grid-template-columns:1fr 1fr 1fr}}
+.shots-grid figure{margin:0}
+
+/* pricing */
+.plans{display:grid;gap:16px;align-items:start}
+@media(min-width:900px){.plans{grid-template-columns:repeat(3,1fr)}}
+.plan{position:relative;border-radius:24px;border:1px solid var(--paper-edge);background:var(--paper-cool);padding:36px 32px;display:flex;flex-direction:column}
+.plan-hot{background:var(--band);color:var(--band-text);border-color:var(--band)}
+@media(min-width:900px){.plan-hot{transform:translateY(-16px);padding-top:44px;padding-bottom:44px}}
+.plan-flag{position:absolute;top:-12px;left:30px;display:inline-flex;background:var(--terracotta);color:#fafaf8;border-radius:999px;padding:4px 13px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase}
+.plan-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.plan h3{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:28px}
+.plan .p-cap{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);text-align:right}
+.plan-hot .p-cap{color:rgba(250,250,248,.55)}
+.plan .price{margin-top:22px;display:flex;align-items:baseline;gap:8px}
+.plan .price .amt{font-family:var(--font-display);font-variation-settings:"SOFT" 100;font-feature-settings:"lnum";font-size:52px;line-height:1}
+.plan .price .per{font-size:14px;color:var(--ink-faint)}
+.plan-hot .price .per{color:rgba(250,250,248,.55)}
+.plan .blurb{margin-top:18px;font-size:14.5px;line-height:1.65;color:var(--ink-faint)}
+.plan-hot .blurb{color:rgba(250,250,248,.72)}
+.plan ul{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px}
+.plan ul li{display:flex;gap:12px;font-size:13.5px;color:var(--ink-soft)}
+.plan-hot ul li{color:rgba(250,250,248,.85)}
+.plan ul li::before{content:"";flex:none;margin-top:9px;width:12px;height:4px;background:var(--terracotta)}
+.plan-hot ul li::before{background:var(--terracotta-soft)}
+.plan .btn{margin-top:30px;justify-content:center}
+.plan-hot .btn{background:var(--band-text);color:#141210}
+.plan-hot .btn:hover{background:var(--terracotta);color:#fafaf8}
+.fx-note{margin-top:36px;text-align:center;font-size:13px;color:var(--ink-faint);max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.7}
+
+/* faq */
+.faq{max-width:820px}
+.faq details{border-bottom:1px solid var(--ink-whisper)}
+.faq summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;justify-content:space-between;gap:18px;padding:22px 4px;font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:19px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .plus{flex:none;font-family:var(--font-mono);font-size:14px;color:var(--terracotta);transition:transform .25s}
+.faq details[open] summary .plus{transform:rotate(45deg)}
+.faq .a{padding:0 4px 24px;color:var(--ink-faint);line-height:1.7;font-size:15px;max-width:60ch}
+
+/* footer */
+.footer{background:var(--band);color:var(--band-text)}
+.footer-in{padding:72px 0 40px}
+.footer .brand-name{font-size:38px}
+.footer .brand-mark{width:48px;height:48px;border-radius:14px;background:rgba(250,250,248,.06);border:1px solid var(--band-edge);color:var(--band-text)}
+.footer-grid{display:grid;gap:40px}
+@media(min-width:900px){.footer-grid{grid-template-columns:5fr 2fr 2fr 3fr}}
+.footer .about{margin-top:20px;color:rgba(250,250,248,.65);max-width:24rem;line-height:1.7;font-size:14.5px}
+.footer .made{margin-top:20px;font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(250,250,248,.5)}
+.footer h4{font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(250,250,248,.45);margin-bottom:16px;font-weight:500}
+.footer ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.footer ul a{font-size:14px;color:rgba(250,250,248,.78);text-decoration:none}
+.footer ul a:hover{color:#fafaf8}
+.footer-strip{margin-top:56px;padding-top:22px;border-top:1px solid var(--band-edge);display:flex;flex-wrap:wrap;gap:10px 22px;font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(250,250,248,.5)}
+.footer-strip .right{margin-left:auto}
+</style>
+</head>
+<body>
+
+<!-- ————————————————— topbar ————————————————— -->
+<header class="topbar">
+  <div class="wrap">
+    <div class="topbar-in">
+      <a class="brand" href="#top" aria-label="whatsacc home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 64 64" fill="none">
+            <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
+          </svg>
+        </span>
+        <span class="brand-name">whatsacc</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#how">How it works</a>
+        <a href="#selfhost">Self-host</a>
+        <a href="#pricing">Pricing</a>
+        <a href="docs/">Docs</a>
+        <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+        <a class="nav-cta" href="https://whatsacc.com/portal">Get started</a>
+      </nav>
+      <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="ic-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.6"/>
+          <path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"/>
+        </svg>
+        <svg class="ic-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>
+        </svg>
+      </button>
+      <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M2 4.5h12M2 8h12M2 11.5h12"/>
+        </svg>
+      </button>
+    </div>
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile">
+      <a href="#how">How it works</a>
+      <a href="#selfhost">Self-host</a>
+      <a href="#pricing">Pricing</a>
+      <a href="docs/">Docs</a>
+      <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+      <a href="https://whatsacc.com/portal">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ————————————————— hero ————————————————— -->
+<section class="hero">
+  <svg class="starfield" viewBox="0 0 1440 780" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
+    <circle class="tw" cx="90" cy="80" r="1.3"/><circle class="tw" cx="240" cy="180" r="1"/>
+    <circle class="tw" cx="410" cy="60" r="1.5"/><circle class="tw" cx="560" cy="140" r="1"/>
+    <circle class="tw" cx="700" cy="50" r="1.2"/><circle class="tw" cx="830" cy="120" r="1"/>
+    <circle class="tw" cx="960" cy="40" r="1.4"/><circle class="tw" cx="1080" cy="170" r="1"/>
+    <circle class="tw" cx="1220" cy="70" r="1.3"/><circle class="tw" cx="1350" cy="150" r="1"/>
+    <circle class="tw" cx="160" cy="300" r="1"/><circle class="tw" cx="360" cy="260" r="1.2"/>
+    <circle class="tw" cx="640" cy="240" r="1"/><circle class="tw" cx="1010" cy="280" r="1.2"/>
+    <circle class="tw" cx="1290" cy="260" r="1"/><circle class="tw" cx="1400" cy="330" r="1.2"/>
+  </svg>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span class="eyebrow">part of the vulos suite &middot; est. 2026</span>
+        </div>
+        <h1 class="display-tight">
+          Texts<br>
+          that <em>open</em><br>
+          <span class="gates-underline">gates.
+            <svg viewBox="0 0 360 12" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M4 8 Q 92 -2 180 6 T 356 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </h1>
+        <p class="hero-tag">
+          whatsacc is a <b>decentralized access network</b>. One MIT-licensed gateway binary
+          turns a WhatsApp, Slack or Discord message into a signed command at your gate.
+        </p>
+        <p class="hero-sub">
+          Run the gateway yourself — your number, your rules, your SQLite file — or
+          use the flagship we host. Same binary, nothing held back.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-ink" href="https://whatsacc.com/portal">Get started</a>
+          <a class="btn btn-outline" href="docs/">Read the docs</a>
+          <a class="btn btn-ghost" href="https://github.com/vul-os/whatsacc" rel="noopener">
+            View on GitHub
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+          </a>
+        </div>
+        <dl class="stat-row">
+          <div><dt>Server</dt><dd>1 <small>binary</small></dd></div>
+          <div><dt>Channels</dt><dd>3 <small>chat apps</small></dd></div>
+          <div><dt>Lock-in</dt><dd>0 <small>clouds</small></dd></div>
+          <div><dt>License</dt><dd><small style="font-family:var(--font-display);font-size:26px">MIT</small></dd></div>
+        </dl>
+      </div>
+
+      <div class="hero-visual">
+        <div class="drift">
+          <figure class="browser" style="margin:0">
+            <div class="browser-bar" aria-hidden="true">
+              <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+              <span class="addr">
+                <svg class="lock" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="1" y="4.5" width="7" height="5.5" rx="1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5"/></svg>
+                <span>gate.whatsacc.com — portal</span>
+              </span>
+            </div>
+            <div class="shot">
+              <img class="shot-light" src="screenshots/portal-dashboard.png" width="1440" height="900" loading="eager" alt="whatsacc portal dashboard — locations, live activity and controllers" onerror="this.classList.add('missing')">
+              <img class="shot-dark" src="screenshots/dark/portal-dashboard.png" width="1440" height="900" loading="eager" alt="whatsacc portal dashboard, dark theme" onerror="this.classList.add('missing')">
+            </div>
+          </figure>
+        </div>
+        <span class="corner corner-tl" aria-hidden="true"></span>
+        <span class="corner corner-br" aria-hidden="true"></span>
+        <div class="shot-caption" aria-hidden="true">
+          <span>fig. 01 — the management portal</span>
+          <span>embedded in the binary</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="wrap">
+      <div class="strip-in">
+        <span>Vol. 02 &mdash; the decentralized issue</span>
+        <span class="mid">&mdash; many gateways &middot; zero centers &mdash;</span>
+        <span>Durban &middot; Lagos &middot; Lisbon</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— chat demo ————————————————— -->
+<section class="section section-warm" id="demo">
+  <div class="wrap">
+    <div class="chat-grid">
+      <div class="chat-copy reveal">
+        <span class="eyebrow kicker">The whole flow</span>
+        <h2 class="display">Like sending a text.<br><em>Because it is.</em></h2>
+        <p style="margin-top:22px;max-width:28rem;color:var(--ink-faint);line-height:1.7">
+          Residents text the word <b style="font-weight:600">open</b> on the channel they already
+          use — WhatsApp or Slack, Discord soon. The gateway resolves who they are, runs your rules,
+          and signs a command to the controller at the gate. The reply lands in the same thread.
+        </p>
+        <ul class="tick-list">
+          <li>Identity is <code style="font-family:var(--font-mono);font-size:.9em">(channel, sender)</code> — one person can be reachable on several channels.</li>
+          <li>Geofence, time windows and quotas are checked before anything moves.</li>
+          <li>Every open — and every denial — lands in the audit log within the same second.</li>
+        </ul>
+      </div>
+
+      <div class="reveal">
+        <div class="phone" role="img" aria-label="A chat conversation: a resident texts 'open', picks the main entrance from a numbered list, and the gate opens.">
+          <div class="phone-screen">
+            <div class="phone-head">
+              <span class="avatar" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 64 64" fill="none"><path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="42" r="3.6" fill="var(--terracotta)"/></svg>
+              </span>
+              <div class="who"><b>whatsacc &middot; Stellar Heights</b><span><i></i>gateway online</span></div>
+            </div>
+            <div class="chat-body">
+              <span class="day-chip">today</span>
+              <div class="msg msg-out">open<span class="t">17:42 ✓✓</span></div>
+              <div class="picker" aria-hidden="true">
+                <div class="p-head">You have <b style="font-weight:600">3 access points</b> here. Which one?</div>
+                <button type="button" tabindex="-1"><span class="n">1</span> Main entrance</button>
+                <button type="button" tabindex="-1"><span class="n">2</span> Pedestrian gate</button>
+                <button type="button" tabindex="-1"><span class="n">3</span> Parking barrier</button>
+              </div>
+              <div class="msg msg-out">1<span class="t">17:42 ✓✓</span></div>
+              <div class="msg msg-in msg-ok">
+                <span class="ok-line">
+                  <span class="ok-badge" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span><b style="font-weight:600">Gate opened</b> — Main entrance &middot; 1.8&thinsp;s</span>
+                </span>
+                <span class="meta">signed &middot; controller SH-G1 &middot; audit a3f9c2</span>
+                <span class="t">17:42</span>
+              </div>
+              <span class="typing">delivered ✓✓</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— how it works ————————————————— -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">How it works</span>
+        <h2 class="display-tight">Three moments,<br><em>two seconds</em>.</h2>
+      </div>
+      <p class="lede">
+        The whole experience hides behind a chat thread. Between the message and the motor
+        sit your rules — and an Ed25519 signature nothing on the network can forge.
+      </p>
+    </div>
+
+    <div class="how-illo reveal" aria-hidden="true">
+      <svg viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet">
+        <!-- phone -->
+        <g transform="translate(40 50)">
+          <rect width="140" height="240" rx="22" fill="var(--band)"/>
+          <rect x="8" y="8" width="124" height="224" rx="16" fill="var(--paper-cool)"/>
+          <rect x="56" y="14" width="28" height="4" rx="2" fill="var(--ink)" opacity="0.4"/>
+          <g transform="translate(20 60)">
+            <rect width="80" height="28" rx="14" fill="var(--terracotta)"/>
+            <text x="14" y="18" fill="#fafaf8" font-family="Inter" font-size="12" font-weight="500">open</text>
+          </g>
+          <g transform="translate(20 100)">
+            <rect width="100" height="28" rx="14" fill="var(--band)"/>
+            <text x="10" y="18" fill="var(--band-text)" font-family="Inter" font-size="11">opened &middot; 1.8s</text>
+          </g>
+        </g>
+        <!-- signal arc through checkpoints -->
+        <path d="M180 164 C 280 70, 480 70, 610 130" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 5"/>
+        <circle cx="180" cy="164" r="2.5" fill="var(--ink)"/>
+        <g font-family="Inter" font-size="10" fill="var(--ink)">
+          <g>
+            <line x1="272" y1="110" x2="272" y2="92" stroke="var(--ink)" stroke-width="1" opacity="0.4"/>
+            <circle cx="272" cy="110" r="6" fill="var(--gold)" stroke="var(--ink)" stroke-width="1.5"/>
+            <text x="255" y="84" opacity="0.75" font-weight="500">webhook</text>
+          </g>
+          <g>
+            <line x1="385" y1="88" x2="385" y2="70" stroke="var(--ink)" stroke-width="1" opacity="0.4"/>
+            <circle cx="385" cy="88" r="6" fill="var(--terracotta)" stroke="var(--ink)" stroke-width="1.5"/>
+            <text x="372" y="62" opacity="0.75" font-weight="500">rules</text>
+          </g>
+          <g>
+            <line x1="502" y1="96" x2="502" y2="78" stroke="var(--ink)" stroke-width="1" opacity="0.4"/>
+            <circle cx="502" cy="96" r="6" fill="var(--signal)" stroke="var(--ink)" stroke-width="1.5"/>
+            <text x="490" y="70" opacity="0.75" font-weight="500">signed</text>
+          </g>
+        </g>
+        <!-- gate -->
+        <g transform="translate(540 90)">
+          <path d="M-10 100 V60 a80 40 0 0 1 160 0 V100" fill="none" stroke="var(--ink)" stroke-width="2"/>
+          <rect x="0" y="100" width="140" height="80" fill="none" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="20" y1="100" x2="20" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="40" y1="100" x2="40" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="60" y1="100" x2="60" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="80" y1="100" x2="80" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="100" y1="100" x2="100" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <line x1="120" y1="100" x2="120" y2="180" stroke="var(--ink)" stroke-width="2"/>
+          <circle cx="70" cy="40" r="6" fill="var(--terracotta)" stroke="var(--ink)" stroke-width="1.5"/>
+        </g>
+        <!-- dot pattern flourish -->
+        <g fill="var(--ink)" opacity="0.15">
+          <circle cx="250" cy="270" r="1.4"/><circle cx="270" cy="278" r="1.4"/><circle cx="290" cy="268" r="1.4"/>
+          <circle cx="310" cy="280" r="1.4"/><circle cx="330" cy="272" r="1.4"/><circle cx="350" cy="282" r="1.4"/>
+          <circle cx="370" cy="270" r="1.4"/><circle cx="390" cy="279" r="1.4"/><circle cx="410" cy="269" r="1.4"/>
+        </g>
+      </svg>
+    </div>
+
+    <ol class="steps">
+      <li class="reveal">
+        <div class="step-top"><span class="n">01</span><span class="dot"></span><span class="line"></span></div>
+        <h3>A message arrives</h3>
+        <p>Someone texts <code>open</code> — on WhatsApp, Slack or Discord. The channel's
+        webhook lands on your gateway and its signature is verified before anything else happens.</p>
+      </li>
+      <li class="reveal">
+        <div class="step-top"><span class="n">02</span><span class="dot"></span><span class="line"></span></div>
+        <h3>Your rules decide</h3>
+        <p>The gateway resolves the sender to a membership, then checks location, access point,
+        time window, geofence and quota. The verdict — either way — is appended to the audit log.</p>
+      </li>
+      <li class="reveal">
+        <div class="step-top"><span class="n">03</span><span class="dot"></span></div>
+        <h3>A signed command goes out</h3>
+        <p>An Ed25519-signed command with a nonce and expiry reaches the controller, which
+        dialed out to the gateway — no inbound ports. It verifies against the pinned key and pulses the relay.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ————————————————— three ways in ————————————————— -->
+<section class="section section-warm" id="ways">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">Three ways in</span>
+        <h2 class="display-tight">Ranked by how people<br><em>actually behave</em>.</h2>
+      </div>
+      <p class="lede">
+        Chat is the product. Everything else exists for the days chat can't reach you —
+        and is deliberately boring, in the way a fire escape should be.
+      </p>
+    </div>
+
+    <div class="ways">
+      <div class="way reveal">
+        <span class="w-tag"><i style="background:var(--terracotta)"></i>01 &middot; primary</span>
+        <h3>Chat — <em>the daily door</em></h3>
+        <p>No app to install, no fob to lose. Anyone you trust texts the gateway from the
+        channel they already live in. Replies, pickers and quota warnings come back inline.</p>
+        <div class="chips" aria-label="Supported channels">
+          <span class="chip">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-4-.9L3 20l1.2-5.2a8 8 0 0 1-.7-3.3A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3Z"/></svg>
+            WhatsApp
+          </span>
+          <span class="chip">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M9 4v7M15 6v7M6 9h7M11 15h7M9 15v3M15 12v3"/></svg>
+            Slack
+          </span>
+          <span class="chip">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 17.5 7 20l-3.5-1.5c-.6-3.8.2-7.9 2-11.5L9 5.5l.5 1.5a13 13 0 0 1 5 0L15 5.5l3.5 1.5c1.8 3.6 2.6 7.7 2 11.5L17 20l-1.5-2.5"/><circle cx="9" cy="12.5" r="1.2"/><circle cx="15" cy="12.5" r="1.2"/></svg>
+            Discord <span class="soon">soon</span>
+          </span>
+        </div>
+        <div class="w-foot">webhook → rules → signed command</div>
+      </div>
+
+      <div class="way reveal">
+        <span class="w-tag"><i style="background:var(--gold)"></i>02 &middot; emergency</span>
+        <h3>The app — <em>works offline</em></h3>
+        <p>The whatsacc app quietly holds a short-lived, gateway-signed grant of your rights.
+        When the internet is down, it finds the controller over LAN or Bluetooth and proves
+        itself with a challenge-response. No cloud, no Meta, no signal required.</p>
+        <div class="w-foot">tauri &middot; desktop + iOS + Android &middot; also the admin console</div>
+      </div>
+
+      <div class="way reveal">
+        <span class="w-tag"><i style="background:var(--signal)"></i>03 &middot; fallback</span>
+        <h3>The portal</h3>
+        <p>Unlimited opens through the gateway's own web portal, always. Quota warnings
+        in chat point here.</p>
+        <div class="w-foot">served by the same binary</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— self-host band ————————————————— -->
+<section class="section selfhost" id="selfhost">
+  <div class="wrap">
+    <div class="selfhost-grid">
+      <div class="reveal">
+        <span class="eyebrow kicker">Run your own gateway</span>
+        <h2 class="display-tight">No cloud center.<br><em>Anyone can run one.</em></h2>
+        <p class="lede">
+          whatsacc is a network of independent gateways — Go, one binary, one SQLite file.
+          We run the flagship at whatsacc.com; you can run yours on a Pi behind your couch.
+          Same code, all of it MIT. The only private thing about our gateway is its <code style="font-family:var(--font-mono);font-size:.9em">.env</code>.
+        </p>
+        <ul class="selfhost-points">
+          <li>
+            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-4-.9L3 20l1.2-5.2a8 8 0 0 1-.7-3.3A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3Z"/></svg></span>
+            <div><b>Bring your own channel</b>
+            <span>Slack takes minutes — an app manifest and a signing secret (Discord lands next). WhatsApp needs a verified
+            Meta business number (a WABA); that friction is exactly what the hosted flagship absorbs for you.</span></div>
+          </li>
+          <li>
+            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span>
+            <div><b>Reachable your way</b>
+            <span>A public VPS needs nothing. Behind NAT, attach a tunnel — vulos-relay is one config line,
+            cloudflared and frp work too. Controllers always dial out, so they never need a port.</span></div>
+          </li>
+          <li>
+            <span class="pt-ic" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+            <div><b>Billing included — honestly</b>
+            <span>The tiering and Paystack code ships in the binary, MIT, behind a flag that's off by default.
+            Run a free gateway for your street — or a paid one with your own keys and your own tiers. We mean it.</span></div>
+          </li>
+        </ul>
+        <span class="mit-badge"><i aria-hidden="true"></i>MIT licensed &middot; every line</span>
+      </div>
+
+      <div class="reveal">
+        <div class="codeblock">
+          <div class="cb-bar"><i aria-hidden="true"></i>your-vps ~ $</div>
+          <pre><code><span class="c"># one binary, one SQLite file, portal embedded</span>
+docker run -d --name whatsacc \
+  -p 8080:8080 -v whatsacc:/data \
+  ghcr.io/vul-os/whatsacc-gateway
+
+<span class="c"># point a channel at it (slack: minutes)</span>
+whatsacc channel add slack --manifest slack.yml
+
+<span class="c"># behind NAT? one line of tunnel config</span>
+whatsacc tunnel use vulos-relay   <span class="c"># or cloudflared, frp…</span>
+
+<span class="g">✓ gateway up</span> — portal at <span class="o">https://your-gate.example</span>
+<span class="g">✓ audit log</span>  /data/whatsacc.db</code></pre>
+        </div>
+        <p style="margin-top:18px;font-size:12.5px;line-height:1.7;color:rgba(250,250,248,.5);font-family:var(--font-mono)">
+          gateway v0.x — image names settle at 1.0 &middot; see <a href="docs/#/self-host" style="color:rgba(250,250,248,.75)">docs → run a gateway</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— features ————————————————— -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">Features</span>
+        <h2 class="display-tight">Quietly serious<br><em>about access.</em></h2>
+      </div>
+      <p class="lede">
+        Only the things gate-openers actually need — each one solid enough to put in front
+        of a body corporate. Anything not shipped yet says so.
+      </p>
+    </div>
+
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="11" r="7.5" stroke-dasharray="2.5 3"/><circle cx="12" cy="11" r="3.5"/><circle cx="12" cy="11" r="1" fill="currentColor"/></svg></span>
+        <h3>Geofence safety</h3>
+        <p>Block opens from across town. Per-location radius; live-location confirmation when
+        the stakes are high. Denials record the actual GPS distance.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></span>
+        <h3>Time windows</h3>
+        <p>The cleaner, Tuesdays 08:00–12:00. Contractors for one Saturday. Access that
+        expires on its own instead of living in someone's head.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+        <h3>Visitor passes <span class="soon">beta</span></h3>
+        <p>One-time PIN or QR sent over chat or a link. Your guest opens the gate once,
+        the pass burns, the audit log remembers.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span>
+        <h3>Time &amp; attendance <span class="soon">coming</span></h3>
+        <p>The audit log already has the data — staff clock-in reports and a who's-on-site
+        evacuation list are a settings toggle away.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20Z"/><path d="M9 9h6M9 13h4"/></svg></span>
+        <h3>Audit log</h3>
+        <p>Every open, denial, pairing and config change — actor, location, verdict, message id.
+        Append-only, exportable, kept in your own SQLite file.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/></svg></span>
+        <h3>Lockdown <span class="soon">coming</span></h3>
+        <p>One command freezes every access point at a location. Protocol support is in the
+        signed-command contract today; the big red button ships with controller I/O.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7.5a4 4 0 1 0-4.4 4 L4 17v3h3l6-6.1a4 4 0 0 0 1-6.4Z"/><circle cx="15.5" cy="6.5" r="1" fill="currentColor"/></svg></span>
+        <h3>Per-device keys</h3>
+        <p>Every controller pairs once and pins the gateway's signing key. Commands carry a
+        nonce and expiry — a captured packet is a paperweight.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><circle cx="12" cy="17" r="3"/><path d="M9 9.5 11 14M15 9.5 13 14"/></svg></span>
+        <h3>Multi-channel identity</h3>
+        <p>Memberships key on (channel, sender) — the same person can open from WhatsApp
+        today and Slack tomorrow without being two people in your records.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20V9.5A6 6 0 0 1 18 9.5V20"/><path d="M9.5 20v-8.5a2.5 2.5 0 0 1 5 0V20"/><circle cx="12" cy="14.5" r=".9" fill="currentColor"/></svg></span>
+        <h3>Multi-tenant locations</h3>
+        <p>House → building → complex. Move members between properties without re-pairing
+        hardware. Roles inherit, then override.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— screenshots band ————————————————— -->
+<section class="section section-warm" id="inside">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">A peek inside</span>
+        <h2 class="display-tight">The control room<br><em>behind the gate.</em></h2>
+      </div>
+      <p class="lede">
+        Owners and managers see every event live — filter by location, member or device,
+        replay a denied open and see exactly which check rejected it.
+      </p>
+    </div>
+
+    <div class="shots-grid">
+      <figure class="reveal">
+        <div class="browser">
+          <div class="browser-bar" aria-hidden="true">
+            <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+            <span class="addr"><span>portal / access points</span></span>
+          </div>
+          <div class="shot">
+            <img class="shot-light" src="screenshots/portal-locations.png" width="1440" height="900" loading="lazy" alt="Access points and controllers in the whatsacc portal" onerror="this.classList.add('missing')">
+            <img class="shot-dark" src="screenshots/dark/portal-locations.png" width="1440" height="900" loading="lazy" alt="Access points view, dark theme" onerror="this.classList.add('missing')">
+          </div>
+        </div>
+        <figcaption class="shot-caption"><span>fig. 02 — access points &amp; controllers</span></figcaption>
+      </figure>
+      <figure class="reveal">
+        <div class="browser">
+          <div class="browser-bar" aria-hidden="true">
+            <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+            <span class="addr"><span>portal / analytics</span></span>
+          </div>
+          <div class="shot">
+            <img class="shot-light" src="screenshots/portal-analytics.png" width="1440" height="900" loading="lazy" alt="Open analytics and audit trends" onerror="this.classList.add('missing')">
+            <img class="shot-dark" src="screenshots/dark/portal-analytics.png" width="1440" height="900" loading="lazy" alt="Analytics view, dark theme" onerror="this.classList.add('missing')">
+          </div>
+        </div>
+        <figcaption class="shot-caption"><span>fig. 03 — analytics &amp; audit</span></figcaption>
+      </figure>
+      <figure class="reveal">
+        <div class="browser">
+          <div class="browser-bar" aria-hidden="true">
+            <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+            <span class="addr"><span>app / emergency access</span></span>
+          </div>
+          <div class="shot">
+            <img class="shot-light" src="screenshots/app-emergency.png" width="1440" height="900" loading="lazy" alt="The whatsacc app's offline emergency access screen" onerror="this.classList.add('missing')">
+            <img class="shot-dark" src="screenshots/dark/app-emergency.png" width="1440" height="900" loading="lazy" alt="Emergency access screen, dark theme" onerror="this.classList.add('missing')">
+          </div>
+        </div>
+        <figcaption class="shot-caption"><span>fig. 04 — the app, internet down</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ————————————————— pricing ————————————————— -->
+<section class="section" id="pricing">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">Pricing</span>
+        <h2 class="display-tight">Pay for the flagship,<br>or <em>pay nobody</em>.</h2>
+      </div>
+      <p class="lede">
+        The hosted tiers monetize the hard parts — Meta onboarding, our WhatsApp number,
+        hosting and uptime. Never secret code. Self-hosting is free because there's nothing
+        to withhold.
+      </p>
+    </div>
+
+    <div class="plans">
+      <div class="plan reveal">
+        <div class="plan-top"><h3>Free</h3><span class="p-cap">hosted flagship</span></div>
+        <div class="price"><span class="amt">R0</span><span class="per">/ month</span></div>
+        <p class="blurb">A single house on the flagship gateway. Try it on your own gate
+        first — most people do.</p>
+        <ul>
+          <li>1 location &middot; 1 controller</li>
+          <li>Capped opens per month</li>
+          <li>Texts go to our WhatsApp number</li>
+          <li>Audit log &middot; 30 days</li>
+        </ul>
+        <a class="btn btn-outline" href="https://whatsacc.com/portal">Start free</a>
+      </div>
+
+      <div class="plan plan-hot reveal">
+        <span class="plan-flag">most chosen</span>
+        <div class="plan-top"><h3>Pro</h3><span class="p-cap">hosted flagship</span></div>
+        <div class="price"><span class="amt">R190</span><span class="per">/ month · ≈ $10*</span></div>
+        <p class="blurb">For complexes, buildings and property managers running real volume
+        through the flagship.</p>
+        <ul>
+          <li>More locations &middot; more controllers</li>
+          <li>Unlimited opens</li>
+          <li>Geofence, time windows, roles</li>
+          <li>Full audit retention &middot; CSV export</li>
+          <li>Priority support</li>
+        </ul>
+        <a class="btn" href="https://whatsacc.com/portal">Choose Pro</a>
+      </div>
+
+      <div class="plan reveal">
+        <div class="plan-top"><h3>Self-host</h3><span class="p-cap">your gateway</span></div>
+        <div class="price"><span class="amt">R0</span><span class="per">forever</span></div>
+        <p class="blurb">The same MIT binary we run — bring your own number, bot token
+        and URL. Nothing is held back.</p>
+        <ul>
+          <li>Every feature, no caps</li>
+          <li>Your WABA / Discord / Slack</li>
+          <li>Your SQLite file, your audit log</li>
+          <li>Billing flag off — or on, with <i>your</i> keys</li>
+        </ul>
+        <a class="btn btn-outline" href="docs/#/self-host">Read the guide</a>
+      </div>
+    </div>
+
+    <p class="fx-note">
+      * Placeholder launch pricing, billed in South African rand via Paystack. The dollar figure
+      is an approximation and drifts with the exchange rate. Final tiers land with gateway&nbsp;1.0.
+    </p>
+  </div>
+</section>
+
+<!-- ————————————————— faq ————————————————— -->
+<section class="section section-warm" id="faq">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow kicker">Common questions</span>
+        <h2 class="display-tight">The things<br><em>people ask first.</em></h2>
+      </div>
+    </div>
+
+    <div class="faq reveal">
+      <details>
+        <summary>Do residents need to install anything?<span class="plus">+</span></summary>
+        <p class="a">No. Residents text the gateway from WhatsApp (or Slack) like any
+        other contact. The only people who install something are the property owner — the controller
+        at the gate — and anyone who wants the optional app for emergency offline access.</p>
+      </details>
+      <details>
+        <summary>What happens when the internet is down?<span class="plus">+</span></summary>
+        <p class="a">The app path keeps working. It holds a short-lived grant, signed earlier by the
+        gateway, and talks to the controller directly over your LAN or Bluetooth with a
+        challenge-response. No connectivity, no cloud, no Meta involved. Controllers also keep
+        their local button and fail-safe wiring — whatsacc is in parallel, never in the way.</p>
+      </details>
+      <details>
+        <summary>Why is WhatsApp harder to self-host than Slack?<span class="plus">+</span></summary>
+        <p class="a">WhatsApp requires a verified Meta business account and phone number (a WABA)
+        before you can receive webhooks. Slack needs an app manifest and a signing secret — minutes
+        (Discord, when it lands, will be a bot token). That asymmetry is the honest core of our
+        business: the hosted flagship absorbs the WABA friction, and you pay for that, not for code.</p>
+      </details>
+      <details>
+        <summary>Is the billing code really open source?<span class="plus">+</span></summary>
+        <p class="a">Yes — MIT, in the same binary, behind a flag that ships off. If you want to run
+        a paid gateway for your neighbourhood with your own Paystack or Stripe keys and your own
+        tiers, that's a supported feature, not a loophole.</p>
+      </details>
+      <details>
+        <summary>What hardware does it work with?<span class="plus">+</span></summary>
+        <p class="a">Any gate, door or barrier with a dry-contact relay input — which is most of
+        them. The controller is a Pi-class board wired in parallel with your existing receiver,
+        on Wi-Fi or a 4G SIM. It only ever dials out, so CGNAT and closed ports don't matter.</p>
+      </details>
+      <details>
+        <summary>Is this secure enough for a complex with 200 residents?<span class="plus">+</span></summary>
+        <p class="a">Commands are Ed25519-signed with a nonce and expiry, and each controller pins
+        its gateway's public key at pairing — a hostile network or hijacked DNS can't forge an open.
+        Add channel-verified identity, optional geofence, per-member rules and an append-only audit
+        log. Every open earns its way through. Details in the security chapter of the docs.</p>
+      </details>
+      <details>
+        <summary>Can I leave the flagship later?<span class="plus">+</span></summary>
+        <p class="a">Yes, and structurally so: the self-hosted gateway is the same binary. Export
+        your data, stand up your own gateway, re-pair your controllers. Nothing about the flagship
+        is special except that we run it well.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ————————————————— footer ————————————————— -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-in">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#top" aria-label="whatsacc home" style="text-decoration:none;color:inherit">
+            <span class="brand-mark" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 64 64" fill="none">
+                <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
+              </svg>
+            </span>
+            <span class="brand-name">whatsacc</span>
+          </a>
+          <p class="about">A quieter way through the threshold. One MIT gateway binary,
+          a network with no center — built in Durban, deployed wherever there's a gate
+          that needs opening.</p>
+          <p class="made">Made in South Africa</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="docs/#/security">Security</a></li>
+            <li><a href="https://whatsacc.com/portal">Portal</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Builders</h4>
+          <ul>
+            <li><a href="docs/">Documentation</a></li>
+            <li><a href="docs/#/self-host">Run a gateway</a></li>
+            <li><a href="docs/#/controllers">Hardware setup</a></li>
+            <li><a href="docs/#/api">API reference</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Open source</h4>
+          <ul>
+            <li><a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub — vul-os/whatsacc</a></li>
+            <li><a href="https://github.com/vul-os/whatsacc/blob/main/LICENSE" rel="noopener">MIT license</a></li>
+            <li><a href="https://vulos.org" rel="noopener">The vulos suite</a></li>
+            <li><a href="mailto:hello@whatsacc.com">hello@whatsacc.com</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-strip">
+        <span>&copy; 2026 whatsacc</span>
+        <span aria-hidden="true">&mdash;</span>
+        <span>texts that open gates</span>
+        <span class="right">MIT &middot; v 0.2 &middot; durban</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* theme toggle — persists; key shared with docs/ */
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  btn.addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('whatsacc.theme', next); } catch(e){}
+  });
+
+  /* mobile nav */
+  var menuBtn = document.getElementById('menuBtn');
+  var mobileNav = document.getElementById('mobileNav');
+  menuBtn.addEventListener('click', function(){
+    var open = mobileNav.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  mobileNav.addEventListener('click', function(e){
+    if (e.target.tagName === 'A') { mobileNav.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false'); }
+  });
+
+  /* reveal on scroll */
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var els = document.querySelectorAll('.reveal');
+  if (reduced || !('IntersectionObserver' in window)) {
+    els.forEach ? els.forEach(function(el){ el.classList.add('is-in'); })
+                : Array.prototype.forEach.call(els, function(el){ el.classList.add('is-in'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    Array.prototype.forEach.call(els, function(el){ io.observe(el); });
+  }
+})();
+</script>
+</body>
+</html>

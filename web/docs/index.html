@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>whatsacc — docs</title>
+<meta name="description" content="Documentation for whatsacc — the decentralized chat-to-gate access network. Run a gateway, wire a controller, link WhatsApp or Slack.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231A1F36'/%3E%3Cpath d='M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z' fill='none' stroke='%23F4EDE2' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='42' r='3' fill='%23D6624D'/%3E%3C/svg%3E">
+<script>
+(function(){
+  var t;
+  try { t = localStorage.getItem('whatsacc.theme'); } catch(e){}
+  if (t !== 'light' && t !== 'dark')
+    t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<style>
+@font-face{font-family:'Fraunces';font-style:normal;font-weight:100 900;font-display:swap;src:url('../fonts/fraunces-var.woff2') format('woff2')}
+@font-face{font-family:'Fraunces';font-style:italic;font-weight:100 900;font-display:swap;src:url('../fonts/fraunces-italic-var.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('../fonts/inter-var.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-style:italic;font-weight:100 900;font-display:swap;src:url('../fonts/inter-italic-var.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url('../fonts/jetbrains-mono-var.woff2') format('woff2')}
+
+:root{
+  color-scheme:light;
+  --ink:#141210; --ink-soft:#302c28; --ink-faint:rgba(20,18,16,.55); --ink-whisper:rgba(20,18,16,.09);
+  --paper:#fafaf8; --paper-warm:#f2ede6; --paper-cool:#fdfdfc; --paper-edge:rgba(20,18,16,.07);
+  --terracotta:#c86848; --terracotta-deep:#a24f32; --gold:#b8914a; --signal:#3a6e56;
+  --band:#141210; --band-text:#fafaf8;
+  --code-bg:#f2ede6; --code-block:#141210; --code-block-text:#efe8db;
+  --shadow-paper:0 1px 2px rgba(14,12,10,.04),0 8px 24px -8px rgba(14,12,10,.10);
+  --font-display:'Fraunces','Iowan Old Style',serif;
+  --font-sans:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+}
+:root[data-theme='dark']{
+  color-scheme:dark;
+  --ink:#f5efe6; --ink-soft:#d8cfbf; --ink-faint:rgba(245,239,230,.55); --ink-whisper:rgba(245,239,230,.10);
+  --paper:#0f0e0c; --paper-warm:#181614; --paper-cool:#131210; --paper-edge:rgba(245,239,230,.08);
+  --terracotta:#e0896a; --terracotta-deep:#f0a484; --gold:#d4ae6a; --signal:#88b89c;
+  --band:#1a1714; --band-text:#f5efe6;
+  --code-bg:#181614; --code-block:#0e0c0a; --code-block-text:#efe8db;
+  --shadow-paper:0 1px 0 rgba(255,255,255,.03),0 16px 48px -16px rgba(0,0,0,.55);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:15.5px;line-height:1.7;
+  font-feature-settings:"ss01","cv11";-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1000px 480px at 92% -10%,color-mix(in srgb,var(--terracotta) 7%,transparent),transparent 60%);
+  background-attachment:fixed}
+::selection{background:var(--ink);color:var(--paper)}
+a{color:inherit}
+
+/* ————— topbar ————— */
+.topbar{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--paper-edge)}
+.topbar-in{max-width:1440px;margin:0 auto;display:flex;align-items:center;gap:14px;height:58px;padding:0 20px}
+.brand{display:inline-flex;align-items:center;gap:9px;text-decoration:none}
+.brand-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--band);color:var(--band-text)}
+:root[data-theme='dark'] .brand-mark{background:var(--paper-warm);border:1px solid var(--paper-edge)}
+.brand-name{font-family:var(--font-display);font-style:italic;font-variation-settings:"SOFT" 60;font-size:19px}
+.brand-docs{font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--terracotta);border:1px solid currentColor;border-radius:5px;padding:2px 6px;margin-left:2px}
+.search-wrap{position:relative;flex:1;max-width:420px;margin-left:auto}
+.search-wrap input{width:100%;height:34px;border-radius:999px;border:1px solid var(--ink-whisper);background:var(--paper-cool);
+  color:var(--ink);font:inherit;font-size:13px;padding:0 14px 0 34px;outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:var(--terracotta)}
+.search-wrap .s-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-faint);pointer-events:none}
+.search-wrap kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);border:1px solid var(--ink-whisper);border-radius:4px;padding:1px 5px}
+.top-links{display:none;align-items:center;gap:18px}
+@media(min-width:900px){.top-links{display:flex}}
+.top-links a{font-size:13.5px;text-decoration:none;color:var(--ink-faint)}
+.top-links a:hover{color:var(--ink)}
+.theme-btn,.side-btn{display:grid;place-items:center;width:32px;height:32px;border-radius:999px;border:1px solid var(--ink-whisper);
+  background:transparent;color:var(--ink-faint);cursor:pointer}
+.theme-btn:hover,.side-btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.theme-btn .ic-moon{display:none}
+:root[data-theme='dark'] .theme-btn .ic-sun{display:none}
+:root[data-theme='dark'] .theme-btn .ic-moon{display:block}
+.side-btn{display:grid}
+@media(min-width:1000px){.side-btn{display:none}}
+
+/* ————— layout ————— */
+.shell{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:0;padding:0 20px}
+@media(min-width:1000px){.shell{grid-template-columns:250px minmax(0,1fr)}}
+@media(min-width:1240px){.shell{grid-template-columns:250px minmax(0,1fr) 210px}}
+
+/* sidebar */
+.sidebar{display:none;position:fixed;inset:58px 0 0 0;z-index:30;background:var(--paper);padding:20px;overflow-y:auto}
+.sidebar.open{display:block}
+@media(min-width:1000px){
+  .sidebar{display:block;position:sticky;top:58px;inset:auto;height:calc(100vh - 58px);background:transparent;
+    padding:28px 20px 40px 0;border-right:1px solid var(--paper-edge)}
+}
+.sidebar details{margin-bottom:6px}
+.sidebar summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);
+  padding:9px 4px 7px;user-select:none}
+.sidebar summary::-webkit-details-marker{display:none}
+.sidebar summary .tri{transition:transform .2s;font-size:9px}
+.sidebar details:not([open]) summary .tri{transform:rotate(-90deg)}
+.sidebar ul{list-style:none;margin:0 0 6px;padding:0}
+.sidebar li a{display:block;font-size:13.5px;color:var(--ink-faint);text-decoration:none;padding:5px 10px;border-left:2px solid var(--ink-whisper);transition:color .15s,border-color .15s}
+.sidebar li a:hover{color:var(--ink)}
+.sidebar li a.active{color:var(--terracotta);border-left-color:var(--terracotta);font-weight:500}
+
+/* content */
+.content{min-width:0;padding:36px 0 90px}
+@media(min-width:1000px){.content{padding:44px 40px 110px}}
+.doc{max-width:46rem}
+.doc-kicker{font-family:var(--font-mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.doc-kicker i{font-style:normal;width:7px;height:7px;border-radius:999px;background:var(--terracotta)}
+.doc h1{font-family:var(--font-display);font-variation-settings:"SOFT" 0;letter-spacing:-.02em;font-weight:440;font-size:clamp(2rem,5vw,2.9rem);line-height:1.05;margin:0 0 22px}
+.doc h2{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-weight:450;font-size:1.45rem;line-height:1.2;margin:44px 0 14px;padding-top:10px}
+.doc h3{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-weight:480;font-size:1.15rem;margin:30px 0 10px}
+.doc h2 a.anchor,.doc h3 a.anchor{text-decoration:none;color:transparent;margin-left:8px;font-size:.8em}
+.doc h2:hover a.anchor,.doc h3:hover a.anchor{color:var(--terracotta)}
+.doc p{margin:0 0 14px;color:var(--ink-soft)}
+.doc ul,.doc ol{margin:0 0 16px;padding-left:24px;color:var(--ink-soft)}
+.doc li{margin-bottom:6px}
+.doc li::marker{color:var(--terracotta)}
+.doc a{color:var(--terracotta);text-decoration:underline;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--terracotta) 45%,transparent)}
+.doc a:hover{color:var(--terracotta-deep)}
+.doc strong{color:var(--ink);font-weight:600}
+.doc code{font-family:var(--font-mono);font-size:.85em;background:var(--code-bg);border:1px solid var(--paper-edge);padding:1px 5px;border-radius:5px}
+.doc pre{background:var(--code-block);color:var(--code-block-text);border-radius:12px;padding:16px 18px;overflow-x:auto;
+  margin:0 0 18px;box-shadow:var(--shadow-paper)}
+.doc pre code{background:transparent;border:0;padding:0;font-size:12.5px;line-height:1.7;color:inherit}
+.doc blockquote{margin:0 0 16px;padding:12px 18px;border-left:3px solid var(--gold);background:var(--paper-warm);border-radius:0 10px 10px 0;color:var(--ink-soft)}
+.doc blockquote p:last-child{margin:0}
+.doc table{width:100%;border-collapse:collapse;margin:0 0 20px;font-size:13.5px;display:block;overflow-x:auto}
+.doc th{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);text-align:left;padding:8px 12px;border-bottom:2px solid var(--ink-whisper)}
+.doc td{padding:9px 12px;border-bottom:1px solid var(--paper-edge);color:var(--ink-soft);vertical-align:top}
+.doc img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--paper-edge);box-shadow:var(--shadow-paper);margin:4px 0 8px}
+.doc hr{border:0;height:1px;background:var(--ink-whisper);margin:32px 0}
+
+/* prev / next */
+.pager{display:flex;gap:12px;justify-content:space-between;margin-top:56px;padding-top:24px;border-top:1px solid var(--paper-edge);max-width:46rem}
+.pager a{flex:1;max-width:48%;text-decoration:none;border:1px solid var(--paper-edge);border-radius:14px;padding:14px 16px;transition:border-color .15s;background:var(--paper-cool)}
+.pager a:hover{border-color:var(--terracotta)}
+.pager .lbl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)}
+.pager .ttl{display:block;margin-top:4px;font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:16px;color:var(--ink)}
+.pager a.next{text-align:right;margin-left:auto}
+
+/* toc */
+.toc{display:none}
+@media(min-width:1240px){.toc{display:block;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;padding:36px 0 40px 22px}}
+.toc h5{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px;font-weight:500}
+.toc ul{list-style:none;margin:0;padding:0}
+.toc li a{display:block;font-size:12.5px;color:var(--ink-faint);text-decoration:none;padding:4px 0 4px 12px;border-left:2px solid var(--ink-whisper);line-height:1.45}
+.toc li.h3 a{padding-left:24px}
+.toc li a:hover{color:var(--ink)}
+.toc li a.current{color:var(--terracotta);border-left-color:var(--terracotta)}
+
+/* search results */
+.results{max-width:46rem}
+.results h1{font-family:var(--font-display);font-variation-settings:"SOFT" 0;font-size:1.9rem;margin:0 0 20px}
+.results .hit{display:block;text-decoration:none;border:1px solid var(--paper-edge);background:var(--paper-cool);border-radius:14px;padding:16px 18px;margin-bottom:12px;transition:border-color .15s}
+.results .hit:hover{border-color:var(--terracotta)}
+.results .hit .h-title{font-family:var(--font-display);font-variation-settings:"SOFT" 30;font-size:17px;color:var(--ink)}
+.results .hit .h-snip{margin-top:5px;font-size:13px;color:var(--ink-faint);line-height:1.6}
+.results .hit mark{background:color-mix(in srgb,var(--gold) 35%,transparent);color:var(--ink);border-radius:3px;padding:0 2px}
+.results .none{color:var(--ink-faint)}
+
+.loading{color:var(--ink-faint);font-family:var(--font-mono);font-size:12px;letter-spacing:.1em}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="../" aria-label="whatsacc home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 64 64" fill="none">
+          <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
+        </svg>
+      </span>
+      <span class="brand-name">whatsacc</span>
+      <span class="brand-docs">docs</span>
+    </a>
+    <div class="search-wrap">
+      <svg class="s-ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+      <input id="search" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search the docs">
+      <kbd>/</kbd>
+    </div>
+    <nav class="top-links" aria-label="Top">
+      <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+      <a href="https://whatsacc.com/portal">Portal</a>
+    </nav>
+    <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
+      <svg class="ic-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"/></svg>
+      <svg class="ic-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg>
+    </button>
+    <button class="side-btn" id="sideBtn" type="button" aria-label="Toggle navigation" aria-expanded="false">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidebar" id="sidebar" aria-label="Documentation"></nav>
+  <main class="content" id="content"><p class="loading">loading…</p></main>
+  <aside class="toc" id="toc" aria-label="On this page"></aside>
+</div>
+
+<script src="vendor/marked.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  var root = document.documentElement;
+  var contentEl = document.getElementById('content');
+  var sidebarEl = document.getElementById('sidebar');
+  var tocEl = document.getElementById('toc');
+  var searchEl = document.getElementById('search');
+  var manifest = null;
+  var pageById = {};
+  var order = [];          // flattened page ids in group order
+  var mdCache = {};        // id -> markdown text
+  var tocObserver = null;
+
+  /* ---------- theme ---------- */
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('whatsacc.theme', next); } catch(e){}
+  });
+
+  /* ---------- mobile sidebar ---------- */
+  var sideBtn = document.getElementById('sideBtn');
+  sideBtn.addEventListener('click', function(){
+    var open = sidebarEl.classList.toggle('open');
+    sideBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  /* ---------- helpers ---------- */
+  function slug(text){
+    return String(text).toLowerCase().replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-');
+  }
+  function esc(s){
+    return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; });
+  }
+  function currentRoute(){
+    var h = location.hash;
+    if (h.indexOf('#/') === 0) {
+      var rest = h.slice(2);
+      var i = rest.indexOf('#');
+      return { id: (i === -1 ? rest : rest.slice(0, i)) || order[0],
+               anchor: i === -1 ? null : rest.slice(i + 1) };
+    }
+    return { id: order[0], anchor: null };
+  }
+
+  /* ---------- boot ---------- */
+  fetch('manifest.json').then(function(r){ return r.json(); }).then(function(m){
+    manifest = m;
+    m.pages.forEach(function(p){ pageById[p.id] = p; });
+    var grouped = {};
+    (m.groups || []).forEach(function(g){
+      g.pages.forEach(function(id){ grouped[id] = true; order.push(id); });
+    });
+    m.pages.forEach(function(p){ if (!grouped[p.id]) order.push(p.id); });
+    buildSidebar();
+    route();
+  }).catch(function(){
+    contentEl.innerHTML = '<p class="loading">could not load manifest.json</p>';
+  });
+
+  function buildSidebar(){
+    var html = '';
+    (manifest.groups || []).forEach(function(g){
+      html += '<details open><summary>' + esc(g.title) + '<span class="tri">▾</span></summary><ul>';
+      g.pages.forEach(function(id){
+        var p = pageById[id];
+        if (p) html += '<li><a href="#/' + id + '" data-page="' + id + '">' + esc(p.title) + '</a></li>';
+      });
+      html += '</ul></details>';
+    });
+    sidebarEl.innerHTML = html;
+  }
+
+  function markActive(id){
+    var links = sidebarEl.querySelectorAll('a[data-page]');
+    Array.prototype.forEach.call(links, function(a){
+      a.classList.toggle('active', a.getAttribute('data-page') === id);
+    });
+  }
+
+  function groupTitleFor(id){
+    var t = '';
+    (manifest.groups || []).forEach(function(g){
+      if (g.pages.indexOf(id) !== -1) t = g.title;
+    });
+    return t;
+  }
+
+  function loadMd(id){
+    if (mdCache[id]) return Promise.resolve(mdCache[id]);
+    return fetch(pageById[id].file).then(function(r){
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function(t){ mdCache[id] = t; return t; });
+  }
+
+  /* ---------- render ---------- */
+  function route(){
+    var r = currentRoute();
+    if (!pageById[r.id]) { location.hash = '#/' + order[0]; return; }
+    sidebarEl.classList.remove('open');
+    sideBtn.setAttribute('aria-expanded','false');
+    if (searchEl.value) { searchEl.value = ''; }
+    renderPage(r.id, r.anchor);
+  }
+
+  function renderPage(id, anchor){
+    var page = pageById[id];
+    document.title = page.title + ' — whatsacc docs';
+    markActive(id);
+    loadMd(id).then(function(md){
+      var html = marked.parse(md, { mangle: false, headerIds: false });
+      var kicker = groupTitleFor(id);
+      contentEl.innerHTML =
+        '<article class="doc">' +
+        (kicker ? '<div class="doc-kicker"><i></i>' + esc(kicker) + '</div>' : '') +
+        html + '</article>' + pagerHtml(id);
+      postProcess(id);
+      buildToc();
+      if (anchor) {
+        var el = document.getElementById(anchor);
+        if (el) el.scrollIntoView();
+      } else {
+        window.scrollTo(0, 0);
+      }
+    }).catch(function(){
+      contentEl.innerHTML = '<p class="loading">could not load ' + esc(page.file) + '</p>';
+    });
+  }
+
+  function pagerHtml(id){
+    var i = order.indexOf(id);
+    var prev = i > 0 ? pageById[order[i-1]] : null;
+    var next = i < order.length - 1 ? pageById[order[i+1]] : null;
+    if (!prev && !next) return '';
+    var h = '<nav class="pager">';
+    if (prev) h += '<a href="#/' + prev.id + '"><span class="lbl">← Previous</span><span class="ttl">' + esc(prev.title) + '</span></a>';
+    if (next) h += '<a class="next" href="#/' + next.id + '"><span class="lbl">Next →</span><span class="ttl">' + esc(next.title) + '</span></a>';
+    return h + '</nav>';
+  }
+
+  function postProcess(id){
+    var art = contentEl.querySelector('.doc');
+    if (!art) return;
+    /* heading ids + anchors */
+    var seen = {};
+    Array.prototype.forEach.call(art.querySelectorAll('h2,h3'), function(h){
+      var s = slug(h.textContent);
+      while (seen[s]) s += '-x';
+      seen[s] = true;
+      h.id = s;
+      var a = document.createElement('a');
+      a.className = 'anchor'; a.href = '#/' + id + '#' + s; a.textContent = '#';
+      a.setAttribute('aria-label', 'Link to this section');
+      h.appendChild(a);
+    });
+    /* intercept relative .md links -> hash routes */
+    Array.prototype.forEach.call(art.querySelectorAll('a[href]'), function(a){
+      var href = a.getAttribute('href');
+      var m = href && href.match(/^([a-z0-9-]+)\.md(#.*)?$/i);
+      if (m) a.setAttribute('href', '#/' + m[1] + (m[2] || ''));
+    });
+  }
+
+  function buildToc(){
+    if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+    var hs = contentEl.querySelectorAll('.doc h2, .doc h3');
+    if (!hs.length) { tocEl.innerHTML = ''; return; }
+    var route = currentRoute();
+    var html = '<h5>On this page</h5><ul>';
+    Array.prototype.forEach.call(hs, function(h){
+      var txt = h.textContent.replace(/#$/,'');
+      html += '<li class="' + h.tagName.toLowerCase() + '"><a href="#/' + route.id + '#' + h.id + '" data-h="' + h.id + '">' + esc(txt) + '</a></li>';
+    });
+    tocEl.innerHTML = html + '</ul>';
+    /* highlight while scrolling */
+    if ('IntersectionObserver' in window) {
+      var links = {};
+      Array.prototype.forEach.call(tocEl.querySelectorAll('a[data-h]'), function(a){ links[a.getAttribute('data-h')] = a; });
+      tocObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting) {
+            Object.keys(links).forEach(function(k){ links[k].classList.remove('current'); });
+            var l = links[en.target.id];
+            if (l) l.classList.add('current');
+          }
+        });
+      }, { rootMargin: '-10% 0px -75% 0px' });
+      Array.prototype.forEach.call(hs, function(h){ tocObserver.observe(h); });
+    }
+  }
+
+  /* ---------- search ---------- */
+  var searchTimer = null;
+  searchEl.addEventListener('input', function(){
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 160);
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === '/' && document.activeElement !== searchEl &&
+        !/^(input|textarea)$/i.test(document.activeElement.tagName)) {
+      e.preventDefault(); searchEl.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchEl) {
+      searchEl.value = ''; searchEl.blur(); route();
+    }
+  });
+
+  function loadAll(){
+    return Promise.all(order.map(function(id){ return loadMd(id).catch(function(){ return ''; }); }));
+  }
+
+  function runSearch(){
+    var q = searchEl.value.trim().toLowerCase();
+    if (q.length < 2) { route(); return; }
+    loadAll().then(function(){
+      var hits = [];
+      order.forEach(function(id){
+        var md = mdCache[id] || '';
+        var plain = md.replace(/```[\s\S]*?```/g, ' ').replace(/[#|*_`>\[\]()!-]/g, ' ').replace(/\s+/g, ' ');
+        var low = plain.toLowerCase();
+        var idx = low.indexOf(q);
+        var titleHit = pageById[id].title.toLowerCase().indexOf(q) !== -1;
+        if (idx === -1 && !titleHit) return;
+        var count = 0, at = idx;
+        while (at !== -1 && count < 50) { count++; at = low.indexOf(q, at + q.length); }
+        var snip = '';
+        if (idx !== -1) {
+          var s = Math.max(0, idx - 70), e = Math.min(plain.length, idx + q.length + 90);
+          snip = (s > 0 ? '…' : '') + plain.slice(s, e).trim() + (e < plain.length ? '…' : '');
+          snip = esc(snip).replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark>$1</mark>');
+        }
+        hits.push({ id: id, score: (titleHit ? 100 : 0) + count, snip: snip });
+      });
+      hits.sort(function(a, b){ return b.score - a.score; });
+      var html = '<div class="results"><h1>' + (hits.length || 'No') + ' result' + (hits.length === 1 ? '' : 's') +
+                 ' for &ldquo;' + esc(searchEl.value.trim()) + '&rdquo;</h1>';
+      if (!hits.length) html += '<p class="none">Try a different word — or browse the sidebar.</p>';
+      hits.forEach(function(h){
+        html += '<a class="hit" href="#/' + h.id + '"><span class="h-title">' + esc(pageById[h.id].title) + '</span>' +
+                (h.snip ? '<div class="h-snip">' + h.snip + '</div>' : '') + '</a>';
+      });
+      contentEl.innerHTML = html + '</div>';
+      tocEl.innerHTML = '';
+      markActive(null);
+    });
+  }
+
+  window.addEventListener('hashchange', route);
+})();
+</script>
+</body>
+</html>

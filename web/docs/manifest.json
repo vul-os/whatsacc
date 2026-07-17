@@ -1,0 +1,150 @@
+{
+  "title": "whatsacc",
+  "logo": "/product-logos/whatsacc.svg",
+  "brand": {
+    "accent": "#C86848",
+    "accentHover": "#A24F32",
+    "font": "'Inter', ui-sans-serif, system-ui, sans-serif",
+    "displayFont": "'Fraunces', 'Iowan Old Style', 'Apple Garamond', serif",
+    "fonts": [
+      {
+        "family": "Fraunces",
+        "weight": "100 900",
+        "style": "normal",
+        "src": "/products/whatsacc/fonts/fraunces-var.woff2"
+      },
+      {
+        "family": "Fraunces",
+        "weight": "100 900",
+        "style": "italic",
+        "src": "/products/whatsacc/fonts/fraunces-italic-var.woff2"
+      },
+      {
+        "family": "Inter",
+        "weight": "100 900",
+        "style": "normal",
+        "src": "/products/whatsacc/fonts/inter-var.woff2"
+      },
+      {
+        "family": "Inter",
+        "weight": "100 900",
+        "style": "italic",
+        "src": "/products/whatsacc/fonts/inter-italic-var.woff2"
+      },
+      {
+        "family": "JetBrains Mono",
+        "weight": "100 800",
+        "style": "normal",
+        "src": "/products/whatsacc/fonts/jetbrains-mono-var.woff2"
+      },
+      {
+        "family": "JetBrains Mono",
+        "weight": "100 800",
+        "style": "italic",
+        "src": "/products/whatsacc/fonts/jetbrains-mono-italic-var.woff2"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "file": "overview.md"
+    },
+    {
+      "id": "getting-started",
+      "title": "Getting started",
+      "file": "getting-started.md"
+    },
+    {
+      "id": "linking-whatsapp",
+      "title": "Linking WhatsApp",
+      "file": "linking-whatsapp.md"
+    },
+    {
+      "id": "self-host",
+      "title": "Run a gateway",
+      "file": "self-host.md"
+    },
+    {
+      "id": "channels",
+      "title": "Chat channels",
+      "file": "channels.md"
+    },
+    {
+      "id": "billing",
+      "title": "Billing & tiers",
+      "file": "billing.md"
+    },
+    {
+      "id": "controllers",
+      "title": "Controllers",
+      "file": "controllers.md"
+    },
+    {
+      "id": "emergency-access",
+      "title": "Emergency access",
+      "file": "emergency-access.md"
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture",
+      "file": "architecture.md"
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "file": "security.md"
+    },
+    {
+      "id": "api",
+      "title": "API reference",
+      "file": "api.md"
+    },
+    {
+      "id": "screenshots",
+      "title": "Screenshots",
+      "file": "screenshots.md"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "file": "troubleshooting.md"
+    }
+  ],
+  "groups": [
+    {
+      "title": "Start here",
+      "pages": [
+        "overview",
+        "getting-started",
+        "linking-whatsapp"
+      ]
+    },
+    {
+      "title": "Run a gateway",
+      "pages": [
+        "self-host",
+        "channels",
+        "billing"
+      ]
+    },
+    {
+      "title": "Hardware",
+      "pages": [
+        "controllers",
+        "emergency-access"
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        "architecture",
+        "security",
+        "api",
+        "screenshots",
+        "troubleshooting"
+      ]
+    }
+  ]
+}
