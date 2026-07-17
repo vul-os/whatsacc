@@ -35,8 +35,9 @@ Opens over time, denials and their reasons, per-member and per-access-point brea
 
 ### The security page
 
-Served by the gateway itself: the trust model — pinned keys, row-level isolation,
-identity by verified sender — spelled out where residents and trustees can read it.
+Served by the gateway itself: the trust model — pinned keys, tenant isolation at the
+database layer, identity by verified sender — spelled out where residents and
+trustees can read it.
 
 ![The gateway's security page](../screenshots/security.png)
 

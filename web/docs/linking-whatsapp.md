@@ -29,7 +29,7 @@ the high-friction channel — budget an afternoon and some patience:
 3. **A phone number** registered to the WABA. It must be able to receive a one-time
    verification call or SMS, and it stops working as a personal WhatsApp number.
 4. **Webhook configuration** — point Meta at your gateway's public URL
-   (`https://your-gate.example/hooks/whatsapp`), set the verify token, and subscribe to
+   (`https://your-gate.example/webhooks/whatsapp`), set the verify token, and subscribe to
    the `messages` field.
 5. **Credentials into the gateway** — the permanent access token, app secret and phone
    number id go in your gateway's `.env`. The gateway verifies every incoming webhook

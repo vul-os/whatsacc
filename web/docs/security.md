@@ -12,7 +12,7 @@ there is only one binary.
 | Pairing | Claim-token flow: admin creates a claim, the device redeems it once, keys are exchanged |
 | Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response |
 | Channel ingress | Per-channel webhook signature verification (Meta HMAC, Slack signing secret) — fail closed |
-| Tenancy | App-layer org scoping enforced on every SQLite query |
+| Tenancy | Tenant-isolated at the database layer — app-layer org scoping on every SQLite query in the Go gateway; the current Postgres reference enforces forced row-level security |
 | Transport | TLS terminated by the gateway itself; tunnels stay content-blind via SNI passthrough where supported |
 | Audit | Append-only event log: every open, denial, pairing and config change |
 | Abuse limits | Cooldowns, hourly caps and optional per-location quotas at one choke point — see [Rate limits & quotas](limits.md) |
@@ -71,9 +71,9 @@ the grant TTL; see [Emergency access](emergency-access.md) for the full trade-of
 Every open path — portal, API, WhatsApp, Slack — funnels through one enforcement
 point that applies rate limits (cooldowns, hourly caps) and any admin-set quotas, so
 no channel can be picked to bypass them. Every denial is audit-logged with its
-reason, and the internal counters are tenant-isolated under forced row-level
-security with no policies — tenants can neither inspect nor exhaust each other's
-counters. If the counter store itself fails, opens are allowed but tagged in the
+reason, and the internal counters are tenant-isolated at the database layer (the
+current Postgres reference enforces this with forced row-level security) — tenants
+can neither inspect nor exhaust each other's counters. If the counter store itself fails, opens are allowed but tagged in the
 audit log (availability wins for a physical gate; visibility is preserved). The
 full design, defaults and tuning live in [Rate limits & quotas](limits.md).
 
@@ -95,7 +95,7 @@ deliberately narrow:
   in an append-only trail that only admins can read and nothing in the request
   path can write to directly.
 - **Tenant isolation is never weakened.** Admin cross-account reads are an explicit
-  context evaluated by the *same* row-level policies as every tenant query; normal
+  context evaluated by the *same* tenant-scoping rules as every tenant query; normal
   users' scoping is untouched by the admin machinery existing.
 
 ## What we deliberately don't claim

@@ -82,10 +82,12 @@ be reachable, in increasing order of self-sufficiency:
 2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel — run beside
    the binary; tunnels compose at the HTTP layer, so independence from any one provider
    is structural, not a promise.
-3. **No public URL at all** — Slack Socket Mode (and Discord's bot gateway, when it
-   lands) are outbound connections, and controllers dial out too. A LAN-only gateway is
-   a complete installation; only WhatsApp webhooks and remote portal/app access need a
-   URL.
+3. **No public URL at all** — the design goal. Controllers dial out today; Slack
+   Socket Mode (planned, ships with the Go gateway) and Discord's bot gateway, when
+   it lands, are outbound connections too. Once those land, a LAN-only gateway is a
+   complete installation and only WhatsApp webhooks and remote portal/app access need
+   a URL; today's Slack integration is the Events API over the public webhook, so
+   Slack currently needs one as well.
 
 ## The contracts that must not break
 

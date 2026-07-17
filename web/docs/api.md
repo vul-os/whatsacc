@@ -7,12 +7,13 @@ automation, or building on top of a gateway, this is for you.
 The API is served by the gateway itself — every gateway, the same way — under `/v1`.
 
 > The `/v1` surface is stabilising alongside the Go gateway; pre-1.0, expect additive
-> changes and check the repository for the generated, always-current route list.
+> changes — the repository's route code is the source of truth for what exists today.
 
 ## Authentication
 
-Issue tokens in the portal under **Settings → API tokens**. Tokens are scoped to
-specific locations and to read or read-write.
+Tokens will be issued in the portal under **Settings → API tokens** — that surface is
+**planned**, shipping with the API-token system (tracked in the repo todo). Tokens are
+scoped to specific locations and to read or read-write.
 
 ```
 Authorization: Bearer wacc_live_<token>
@@ -58,10 +59,11 @@ readable here, scoped to your token.
 
 ## Webhooks
 
-Subscribe under **Settings → Webhooks** to `open.succeeded`, `open.denied`,
-`device.offline` and `member.revoked`. Payloads are signed with HMAC-SHA256; verify
-with the secret shown when you create the subscription. Deliveries retry with backoff
-for a day, then park.
+Subscriptions will live under **Settings → Webhooks** — this surface is **planned**,
+shipping with the API-token system (tracked in the repo todo) — covering
+`open.succeeded`, `open.denied`, `device.offline` and `member.revoked`. Payloads are
+signed with HMAC-SHA256; verify with the secret shown when you create the
+subscription. Deliveries retry with backoff for a day, then park.
 
 ## Devices
 

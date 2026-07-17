@@ -10,5 +10,6 @@ fonts are vendored in `fonts/`, the markdown renderer in `docs/vendor/`.
   `docs/index.html`, a self-contained viewer for whatsacc.com (sidebar, search, TOC,
   hash routes like `docs/#/self-host`). Theme persists via localStorage `whatsacc.theme`.
 - `screenshots/` + `screenshots/dark/` — PNGs land here from `npm run screenshotter`
-  (portal-dashboard, portal-locations, portal-analytics, app-emergency, landing-hero,
-  docs). The landing degrades gracefully if any are missing.
+  (portal-dashboard, portal-locations, portal-analytics, portal-limits, security,
+  app-emergency, landing-hero, docs). The landing degrades gracefully if any are
+  missing.

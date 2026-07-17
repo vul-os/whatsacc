@@ -40,8 +40,10 @@ nothing held back.
   verified Meta business number (a WABA), and Meta bills you directly for your own
   conversations. See [Chat channels](channels.md).
 - **Reachability is your choice**: a public IP with the gateway's built-in ACME, any
-  tunnel you already trust running beside the binary, or no public URL at all — Slack
-  Socket Mode and the controllers all dial out, so a LAN-only gateway still works.
+  tunnel you already trust running beside the binary — and, once Slack Socket Mode
+  ships with the Go gateway (planned), no public URL at all. Controllers already dial
+  out; today's Slack integration is the Events API webhook, so chat channels still
+  need a reachable URL.
 
 ## Where to go next
 

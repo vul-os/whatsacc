@@ -12,6 +12,11 @@ and Meta's per-conversation fees if you run a WhatsApp channel on your own numbe
 
 ## Install
 
+> **Status — gateway in development.** The single-binary Go gateway is in
+> development. Today the reference implementation runs as the Workers backend in
+> this repo (`backend/` — see the repo README for dev setup); the commands below
+> describe the target install experience and will go live with the gateway.
+
 **Docker** (recommended while pre-1.0):
 
 ```sh
@@ -42,7 +47,9 @@ On first boot the gateway:
 
 - creates `whatsacc.db` (SQLite) in its data directory,
 - generates its **signing keypair** — the key controllers will pin,
-- prints a one-time URL to claim the admin account in the embedded portal.
+- is ready for its one-shot admin claim: redeem the `ADMIN_CLAIM_TOKEN` you set in
+  the environment against `POST /admin/claim` — see the next section and
+  [Instance admin](admin.md).
 
 ## Claim your admin account
 
@@ -84,11 +91,14 @@ at the HTTP layer. Pick whichever of these fits your life:
 - **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, or your own:
   anything that forwards HTTPS to a local port works, run beside the binary. whatsacc
   has no structural dependency on any provider.
-- **No public URL at all** — a gateway on the estate LAN is a complete installation.
-  Slack **Socket Mode** dials out to Slack (no request URL needed), Discord's bot
-  gateway will dial out the same way when it lands, and controllers always dial out.
-  You only need a URL for two things: **WhatsApp webhooks** (Meta must reach you) and
-  **portal/app access from outside the property**.
+- **No public URL at all** — the design goal: a gateway on the estate LAN as a
+  complete installation. Controllers already dial out. Slack **Socket Mode** — the
+  gateway dialing out to Slack, no request URL needed — ships with the Go gateway
+  (planned); Discord's bot gateway will dial out the same way when it lands.
+  *Today* the Slack integration is the **Events API** over the public webhook
+  (`/webhooks/slack`), so chat channels still need a reachable URL — as do
+  **WhatsApp webhooks** (Meta must reach you) and **portal/app access from outside
+  the property**.
 
 Controllers connect to the gateway too — but they dial out from the gate side, so they
 work behind NAT and CGNAT'd 4G SIMs with zero inbound ports at the gate.

@@ -9,8 +9,9 @@ The gateway never got the message. First check you're texting the number (or Sla
 shown in the portal under **Settings → Channels**. Then check the channel is actually
 reaching your gateway — verify your public URL is up
 (`curl https://your-gate.example/healthz`), and re-check the webhook URL in the
-Meta/Slack console. Tunnel users: is the tunnel actually connected? Slack Socket Mode
-users: does the gateway log show the socket connected?
+Meta/Slack console. Tunnel users: is the tunnel actually connected? (Slack Socket
+Mode, when it ships with the Go gateway, will remove the URL requirement for Slack —
+today Slack uses the Events API webhook.)
 
 **I get "I don't recognise this number/account".**
 Your chat identity isn't a member anywhere on this gateway. An admin adds you under
