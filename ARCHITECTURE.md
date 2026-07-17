@@ -4,7 +4,8 @@
 > WhatsApp, Slack, Discord — opens a physical gate, door or barrier.
 
 whatsacc has no cloud center. It is a network of independent **gateways**: anyone can run
-one, whatsacc runs the flagship. Every line of code is MIT-licensed, including billing.
+one, whatsacc runs the flagship. Every line of code is MIT-licensed. There is **no
+billing system** — nothing in the binary charges anyone anything.
 The only private thing about the hosted gateway at [whatsacc.com](https://whatsacc.com)
 is its `.env`.
 
@@ -30,7 +31,6 @@ flowchart LR
         RE["Rules engine<br/>time windows · geofence · quotas"]
         PORTAL["Management portal<br/>(embedded Svelte build)"]
         HUB["Device hub<br/>signed commands · Ed25519"]
-        BILL["Billing (optional)<br/>tiers · Paystack seam"]
         AUD[("Audit log<br/>SQLite")]
     end
 
@@ -64,7 +64,7 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 
 | Component      | What it is                                                                | Runs on                              | Stack                          |
 | -------------- | ------------------------------------------------------------------------- | ------------------------------------ | ------------------------------ |
-| **gateway**    | The entire server: channels, rules, portal, API, device hub, billing, audit | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
+| **gateway**    | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
 | **controller** | The unit wired to the gate relay; verifies signatures, drives the motor    | Pi-class board at the gate, Wi-Fi or GSM | Go agent (+ vendor firmware)  |
 | **app**        | Admin console + **emergency access** for residents                         | Desktop, iOS, Android                | Svelte 5 · Tauri v2            |
 | **web**        | whatsacc.com — landing, docs, downloads. Static.                           | Any static host                      | Svelte (static build)          |
@@ -169,14 +169,13 @@ Meta Business + WABA + phone number. That asymmetry is the entire hosted busines
 ```mermaid
 flowchart TB
     subgraph hosted ["whatsacc.com — the flagship gateway (we run it)"]
-        H["Gateway binary<br/>+ our WABA & number<br/>+ our Paystack keys in .env"]
-        T1["Free tier<br/>1 location · 1 controller · capped opens"]
-        T2["Paid tiers<br/>more locations · unlimited opens"]
-        H --- T1 & T2
+        H["Gateway binary<br/>+ our WABA & number"]
+        T1["Free for everyone<br/>no tiers · no wallet · no card"]
+        H --- T1
     end
 
     subgraph self ["Your gateway (same MIT binary)"]
-        S["Gateway binary<br/>+ YOUR WABA / Discord / Slack<br/>+ billing off — or YOUR keys"]
+        S["Gateway binary<br/>+ YOUR WABA / Slack / Discord<br/>you pay Meta directly"]
     end
 
     subgraph reach ["Reachability (self-host, pick one)"]
@@ -192,8 +191,13 @@ flowchart TB
   gateway routes by sender → memberships. A complex never touches Meta. Tiers monetize
   Meta onboarding, hosting and uptime — not secret code.
 - **Self-hosted**: same binary, bring your own channel credentials and a public URL.
-  Billing code ships in the binary behind a flag, so a third party can run their **own
-  paid gateway** with their own tiers and their own Paystack/Stripe keys.
+  There is no billing code to configure — the binary has none.
+
+**Funding the expensive edge, honestly.** The one real marginal cost in the system is
+Meta's per-conversation fee on a hosted gateway. Today the flagship absorbs it. If that
+ever needs funding at scale, the direction is **DMTAP-style postage** — prepaid signed
+vouchers redeemed per use at the edge, with an issuer-side ledger (see DMTAP §9.5) —
+a shared Vulos primitive, not a subscription billing stack bolted into this product.
 
 The gateway core is transport-agnostic — it binds a listener, full stop. Tunnels
 compose at the HTTP layer, so independence from any one provider (including vulos-relay)
@@ -256,13 +260,13 @@ Per-location **settings toggles, off by default**:
 | Database              | **SQLite** (was Neon Postgres + RLS) | Zero-dependency self-hosting; one file to back up; RLS existed for shared-cloud tenancy we no longer have |
 | Frontend              | **Svelte 5** (was React 19)    | One codebase → embedded portal + Tauri desktop/mobile; small output |
 | Apps                  | **Tauri v2**                   | Desktop + iOS + Android from the Svelte codebase                    |
-| Billing               | **In the gateway, MIT, flagged off** | Paid third-party gateways are a feature; Paystack is the reference `BillingProvider` |
+| Billing               | **None**                       | No Paystack, no tiers, no wallet; edge costs absorbed — DMTAP postage is the future path if ever needed |
 | License               | **MIT, everything**            | The moat is running the best flagship, not hiding code              |
 
 ## 10. Migration path from the current codebase
 
 The Deno/Hono backend (~2.9k lines of routes) is the **spec**: auth, locations, access
-rules, devices/pairing, WhatsApp flows and billing port to Go nearly mechanically. The
+rules, devices/pairing and WhatsApp flows port to Go nearly mechanically. The
 18 Postgres migrations fold into a clean SQLite baseline. The React landing/docs carry
 their brand (Fraunces/Inter/JetBrains Mono, ink-on-paper, arch motif) into the Svelte
 `web/` and `app/`. The Deno test suite's cases (unit, integration, security, contract)

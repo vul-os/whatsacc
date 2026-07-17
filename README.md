@@ -15,7 +15,7 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/portal-dashboard.png" />
-  <img src="web/screenshots/portal-dashboard.png" width="840" alt="The whatsacc management portal — tap-to-open access points, wallet, live activity" />
+  <img src="web/screenshots/portal-dashboard.png" width="840" alt="The whatsacc management portal — tap-to-open access points, live activity" />
 </picture>
 
 </div>
@@ -25,14 +25,14 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 There is **no cloud center**. whatsacc is a decentralized network of independent
 **gateways**: a gateway is one MIT-licensed Go binary (SQLite inside, management portal
 embedded) that anyone can run — a VPS, a Pi in the guardhouse, anywhere with a public
-URL. whatsacc runs the flagship hosted gateway at [whatsacc.com](https://whatsacc.com)
-with free and paid tiers; the same binary, billing included, lets **you** run your own —
-even a paid one with your own tiers and keys.
+URL. whatsacc runs the flagship hosted gateway at [whatsacc.com](https://whatsacc.com) —
+free, no tiers, no wallet, no card. The same binary lets **you** run your own with your
+own WhatsApp number and Slack workspace; there is **no billing system** anywhere in it.
 
 ```mermaid
 flowchart LR
     R["🧍 Resident"] -- "“open”" --> CH["WhatsApp · Slack · Discord soon"]
-    CH --> GW["Gateway<br/>one Go binary · SQLite<br/>rules · portal · audit · billing"]
+    CH --> GW["Gateway<br/>one Go binary · SQLite<br/>rules · portal · audit"]
     APP["📱 App (Tauri)<br/>admin + emergency"] --> GW
     GW -- "signed command<br/>(outbound wss)" --> C["Controller at the gate<br/>Wi-Fi / GSM 4G"]
     C --> G["🚧 Gate opens"]
@@ -77,9 +77,9 @@ npm run screenshotter   # boots the app with mocked data → web/screenshots/{,d
 
 | Directory     | What                                                             | Status |
 | ------------- | ---------------------------------------------------------------- | ------ |
-| `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 13-chapter docs, self-contained, light/dark | ✅ |
+| `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 12-chapter docs, self-contained, light/dark | ✅ |
 | `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events, tunnel | ✅ v0 draft |
-| `backend/`    | Current API — Cloudflare Workers · Postgres RLS · Paystack · WhatsApp + Slack | ✅ running, **spec for the Go port** |
+| `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Current portal + marketing — React 19 · Vite · light/dark        | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
 | `gateway/`    | Go single-binary gateway (SQLite, embedded portal, channel seam) | 🔨 next |
@@ -109,18 +109,16 @@ npm run check                   # tsc
 npm run test:unit               # pure unit tests, no DB
 npm run test:integration        # real local Postgres — TRUNCATEs tables, use a throwaway DB
 npm run test:security           # authz / RLS / webhook-signature suites
-npm run test:contract           # opt-in: real Paystack/Resend test APIs when keys are set
+npm run test:contract           # opt-in: real Resend test API when keys are set
 ```
 
-Contract suites skip cleanly without keys, refuse to run against live Paystack keys,
-and leave artifacts in test dashboards — see [`web/docs/`](web/docs/) for details.
+Contract suites skip cleanly without keys — see [`web/docs/`](web/docs/) for details.
 
 ## Docs
 
 The full documentation ships in this repo at [`web/docs/`](web/docs/) — getting
-started, linking WhatsApp, running your own gateway, channels, billing and running a
-*paid* gateway, controllers and pairing, offline emergency access, security model, API
-reference, troubleshooting. Served at
+started, linking WhatsApp, running your own gateway, channels, controllers and pairing,
+offline emergency access, security model, API reference, troubleshooting. Served at
 [whatsacc.com/docs](https://whatsacc.com/docs) and inside the
 [Vulos console](https://vulos.org/products/whatsacc/docs).
 
@@ -134,5 +132,5 @@ plain public IP works.
 
 ## License
 
-[MIT](LICENSE) — all of it: gateway, portal, app, controller agent, billing. The moat
-is running the best flagship, not hiding code.
+[MIT](LICENSE) — all of it: gateway, portal, app, controller agent. No billing system,
+no paid features. The moat is running the best flagship, not hiding code.
