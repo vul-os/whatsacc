@@ -204,6 +204,8 @@ own tenants, numbers, devices and audit log — with zero coordination between t
 | Tenancy          | App-layer org scoping in SQLite (replaces Postgres RLS)                     |
 | Transport        | TLS terminated by the gateway itself — any tunnel in front only ever sees ciphertext when run in passthrough mode |
 | Audit            | Append-only event log: every open, denial, pairing, config change           |
+| Abuse limits     | Non-monetary rate limits (open cooldown, hourly caps, chat flood throttle) + optional admin-set per-location quotas; denials audited, chat replies honest |
+| Instance admin   | Gateway operator role (one-time claim bootstrap): manage accounts/users, suspend, tune rate-limit defaults, cross-tenant audit view |
 
 ## 7. The contracts that must not break (`proto/`)
 
