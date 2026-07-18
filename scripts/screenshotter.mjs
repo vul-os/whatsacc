@@ -6,8 +6,8 @@
 // Boots the existing Vite app on a free port, intercepts every backend API
 // request with Playwright route mocks (fixtures in scripts/screenshotter-fixtures/),
 // seeds an authenticated session, and captures polished PNGs into:
-//   web/screenshots/          (light)
-//   web/screenshots/dark/     (dark)
+//   site/screenshots/         (light)
+//   site/screenshots/dark/    (dark)
 //
 // No backend (Deno, port 8787/8000) is required. Exits non-zero on any failure.
 
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const FIXTURES = path.join(__dirname, 'screenshotter-fixtures');
-const OUT_LIGHT = path.join(ROOT, 'web', 'screenshots');
+const OUT_LIGHT = path.join(ROOT, 'site', 'screenshots');
 const OUT_DARK = path.join(OUT_LIGHT, 'dark');
 const MIN_BYTES = 30_000; // a real 2x/3x product shot is far bigger than this
 
@@ -411,7 +411,7 @@ async function main() {
       }
     }
 
-    console.log(`\nDone. ${written.length} light + ${written.length} dark PNGs in web/screenshots/`);
+    console.log(`\nDone. ${written.length} light + ${written.length} dark PNGs in site/screenshots/`);
   } catch (err) {
     console.error('\nScreenshotter failed:', err.message ?? err);
     if (viteLog.trim()) {

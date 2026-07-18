@@ -68,7 +68,7 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 | **gateway**    | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
 | **controller** | The unit wired to the gate relay; verifies signatures, drives the motor    | Pi-class board at the gate, Wi-Fi or GSM | Go agent (+ vendor firmware)  |
 | **app**        | Admin console + **emergency access** for residents                         | Desktop, iOS, Android                | Svelte 5 · Tauri v2            |
-| **web**        | whatsacc.com — landing, docs, downloads. Static.                           | Any static host                      | static HTML + markdown docs    |
+| **site**       | Marketing landing + docs — static mini-site (house format), fully separate from the app | Any static host · Vulos console sync | static HTML + markdown docs    |
 | **proto**      | The versioned wire contracts (see §7)                                      | —                                    | Markdown + schemas             |
 
 ### Repo layout
@@ -77,8 +77,8 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 whatsacc/
 ├── backend/      # current API — Cloudflare Workers · Hono · Postgres (spec for the Go port)
 ├── src/          # current portal + marketing — React 19 · Vite
-├── scripts/      # screenshotter (Playwright product shots) · postbuild site assembly
-├── web/          # whatsacc.com — hand-written landing.html + markdown docs (static)
+├── scripts/      # screenshotter (Playwright product shots)
+├── site/         # marketing mini-site — hand-written index.html + docs.html + markdown docs (static)
 ├── proto/        # pairing · signed commands · grants · events contracts
 ├── gateway/      # 🔨 next: Go, the whole product server
 │   └── migrations/   # SQLite schema, clean folded baseline
@@ -250,5 +250,5 @@ The Cloudflare Workers/Hono backend (~2.9k lines of routes) is the **spec**: aut
 locations, access rules, devices/pairing and WhatsApp flows port to Go nearly
 mechanically. The folded Postgres migrations map to a clean SQLite baseline. The React
 landing/docs carry their brand (Fraunces/Inter/JetBrains Mono, ink-on-paper, arch
-motif) into the Svelte `web/` and `app/`. The vitest suite's cases (unit, integration,
+motif) into `site/` and `app/`. The vitest suite's cases (unit, integration,
 security, contract) are ported alongside the routes they cover.

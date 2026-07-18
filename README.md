@@ -14,8 +14,8 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 [![Part of Vulos](https://img.shields.io/badge/suite-vulos.org-2c5f4f.svg)](https://vulos.org)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/portal-dashboard.png" />
-  <img src="web/screenshots/portal-dashboard.png" width="840" alt="The whatsacc management portal — tap-to-open access points, live activity" />
+  <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/portal-dashboard.png" />
+  <img src="site/screenshots/portal-dashboard.png" width="840" alt="The whatsacc management portal — tap-to-open access points, live activity" />
 </picture>
 
 </div>
@@ -61,27 +61,27 @@ controllers and apps depend on are versioned in [`proto/`](proto/).
 
 | Access points & controllers | Analytics |
 | :---: | :---: |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/portal-locations.png" /><img src="web/screenshots/portal-locations.png" alt="Access points — controllers, maintenance windows, meters" /></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/portal-analytics.png" /><img src="web/screenshots/portal-analytics.png" alt="Analytics — opens per day, per access point, active members" /></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/portal-locations.png" /><img src="site/screenshots/portal-locations.png" alt="Access points — controllers, maintenance windows, meters" /></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/portal-analytics.png" /><img src="site/screenshots/portal-analytics.png" alt="Analytics — opens per day, per access point, active members" /></picture> |
 
 | Tap-to-open (mobile) | Landing |
 | :---: | :---: |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/app-emergency.png" /><img src="web/screenshots/app-emergency.png" width="270" alt="Mobile tap-to-open gate view" /></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="web/screenshots/dark/landing-hero.png" /><img src="web/screenshots/landing-hero.png" alt="whatsacc.com landing" /></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/app-emergency.png" /><img src="site/screenshots/app-emergency.png" width="270" alt="Mobile tap-to-open gate view" /></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/landing-hero.png" /><img src="site/screenshots/landing-hero.png" alt="whatsacc.com landing" /></picture> |
 
 Every screenshot above is generated, not hand-made — light **and** dark, from the real
 app with realistic data:
 
 ```bash
-npm run screenshotter   # boots the app with mocked data → web/screenshots/{,dark/}
+npm run screenshotter   # boots the app with mocked data → site/screenshots/{,dark/}
 ```
 
 ## Monorepo
 
 | Directory     | What                                                             | Status |
 | ------------- | ---------------------------------------------------------------- | ------ |
-| `web/`        | [whatsacc.com](https://whatsacc.com) — landing + 14-chapter docs, self-contained, light/dark | ✅ |
+| `site/`       | Landing + 14-chapter docs — house mini-site format, self-contained, light/dark | ✅ |
 | `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events | ✅ v0 draft |
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
-| `src/`        | Current portal + marketing — React 19 · Vite · light/dark        | ✅ running |
+| `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
 | `gateway/`    | Go single-binary gateway (SQLite, embedded portal, channel seam) | 🔨 next |
 | `controller/` | Gate device agent + reference wiring                             | 🔨 planned |
@@ -119,15 +119,15 @@ npm run test:security           # authz / RLS / webhook-signature suites
 npm run test:contract           # opt-in: real Resend test API when keys are set
 ```
 
-Contract suites skip cleanly without keys — see [`web/docs/`](web/docs/) for details.
+Contract suites skip cleanly without keys — see [`site/docs/`](site/docs/) for details.
 
 ## Docs
 
-The full documentation ships in this repo at [`web/docs/`](web/docs/) — getting
+The full documentation ships in this repo at [`site/docs/`](site/docs/) — getting
 started, linking WhatsApp, running your own gateway, channels, controllers and pairing,
-offline emergency access, security model, API reference, troubleshooting. Served at
-[whatsacc.com/docs](https://whatsacc.com/docs) and inside the
-[Vulos console](https://vulos.org/products/whatsacc/docs).
+offline emergency access, security model, API reference, troubleshooting. `site/` is a
+plain static site — host it anywhere; it also syncs into the
+[Vulos console](https://vulos.org/products/whatsacc/docs) as the product mini-site.
 
 ## Part of the Vulos suite
 

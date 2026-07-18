@@ -33,7 +33,7 @@ In scope, roughly in order of severity:
 3. **Chat webhooks** — signature-verification flaws on channel ingress (Meta HMAC,
    Slack signing secret, Telegram secret token), sender-identity spoofing that leads
    to an open.
-4. **Portal / web** ([`src/`](src/), [`web/`](web/)) — XSS, CSRF, token handling.
+4. **Portal / web** ([`src/`](src/), [`site/`](site/)) — XSS, CSRF, token handling.
 
 Out of scope: vulnerabilities in Meta/Slack/Telegram themselves, self-inflicted
 misconfiguration of a self-hosted gateway (e.g. publishing your `.env`), and

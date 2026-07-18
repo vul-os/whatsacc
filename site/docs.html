@@ -17,11 +17,11 @@
 })();
 </script>
 <style>
-@font-face{font-family:'Fraunces';font-style:normal;font-weight:100 900;font-display:swap;src:url('../fonts/fraunces-var.woff2') format('woff2')}
-@font-face{font-family:'Fraunces';font-style:italic;font-weight:100 900;font-display:swap;src:url('../fonts/fraunces-italic-var.woff2') format('woff2')}
-@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('../fonts/inter-var.woff2') format('woff2')}
-@font-face{font-family:'Inter';font-style:italic;font-weight:100 900;font-display:swap;src:url('../fonts/inter-italic-var.woff2') format('woff2')}
-@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url('../fonts/jetbrains-mono-var.woff2') format('woff2')}
+@font-face{font-family:'Fraunces';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/fraunces-var.woff2') format('woff2')}
+@font-face{font-family:'Fraunces';font-style:italic;font-weight:100 900;font-display:swap;src:url('fonts/fraunces-italic-var.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/inter-var.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-style:italic;font-weight:100 900;font-display:swap;src:url('fonts/inter-italic-var.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url('fonts/jetbrains-mono-var.woff2') format('woff2')}
 
 :root{
   color-scheme:light;
@@ -172,7 +172,7 @@ a{color:inherit}
 
 <header class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="../" aria-label="whatsacc home">
+    <a class="brand" href="./" aria-label="whatsacc home">
       <span class="brand-mark" aria-hidden="true">
         <svg width="17" height="17" viewBox="0 0 64 64" fill="none">
           <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -189,7 +189,7 @@ a{color:inherit}
     </div>
     <nav class="top-links" aria-label="Top">
       <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
-      <a href="../">Home</a>
+      <a href="./">Home</a>
     </nav>
     <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
       <svg class="ic-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"/></svg>
@@ -207,7 +207,7 @@ a{color:inherit}
   <aside class="toc" id="toc" aria-label="On this page"></aside>
 </div>
 
-<script src="vendor/marked.min.js"></script>
+<script src="docs/vendor/marked.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -255,7 +255,7 @@ a{color:inherit}
   }
 
   /* ---------- boot ---------- */
-  fetch('manifest.json').then(function(r){ return r.json(); }).then(function(m){
+  fetch('docs/manifest.json').then(function(r){ return r.json(); }).then(function(m){
     manifest = m;
     m.pages.forEach(function(p){ pageById[p.id] = p; });
     var grouped = {};
@@ -266,7 +266,7 @@ a{color:inherit}
     buildSidebar();
     route();
   }).catch(function(){
-    contentEl.innerHTML = '<p class="loading">could not load manifest.json</p>';
+    contentEl.innerHTML = '<p class="loading">could not load docs/manifest.json</p>';
   });
 
   function buildSidebar(){
@@ -299,7 +299,7 @@ a{color:inherit}
 
   function loadMd(id){
     if (mdCache[id]) return Promise.resolve(mdCache[id]);
-    return fetch(pageById[id].file).then(function(r){
+    return fetch('docs/' + pageById[id].file).then(function(r){
       if (!r.ok) throw new Error(r.status);
       return r.text();
     }).then(function(t){ mdCache[id] = t; return t; });

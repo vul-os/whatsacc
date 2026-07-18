@@ -28,9 +28,8 @@ Notes:
   (Google OAuth, Resend, WhatsApp/Telegram/Slack) is optional and degrades cleanly.
 - `wrangler dev` does **not** read `.env` — it reads `backend/.dev.vars`. Keep the
   two in sync so the worker and the test/migrate scripts hit the same database.
-- `npm run build` assembles the deployable `dist/` (SPA as `app.html`, marketing
-  landing as `index.html`, plus `docs/`, `screenshots/`, `fonts/` — see
-  `scripts/postbuild.mjs` and `firebase.json`).
+- `npm run build` produces the application only (`dist/` = the SPA). The marketing
+  site lives in `site/` and is plain static files — no build step; host it anywhere.
 
 ## Test suites
 

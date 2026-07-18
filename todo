@@ -9,7 +9,7 @@
 ## carried over (still relevant)
 - [x] buy domain on namecheap, whatsacc.com
 - [x] resend setup, connect dns settings
-- [x] firebase hosting (prod + dev sites)
+- [x] static site/ (firebase removed by decision — host anywhere / Vulos console sync)
 - [x] google oauth set up
 - [x] light / dark mode with toggle in top bar
 - [x] docs home page with search

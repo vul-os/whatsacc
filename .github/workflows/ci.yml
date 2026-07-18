@@ -18,17 +18,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - name: Verify dist/ layout (landing + SPA shell + docs + assets)
-        run: |
-          test -f dist/index.html
-          test -f dist/app.html
-          test -f dist/docs/index.html
-          test -f dist/docs/manifest.json
-          test -f dist/docs/vendor/marked.min.js
-          test -d dist/fonts
-          test -d dist/screenshots
-          test -d dist/assets
-          grep -q 'id="root"' dist/app.html
 
   backend:
     name: backend (typecheck + unit)
