@@ -86,10 +86,10 @@ func TestSignCommandClampsTTL(t *testing.T) {
 	}
 }
 
-// JCS-subset vectors. proto/vectors/ did not exist when this was written —
-// these are self-authored vectors matching RFC 8785 for the envelope subset.
-// When proto/vectors/ lands, add a test that walks that directory and prefer
-// its cases over these.
+// Self-authored JCS-subset vectors (RFC 8785, envelope subset). The
+// authoritative cross-implementation cases live in proto/vectors/ and are
+// exercised by vectors_test.go; these remain for edge cases the shared
+// vectors don't carry (unicode, control chars, empty object).
 func TestJCSVectors(t *testing.T) {
 	cases := []struct {
 		name string
