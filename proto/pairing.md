@@ -64,3 +64,28 @@ Admin (portal)                Gateway                        Controller
   "poll_interval": 30
 }
 ```
+
+Both redeem messages are **unsigned**: authenticity comes from TLS plus possession
+of the single-use claim token, and the response is trusted only because it arrives
+on the TLS connection the controller itself opened. `controller_pubkey` /
+`gateway_pubkey` are raw 32-byte Ed25519 public keys, base64url, no padding.
+
+## WebSocket auth (the "server challenge" of rule 5)
+
+```json
+{ "v": 0, "typ": "ws.challenge", "cnonce": "base64url(128-bit random)",
+  "iat": 1789000000, "exp": 1789000030 }
+```
+
+The controller answers:
+
+```json
+{ "v": 0, "typ": "ws.auth", "device_id": "uuid", "cnonce": "…", "ts": 1789000001,
+  "sig": "base64url(ed25519(controller_key, JCS(message minus sig)))" }
+```
+
+Gateway verifies fail-closed: `sig` against that device's enrolled
+`controller_pubkey`; `cnonce` is one it issued (`cnonce_unknown`), unexpired
+(`cnonce_expired`) and single-use (`cnonce_replay`); `|ts − now| ≤ 90 s`
+(`expired` / `not_yet_valid`). Reason strings are the cmd.ack `detail`
+vocabulary (commands.md).

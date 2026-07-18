@@ -1,0 +1,30 @@
+{
+  "$comment": "*** TEST KEYS ONLY — PUBLIC, DETERMINISTIC, NEVER USE IN PRODUCTION *** Seeds are sha256(\"whatsacc-test-vector:<name>\"). private_seed_hex is the raw 32-byte Ed25519 seed (RFC 8032); public_key_hex/b64u is the raw 32-byte public key.",
+  "keys": {
+    "gateway": {
+      "private_seed_hex": "70aa01ee88373ba4d1088fe27ba9d4e7b5ad63b71210e7acb2ec4590d0ff79fd",
+      "public_key_hex": "59c5830ea98fbf8f0a749e97e1f547c1769478d2266dc71a2152f16daab8e07d",
+      "public_key_b64u": "WcWDDqmPv48KdJ6X4fVHwXaUeNImbccaIVLxbaq44H0"
+    },
+    "gateway_next": {
+      "private_seed_hex": "a85f2ec11eef0ed26b37dbbb71ba23888d03971551b986d2db296086abe351d6",
+      "public_key_hex": "1e398512d90e99225a372f54d4fffa65bd0ba5e67f5ee62beb63a73e290b2840",
+      "public_key_b64u": "HjmFEtkOmSJaNy9U1P_6Zb0LpeZ_XuYr62OnPikLKEA"
+    },
+    "controller": {
+      "private_seed_hex": "b277bf5b83293f641115af6d4b21d4bef2b71b5d3be87a53cb3db4810ed1b548",
+      "public_key_hex": "5d6da29afa070f3699363f48779c946209c3468eb288791dadbe025b4f5f391c",
+      "public_key_b64u": "XW2imvoHDzaZNj9Id5yUYgnDRo6yiHkdrb4CW09fORw"
+    },
+    "app": {
+      "private_seed_hex": "bcf59d31ae4b740fdfab264ee3363240edac395f588a604f4ad7dc930041b89c",
+      "public_key_hex": "d3c0ee3bed9302b6b3f554b8141b1ec1a0c07b2b25aa1beac844c85c05fa71e9",
+      "public_key_b64u": "08DuO-2TAraz9VS4FBsewaDAeyslqhvqyETIXAX6cek"
+    },
+    "attacker": {
+      "private_seed_hex": "913b84e1755084a2790c9d8b8b21b494265dd4dafae9f6459e3525a46467c832",
+      "public_key_hex": "4e87d9565132b973d6e1d9aa8498387e5e30474691048cbb4fc2a56038f4f24b",
+      "public_key_b64u": "TofZVlEyuXPW4dmqhJg4fl4wR0aRBIy7T8KlYDj08ks"
+    }
+  }
+}
