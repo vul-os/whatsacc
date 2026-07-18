@@ -5,6 +5,7 @@ import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api, type CountryRef } from '@/lib/api';
+import { isTauri } from '@/lib/gateway';
 
 const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
 export const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
@@ -217,14 +218,27 @@ export default function Signup() {
 
               {!isInviteSignup && (
                 <>
-                  <a
-                    href={googleStartUrl}
-                    onClick={rememberPendingWhatsAppPhone}
-                    className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
-                  >
-                    <GoogleMark />
-                    <span className="text-sm font-medium">Continue with Google</span>
-                  </a>
+                  {isTauri() ? (
+                    // Google's OAuth redirect can't round-trip through the
+                    // desktop webview — email + password only in the app.
+                    <div
+                      aria-disabled="true"
+                      title="Google sign-in isn’t available in the desktop app — use email + password."
+                      className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/15 bg-paper-cool/40 opacity-45 cursor-not-allowed select-none"
+                    >
+                      <GoogleMark />
+                      <span className="text-sm font-medium">Continue with Google</span>
+                    </div>
+                  ) : (
+                    <a
+                      href={googleStartUrl}
+                      onClick={rememberPendingWhatsAppPhone}
+                      className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+                    >
+                      <GoogleMark />
+                      <span className="text-sm font-medium">Continue with Google</span>
+                    </a>
+                  )}
 
                   <div className="my-3 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
                     <span className="flex-1 h-px bg-ink/12" />

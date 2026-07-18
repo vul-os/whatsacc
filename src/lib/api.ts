@@ -1,11 +1,15 @@
 // Lightweight API client for the whatsacc backend.
 // Handles base URL, bearer auth, JSON, and one-shot refresh-on-401.
 
+import { gatewayFetch, getApiBaseUrl } from './gateway';
+
 const ACCESS_KEY = 'whatsacc.access_token';
 const REFRESH_KEY = 'whatsacc.refresh_token';
 
-const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
-export const API_BASE_URL = (env.VITE_API_BASE_URL ?? 'http://localhost:8787').replace(/\/$/, '');
+// The base URL is resolved per-request (not a build-time constant) so the
+// desktop app can point at any gateway. Resolution order: the user's stored
+// gateway ('whatsacc.gateway_url'), then VITE_API_BASE_URL, then localhost.
+export { getApiBaseUrl } from './gateway';
 
 export type ApiErrorBody = {
   error: string;
@@ -98,7 +102,7 @@ async function refreshAccessToken(): Promise<boolean> {
   if (!refresh) return false;
   refreshing = (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const res = await gatewayFetch(`${getApiBaseUrl()}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh }),
@@ -122,14 +126,14 @@ async function refreshAccessToken(): Promise<boolean> {
 
 export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T> {
   const { body, headers, ...rest } = init;
-  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  const url = path.startsWith('http') ? path : `${getApiBaseUrl()}${path}`;
 
   const doRequest = async (): Promise<Response> => {
     const h = new Headers(headers as HeadersInit | undefined);
     if (body !== undefined && !h.has('Content-Type')) h.set('Content-Type', 'application/json');
     const access = tokenStore.access;
     if (access && !h.has('Authorization')) h.set('Authorization', `Bearer ${access}`);
-    return await fetch(url, {
+    return await gatewayFetch(url, {
       ...rest,
       headers: h,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -271,7 +275,7 @@ export const api = {
 
   countries: () => apiFetch<{ countries: CountryRef[] }>('/reference/countries'),
 
-  googleStartUrl: () => `${API_BASE_URL}/auth/google/start`,
+  googleStartUrl: () => `${getApiBaseUrl()}/auth/google/start`,
 
   accountUpdate: (accountId: string, body: { name?: string }) =>
     apiFetch<void>(`/accounts/${accountId}`, { method: 'PATCH', body }),

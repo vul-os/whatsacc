@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Avatar, resolveAvatarUrl } from '@/components/ui/Avatar';
 import { ApiError, api, type LocationRow } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { getApiBaseUrl, getStoredGatewayUrl, isTauri, openGatewayPicker } from '@/lib/gateway';
 
 export default function Settings() {
   const { currentAccount, user } = useAuth();
@@ -30,8 +31,40 @@ export default function Settings() {
         <ContactSection />
         <LocationsSection />
         {hasPassword ? <PasswordSection /> : <SignInIdentitySection />}
+        <GatewaySection />
       </div>
     </>
+  );
+}
+
+// Which gateway this portal talks to. On desktop (and for anyone who has
+// explicitly picked one) this is where you point the app somewhere else;
+// changing it signs you out of the current gateway.
+function GatewaySection() {
+  const custom = getStoredGatewayUrl() !== null;
+  return (
+    <Card>
+      <h2 className="font-display text-2xl">Gateway</h2>
+      <p className="text-sm text-ink/65 mt-1">
+        {isTauri()
+          ? 'The whatsacc gateway this desktop app is connected to.'
+          : 'The whatsacc gateway this portal is connected to.'}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <code className="rounded-xl bg-paper-cool border border-ink/10 px-4 py-2.5 text-[13.5px] text-ink/85 break-all">
+          {getApiBaseUrl()}
+        </code>
+        <span className="text-xs text-ink/45">{custom ? 'custom' : 'default'}</span>
+      </div>
+      <p className="mt-3 text-sm text-ink/60">
+        Switching gateways signs you out here — your account stays on its gateway.
+      </p>
+      <div className="mt-4">
+        <Button type="button" variant="outline" size="sm" onClick={openGatewayPicker}>
+          Change gateway
+        </Button>
+      </div>
+    </Card>
   );
 }
 

@@ -5,6 +5,7 @@ import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
+import { getApiBaseUrl, getStoredGatewayUrl, isTauri, openGatewayPicker } from '@/lib/gateway';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -42,16 +43,31 @@ export default function Login() {
         Sign in
       </h1>
       <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
-        Use your email and password, or continue with Google.
+        {isTauri()
+          ? 'Use your email and password to sign in.'
+          : 'Use your email and password, or continue with Google.'}
       </p>
 
-      <a
-        href={api.googleStartUrl()}
-        className="mt-5 sm:mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
-      >
-        <GoogleMark />
-        <span className="text-sm font-medium">Continue with Google</span>
-      </a>
+      {isTauri() ? (
+        // The Google OAuth redirect flow can't complete inside the desktop
+        // webview against an arbitrary gateway — password sign-in only here.
+        <div
+          aria-disabled="true"
+          title="Google sign-in isn’t available in the desktop app — use email + password."
+          className="mt-5 sm:mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/15 bg-paper-cool/40 opacity-45 cursor-not-allowed select-none"
+        >
+          <GoogleMark />
+          <span className="text-sm font-medium">Continue with Google</span>
+        </div>
+      ) : (
+        <a
+          href={api.googleStartUrl()}
+          className="mt-5 sm:mt-7 flex items-center justify-center gap-3 h-11 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
+        >
+          <GoogleMark />
+          <span className="text-sm font-medium">Continue with Google</span>
+        </a>
+      )}
 
       <div className="my-5 sm:my-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
         <span className="flex-1 h-px bg-ink/12" />
@@ -106,6 +122,21 @@ export default function Login() {
         </Link>
         .
       </p>
+
+      {/* Desktop builds (or anyone who explicitly picked a gateway) can point
+          this portal at a different gateway. Plain web deploys stay untouched. */}
+      {(isTauri() || getStoredGatewayUrl() !== null) && (
+        <p className="mt-3 text-xs text-ink/45">
+          Gateway: <span className="text-ink/60">{getApiBaseUrl()}</span>{' '}
+          <button
+            type="button"
+            onClick={openGatewayPicker}
+            className="underline underline-offset-4 decoration-terracotta text-ink/70 hover:text-ink"
+          >
+            change
+          </button>
+        </p>
+      )}
     </AuthLayout>
   );
 }

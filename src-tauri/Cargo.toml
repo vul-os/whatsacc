@@ -1,0 +1,31 @@
+[package]
+name = "whatsacc"
+version = "0.1.0"
+description = "whatsacc desktop portal — texts that open gates"
+authors = ["imranparuk"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+# The binary would collide with the lib name if we ever add one; keep explicit.
+[[bin]]
+name = "whatsacc"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+# Native fetch for the webview: gateways enforce a strict CORS allowlist that
+# can never include the Tauri origin, so all API traffic goes through this
+# plugin (see src/lib/gateway.ts).
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true

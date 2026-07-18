@@ -40,3 +40,7 @@ backend/.secrets.*.json
 
 # wrangler local-dev secrets (per-developer)
 backend/.dev.vars
+
+# tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
