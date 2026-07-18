@@ -83,7 +83,7 @@ npm run screenshotter   # boots the app with mocked data → site/screenshots/{,
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
-| `gateway/`    | Go single-binary gateway (SQLite, embedded portal, channel seam) | 🔨 next |
+| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes | 🚧 skeleton, porting from `backend/` |
 | `controller/` | Gate device agent + reference wiring                             | 🔨 planned |
 | `app/`        | Svelte 5 + Tauri v2 — admin console + offline emergency access   | 🔨 planned |
 
