@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"flag"
@@ -21,6 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/vul-os/whatsacc/gateway/internal/channels"
 	"github.com/vul-os/whatsacc/gateway/internal/httpapi"
 	"github.com/vul-os/whatsacc/gateway/internal/keys"
 	"github.com/vul-os/whatsacc/gateway/internal/store"
@@ -83,7 +85,15 @@ func run(dataDir, listen, publicURL, claimToken string, log *slog.Logger) error 
 		// Rate-limit env layer (db overrides via PATCH /v1/admin/limits sit on
 		// top; see store.ResolveRateLimitConfig).
 		RateLimits: store.ParseRateLimitConfig(os.Getenv),
+		// Chat channels (WhatsApp/Slack/Telegram): env-named per the backend.
+		Channels: channels.FromEnv(os.Getenv, publicURL),
 	}, st, ks, log)
+
+	// Always-on channel workers (Slack Socket Mode, when SLACK_APP_TOKEN set)
+	// live for the process lifetime.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv.StartChannels(ctx)
 
 	log.Info("whatsacc gateway", "version", Version, "listen", listen,
 		"data", dataDir, "gateway_key", ks.PublicKeyB64())

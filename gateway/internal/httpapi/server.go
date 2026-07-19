@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vul-os/whatsacc/gateway/internal/channels"
 	"github.com/vul-os/whatsacc/gateway/internal/hub"
 	"github.com/vul-os/whatsacc/gateway/internal/keys"
 	"github.com/vul-os/whatsacc/gateway/internal/portal"
@@ -31,6 +32,10 @@ type Config struct {
 	// RateLimits is the env layer of the rate-limit config (defaults
 	// merged in main via store.ParseRateLimitConfig). Zero value = defaults.
 	RateLimits store.RateLimitConfig
+	// Channels holds the chat-channel credentials (WhatsApp/Slack/Telegram).
+	// Zero value = every channel refuses its webhook (fail-closed) and its
+	// sender is a config-unset no-op.
+	Channels channels.Config
 }
 
 // Server wires the store, signing keys, device hub and config into an
@@ -41,6 +46,16 @@ type Server struct {
 	keys  *keys.Keys
 	hub   *hub.Hub
 	log   *slog.Logger
+
+	// Chat-channel seam (internal/channels). The Channel values authenticate
+	// inbound webhooks; the senders are interfaces so tests inject fakes.
+	wa        channels.WhatsApp
+	slack     channels.Slack
+	tg        channels.Telegram
+	waSend    channels.WhatsAppSender
+	slackSend channels.SlackSender
+	tgSend    channels.TelegramSender
+	socket    *channels.SocketMode // non-nil only when a Slack app token is set
 }
 
 // New builds a Server.
@@ -57,11 +72,37 @@ func New(cfg Config, st *store.Store, ks *keys.Keys, log *slog.Logger) *Server {
 	if (cfg.RateLimits == store.RateLimitConfig{}) {
 		cfg.RateLimits = store.RateLimitDefaults
 	}
-	return &Server{cfg: cfg, store: st, keys: ks, hub: hub.New(), log: log}
+	if cfg.Channels.PublicURL == "" {
+		cfg.Channels.PublicURL = cfg.PublicURL
+	}
+	s := &Server{cfg: cfg, store: st, keys: ks, hub: hub.New(), log: log}
+	ch := cfg.Channels
+	s.wa = channels.WhatsApp{AppSecret: ch.WhatsAppAppSecret, VerifyToken: ch.WhatsAppVerifyToken, PublicURL: ch.PublicURL}
+	s.slack = channels.Slack{SigningSecret: ch.SlackSigningSecret}
+	s.tg = channels.Telegram{WebhookSecret: ch.TelegramWebhookSecret}
+	s.waSend = &channels.HTTPWhatsAppSender{AccessToken: ch.WhatsAppAccessToken, PhoneNumberID: ch.WhatsAppPhoneNumberID, GraphVersion: ch.WhatsAppGraphVersion}
+	s.slackSend = &channels.HTTPSlackSender{BotToken: ch.SlackBotToken}
+	s.tgSend = &channels.HTTPTelegramSender{BotToken: ch.TelegramBotToken}
+	if ch.SlackAppToken != "" {
+		// Socket Mode: the zero-URL path. Events + interactions arrive over the
+		// outbound WebSocket and are fed through the SAME handlers as the webhook.
+		s.socket = &channels.SocketMode{AppToken: ch.SlackAppToken, Logger: log, Handle: s.handleSlackSocketEnvelope}
+	}
+	return s
 }
 
 // Hub exposes the device hub (tests + channel integrations).
 func (s *Server) Hub() *hub.Hub { return s.hub }
+
+// StartChannels launches any always-on channel workers (Slack Socket Mode)
+// bound to ctx. No-op unless a Slack app token is configured. Call once after
+// New; it returns immediately (workers run in the background).
+func (s *Server) StartChannels(ctx context.Context) {
+	if s.socket != nil && s.socket.Enabled() {
+		s.log.Info("slack socket mode enabled (zero public URL)")
+		go s.socket.Run(ctx)
+	}
+}
 
 // Router builds the mux. Later-ported route groups (accounts, locations,
 // access, devices, channels, admin console) attach here.
@@ -132,11 +173,25 @@ func (s *Server) Router() http.Handler {
 	// proto/pairing.md)
 	mux.Handle("GET /v1/devices", s.requireAuth(s.handleDevicesList))
 	mux.Handle("POST /v1/devices", s.requireAuth(s.handleDeviceCreate))
+	// proto/pairing.md's diagram specifies POST /pair/redeem — that's the path
+	// the controller builds from its --gateway URL. Serve it there (spec form)
+	// and keep the /api alias for existing callers.
+	mux.HandleFunc("POST /pair/redeem", s.handlePairRedeem)
 	mux.HandleFunc("POST /api/pair/redeem", s.handlePairRedeem)
 	mux.HandleFunc("GET /api/controller/ws", s.handleControllerWS)
 	mux.HandleFunc("POST /api/controller/challenge", s.handleControllerChallenge)
 	mux.HandleFunc("POST /api/controller/poll", s.handleControllerPoll)
 	mux.HandleFunc("POST /api/controller/ack", s.handleControllerAck)
+
+	// chat channels (spec: backend/src/routes/{whatsapp,slack,telegram}.ts).
+	// Unauthenticated by design: each self-authenticates its provider signature
+	// / secret token (fail-closed), then funnels opens through the SAME
+	// store.LogAccess choke point + hub dispatch the /v1 open route uses.
+	mux.HandleFunc("GET /webhooks/whatsapp", s.handleWhatsAppVerify)
+	mux.HandleFunc("POST /webhooks/whatsapp", s.handleWhatsAppWebhook)
+	mux.HandleFunc("POST /webhooks/slack", s.handleSlackEvents)
+	mux.HandleFunc("POST /webhooks/slack/interactions", s.handleSlackInteractions)
+	mux.HandleFunc("POST /webhooks/telegram", s.handleTelegramWebhook)
 
 	// embedded portal seam — everything unmatched falls through to it
 	mux.Handle("/", portal.Handler())

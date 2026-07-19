@@ -7,6 +7,7 @@ package httpapi
 // the access point's controller over the device hub.
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -83,7 +84,7 @@ func (s *Server) handleOp(w http.ResponseWriter, r *http.Request, command string
 		return
 	}
 
-	delivery := s.dispatchCommand(r, command, verdict)
+	delivery := s.dispatchCommand(r.Context(), command, verdict)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "command": command, "delivery": delivery,
 	})
@@ -97,7 +98,7 @@ func (s *Server) handleOp(w http.ResponseWriter, r *http.Request, command string
 //	queued       offline — queued for the long-poll fallback
 //	no_device    access point has no controller attached (backend parity:
 //	             the open still succeeds; dispatch was a backend TODO)
-func (s *Server) dispatchCommand(r *http.Request, command string, verdict *store.LogAccessResult) string {
+func (s *Server) dispatchCommand(ctx context.Context, command string, verdict *store.LogAccessResult) string {
 	if verdict.AP.DeviceID == "" {
 		return "no_device"
 	}
@@ -105,10 +106,10 @@ func (s *Server) dispatchCommand(r *http.Request, command string, verdict *store
 	env, err := s.keys.SignCommand(command, verdict.AP.DeviceID, verdict.AP.ID, 30*time.Second, cause)
 	if err != nil {
 		s.log.Error("sign command", "err", err)
-		_ = s.store.UpdateAccessLogError(r.Context(), verdict.LogID, "undelivered")
+		_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, "undelivered")
 		return "undelivered"
 	}
-	outcome := s.hub.Dispatch(r.Context(), verdict.AP.DeviceID, env, s.cfg.AckTimeout)
+	outcome := s.hub.Dispatch(ctx, verdict.AP.DeviceID, env, s.cfg.AckTimeout)
 	switch outcome.Delivery {
 	case "acked":
 		if outcome.Result == "denied" || outcome.Result == "error" {
@@ -116,10 +117,10 @@ func (s *Server) dispatchCommand(r *http.Request, command string, verdict *store
 			if outcome.Detail != "" {
 				tag += ":" + outcome.Detail
 			}
-			_ = s.store.UpdateAccessLogError(r.Context(), verdict.LogID, tag)
+			_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, tag)
 		}
 	case "undelivered":
-		_ = s.store.UpdateAccessLogError(r.Context(), verdict.LogID, "undelivered")
+		_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, "undelivered")
 	}
 	return outcome.Delivery
 }

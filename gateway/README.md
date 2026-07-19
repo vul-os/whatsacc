@@ -14,11 +14,14 @@ device), temporary grants, and the platform-admin console. `go build ./...`,
 `go vet ./...`, `go test ./...` are green (default build); `-tags portal`
 builds and tests green too.
 
-Remaining (not blocking the core): channel webhooks (WhatsApp/Telegram/Slack),
-phone-OTP verify routes, analytics endpoints, maintenance/meter records +
-device-fed movement metering, Google OAuth / email-verify / password-reset
-ceremony, and dropping the real Vite bundle into `internal/portal/dist/`. See
-the porting map below.
+The chat channels are now ported too: **WhatsApp, Slack (Events API + Socket
+Mode) and Telegram** all funnel opens through the same open-path choke point.
+See **Chat channels** below.
+
+Remaining (not blocking the core): phone-OTP verify routes, analytics
+endpoints, maintenance/meter records + device-fed movement metering, Google
+OAuth / email-verify / password-reset ceremony, and dropping the real Vite
+bundle into `internal/portal/dist/`. See the porting map below.
 
 **Works today**
 
@@ -61,11 +64,82 @@ When `proto/vectors/` lands, point the tests at it and extend if needed.
 - `0003_openpath.sql` — temporary_access_grants (+ access-point join),
   rate_limit_counters, rate_limit_cooldowns.
 - `0004_admin_audit.sql` — admin_audit_log.
+- `0005_channels.sql` — channel_identities (`(channel, external_id)` →
+  profile), channel_chats + channel_messages (chat/message log, inbound dedupe
+  via a partial unique index on `(channel, provider_message_id)`).
 
 Still deferred (ported with their routes): countries, oauth_identities,
 password/email token tables, device_commands (dispatch is in-memory via the
-hub for now), channel chat/message tables, maintenance_events +
-access_point_meters (movement metering).
+hub for now), maintenance_events + access_point_meters (movement metering).
+(The channel chat/message tables landed in `0005_channels.sql`.)
+
+## Chat channels
+
+The channel seam (`internal/channels`) is deliberately small: authenticate an
+inbound webhook (fail-closed), turn a message into an intent, render a reply.
+Everything behind it is channel-agnostic — **every open, on every channel,
+funnels through the one `store.LogAccess` choke point** (`store/openpath.go`)
+the HTTP `/v1/.../open` route uses, then the same sign-and-dispatch to the
+controller. A channel decides how to ask and how to reply; it never decides
+whether the gate may open. Identity is keyed on `(channel, external id)`
+(`channel_identities`), except WhatsApp whose identity is the **verified phone**
+(`profile_phone_numbers`).
+
+| Channel | Endpoint(s) | Auth (fail-closed) | Identity |
+| --- | --- | --- | --- |
+| WhatsApp | `GET/POST /webhooks/whatsapp` | `X-Hub-Signature-256` HMAC (app secret); GET verify-token handshake; `phone_number_id` filter | verified phone |
+| Slack | `POST /webhooks/slack` + `/webhooks/slack/interactions`, **or Socket Mode** | signing secret, 300 s replay window (missing headers never skip); Socket Mode uses the app token | `slack_user_id` |
+| Telegram | `POST /webhooks/telegram` | `X-Telegram-Bot-Api-Secret-Token` | telegram user id |
+
+- **WhatsApp** ports the full conversational contract from
+  `backend/src/routes/whatsapp.ts`: interactive **list picker** for multiple
+  access points, location select, welcome / linked-locations copy, unlinked
+  **signup prompt**, **visitor grants** (consume + refund-on-denial), honest
+  denial replies (`rate_limited`/`quota_exceeded`/`account_suspended`/
+  `user_disabled` — exact strings), message-id **dedupe**, and the flood
+  throttle (bot goes quiet past the per-minute cap, webhook still `200`).
+- **Slack** runs the Events API + interactions webhooks, **and Socket Mode**.
+- **Telegram** — the Workers backend is an honest stub (links, logs,
+  flood-throttles, replies `success`/`failed`). **This gateway wires it to the
+  REAL open path**: a linked user's `open` runs the choke point, with an
+  inline-keyboard picker when several gates are available and callback taps
+  re-entering the same path. This **exceeds the backend stub**.
+
+### Slack Socket Mode — the zero-URL install (ARCHITECTURE §4)
+
+If `SLACK_APP_TOKEN` (an `xapp-…` app-level token) is configured, the gateway
+**dials out** to Slack over a single outbound WebSocket instead of receiving
+webhooks: `apps.connections.open` → `wss://…` → receive `events_api` /
+`interactive` envelopes → ack each `envelope_id` → feed the payload through the
+**same** handlers the webhook uses. A gateway on a LAN with **no public URL**
+still runs Slack fully — this is what makes "a Pi on the estate LAN is a
+complete installation" real. It is gated behind config (no token → no dial),
+uses `github.com/coder/websocket` (the hub's existing dependency), and is
+launched by `Server.StartChannels(ctx)` from `main` with automatic reconnect.
+
+### Configuration (env, names match the backend)
+
+```sh
+# WhatsApp (Meta Cloud API)
+WHATSAPP_APP_SECRET=…          # HMAC secret for POST webhooks (required to accept)
+WHATSAPP_VERIFY_TOKEN=…        # GET handshake token
+WHATSAPP_ACCESS_TOKEN=…        # Graph send (unset → outbound is a logged no-op)
+WHATSAPP_PHONE_NUMBER_ID=…     # ours; other numbers on the WABA are ignored
+WHATSAPP_GRAPH_VERSION=v21.0   # optional
+
+# Slack
+SLACK_SIGNING_SECRET=…         # required to accept webhooks (fail-closed)
+SLACK_BOT_TOKEN=xoxb-…         # chat.postMessage
+SLACK_APP_TOKEN=xapp-…         # OPTIONAL → enables Socket Mode (zero public URL)
+
+# Telegram
+TELEGRAM_BOT_TOKEN=…           # Bot API send
+TELEGRAM_WEBHOOK_SECRET=…      # must match the secret_token you register
+```
+
+Every sender no-ops (returns a logged `…_unset` error) when its credentials are
+unconfigured, so a half-configured install still records replies without
+crashing — exactly the backend's behaviour.
 
 ## Build / run / test
 
@@ -100,7 +174,7 @@ bearer token. Exactly one caller can ever win; the mechanism burns forever.
 | `routes/access.ts` access points + **open/close** + grants | `internal/httpapi/{access,open}.go` + `store/{accesspoints,openpath,grants}.go` | **done** — open path signs envelopes (`internal/keys`) and dispatches via the hub; maintenance/meters deferred |
 | `lib/rate-limit.ts` | `store/ratelimit.go` + `store/openpath.go` | **done** (SQLite atomic try-bump; exact-once under concurrency) |
 | `routes/devices.ts` (+ `proto/pairing.md`) | `internal/httpapi/devices.go` + `internal/hub` | **done** — claim/redeem, WS challenge/auth, ack correlation, HTTPS long-poll fallback |
-| `routes/whatsapp.ts` / `slack.ts` / `telegram.ts` | `internal/channel/` seam (per ARCHITECTURE §3a) | planned |
+| `routes/whatsapp.ts` / `slack.ts` / `telegram.ts` | `internal/channels/` seam + `internal/httpapi/channels_*.go` | **done** — WhatsApp full contract, Slack Events API **+ Socket Mode** (zero-URL), Telegram wired to the real open path (exceeds the backend stub) |
 | `routes/analytics.ts` | `internal/httpapi/analytics.go` | planned |
 | `routes/phones.ts` (OTP verify) | with profile_phone_numbers migration | planned (schema + invite-side linking done; verify routes pending) |
 | React portal (`../src`, Vite) | embedded via `internal/portal` (`-tags portal`) | **seam done** — placeholder default; `make portal && make build-portal` embeds the real bundle |
@@ -133,6 +207,8 @@ gateway/
 │                         #   locations, access, open path, devices, admin
 ├── internal/hub/         # device registry, ws.challenge/auth, ack correlation
 ├── internal/keys/        # Ed25519 identity, JCS, signed command envelopes
+├── internal/channels/    # chat-channel seam: verify, wire parse, render, senders,
+│                         #   Slack Socket Mode (coder/websocket)
 └── internal/portal/      # go:embed portal seam: static/ default, dist/ (-tags portal)
 ```
 
