@@ -7,7 +7,8 @@
 **Texts that open gates.**
 
 Open physical gates, doors and barriers from the chat apps people already use —
-WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
+WhatsApp, Slack (incl. Socket Mode) and Telegram today, Discord soon. Geofenced,
+audited, built for trust.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-1a1f36.svg)](LICENSE)
 [![Architecture](https://img.shields.io/badge/read-ARCHITECTURE.md-d6624d.svg)](ARCHITECTURE.md)
@@ -151,8 +152,13 @@ Contract suites skip cleanly without keys — see [`site/docs/`](site/docs/) for
 
 ## How it works
 
-Everything server-side is **one binary** (today: the Cloudflare Workers backend in
-`backend/`, the spec for the Go port in `gateway/`). The gateway receives channel
+Everything server-side is **one binary**. The **Go gateway** in `gateway/` is that
+binary and now runs the product core — auth, accounts, locations, access points,
+controller pairing + the WebSocket device hub, the Ed25519-signed open path, admin
+console, rate limits, and the WhatsApp / Slack (Events API + Socket Mode) / Telegram
+channels — on one Go binary with one SQLite file. The mature Cloudflare Workers backend
+in `backend/` is the behavioural reference it was ported from (and still ahead on a few
+deferred surfaces: OTP verify, analytics, OAuth, meters). The gateway receives channel
 webhooks, runs the rules, serves the portal and the app's API, holds the audit log, and
 pushes signed open commands to controllers. Controllers dial **out** to the gateway, so
 they work behind NAT and on CGNAT'd 4G SIMs with zero inbound ports.
@@ -190,7 +196,7 @@ tuning, admin claim token) is documented in
 | [Getting started](site/docs/getting-started.md) | Fastest path to your first opened gate |
 | [Run a gateway](site/docs/self-host.md) | Full self-host walkthrough, install, backup/restore |
 | [Ingress & reachability](site/docs/ingress.md) | Which channels need a public URL, and the honest options if yours does |
-| [Chat channels](site/docs/channels.md) | WhatsApp, Slack, Telegram (beta), Discord (coming) |
+| [Chat channels](site/docs/channels.md) | WhatsApp, Slack (Events API + Socket Mode), Telegram, Discord (coming) |
 | [Controllers](site/docs/controllers.md) | Wiring a gate device |
 | [Emergency access](site/docs/emergency-access.md) | The offline LAN/BLE grant path |
 | [Architecture](site/docs/architecture.md) · [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design |
@@ -210,16 +216,18 @@ static site, host it anywhere; it also syncs into the
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
-| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes, channel seam | 🚧 in progress, porting from `backend/` |
-| `controller/` | Gate device agent + reference wiring                             | 🚧 in progress |
-| `e2e/`        | End-to-end suites against the Go gateway + controller             | 🚧 in progress |
-| `app/`        | Svelte 5 + Tauri v2 — admin console + offline emergency access   | 🔨 planned |
+| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes, WhatsApp/Slack/Telegram channels, admin console | 🟢 runs the product core |
+| `controller/` | Gate device agent — pairing, key pinning, signed-command verification, offline LAN/BLE grants | 🟢 reference impl real; GPIO relay + BLE radio need real hardware (`-tags gpio` / `-tags ble`) |
+| `e2e/`        | Cross-module suite — real gateway + controller binaries over the wire, money path proven | 🟢 |
+| `src-tauri/`  | Tauri v2 desktop shell wrapping `src/` — gateway picker (any gateway, not build-time-fixed) | 🟢 |
+| `app/`        | A dedicated Svelte 5 rewrite of the app — today's desktop app is `src/` + `src-tauri/` (React 19) instead | 🔨 not started, not needed short-term |
 
 The running Workers stack is the behavioral reference: its routes, tenancy semantics,
 chat flows and test suites define what the Go gateway must do. Build/test commands per
 directory: see the test block under [Quick start](#quick-start-standalone) for
-`backend/`, and `cd gateway && make check` (or `go test ./...`) for the Go gateway once
-you're working there.
+`backend/`, `cd gateway && make check` (or `go test ./...`) for the Go gateway,
+`cd controller && go build ./...` for the controller agent, and `cd e2e && go test ./...`
+for the cross-module harness.
 
 Dev setup, test suites and style live in [CONTRIBUTING.md](CONTRIBUTING.md).
 

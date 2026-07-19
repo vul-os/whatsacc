@@ -9,6 +9,51 @@ Because the connection is outbound (persistent WebSocket), a controller works be
 NAT, behind CGNAT on a prepaid SIM, and behind whatever router your complex's IT
 volunteer configured in 2014. Zero inbound ports, zero port-forwarding.
 
+## The reference agent (real today)
+
+The agent in [`controller/`](https://github.com/vul-os/whatsacc/tree/main/controller) is
+a real, standalone Go module — std-lib first, no CGO. What's **implemented and
+conformance-tested** against the `proto/` vectors: fail-closed command verification
+(signature, addressing, replay window, lockdown), pairing with gateway-key **pinning**,
+a durable signed event queue, the WSS transport, and **offline grants over both LAN/mDNS
+and BLE** (the BLE framing codec + session verified at ATT MTUs 23/185/512). A
+cross-module e2e harness boots the real gateway and controller binaries together and
+proves the money path end to end.
+
+**Kept honest — what is still stubbed:**
+
+- **GPIO relay driver** — a `-tags gpio` scaffold; the default build uses a mock relay
+  that logs actuations. Wiring a real relay means implementing `internal/relay` behind
+  `-tags gpio` (fail-safe: the line drops on exit/panic → gate closed).
+- **BLE radio** — the framing/session logic is real and tested, but the GATT peripheral
+  glue compiles only under `-tags ble` on Linux/BlueZ and is **not yet
+  hardware-validated**.
+- **Position/tamper sensors** — the `Sensors` interface returns static values today.
+
+Build and drive it without any hardware:
+
+```sh
+cd whatsacc/controller
+go build ./...                                   # default build, zero external deps
+
+# Live agent against a dev gateway (mock relay; prints state transitions)
+go run ./cmd/controller-sim --gateway http://localhost:8080 --claim-token <TOKEN>
+
+go run ./cmd/controller-sim --offline-demo       # replays offline-grant vectors + a live LAN open
+go run ./cmd/controller-sim --ble-demo           # BLE grant flow through the framing codec (no radio)
+```
+
+On a real device the agent pairs once with a claim token and persists the result:
+
+```sh
+go run ./cmd/controller \
+  --state /var/lib/whatsacc --gateway https://gate.example.com \
+  --claim-token <TOKEN> --access-points <ACCESS_POINT_ID>
+```
+
+`--lan :8737` serves offline grants on the LAN (on by default); `--ble` enables the BLE
+peripheral (requires a `-tags ble` Linux build).
+
 ## Wiring (in 30 seconds)
 
 The controller's relay sits **in parallel** with your existing remote receiver's relay.

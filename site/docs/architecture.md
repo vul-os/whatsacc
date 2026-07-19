@@ -19,7 +19,7 @@ question is the decentralization, made visible.
 ## The system at a glance
 
 ```
-resident ── "open" ──► WhatsApp / Slack (Discord soon)
+resident ── "open" ──► WhatsApp / Slack / Telegram (Discord soon)
                               │ webhook (signature-verified)
                               ▼
         ┌──────────── GATEWAY — one Go binary · SQLite ────────────┐
@@ -45,9 +45,23 @@ directly to the controller over LAN/BLE with an offline-verifiable grant
 | --- | --- | --- | --- |
 | **gateway** | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · embedded portal |
 | **controller** | The unit wired to the gate relay; verifies signatures, drives the motor | Pi-class board, Wi-Fi or GSM | Go agent |
-| **app** | Admin console + emergency access | Desktop, iOS, Android | Svelte 5 · Tauri v2 |
+| **app** | Admin console + emergency access | Desktop, iOS, Android | React 19 · Tauri v2 today (gateway picker shipped); a Svelte 5 rewrite is a longer-term target, not started |
 | **web** | whatsacc.com — landing, docs, downloads | Any static host | Static |
 | **proto** | The versioned wire contracts | — | Markdown + schemas |
+
+### Two implementations, one target
+
+The server exists in two forms. The **Go gateway** (`gateway/`) is the target and is now
+the primary implementation: it runs the product core today — auth, accounts, locations,
+access points, controller pairing and the WebSocket device hub, the Ed25519-signed open
+path, the admin console, rate limits, and the WhatsApp / Slack (Events API + Socket Mode)
+/ Telegram channels — on one Go binary with one SQLite file. The mature **Cloudflare
+Workers backend** (`backend/`) is the behavioural reference it was ported from, still
+running and still ahead on a few surfaces the gateway defers (phone-OTP verify, analytics,
+Google OAuth / email-verify / password-reset, meters, the real portal bundle). The
+**controller** (`controller/`) is a real reference Go agent, and a cross-module **e2e**
+harness boots both shipped binaries and proves they interoperate over the real wire —
+the money path (verdict → signed envelope → controller → ack) and the adversarial cases.
 
 ## The three access paths
 
@@ -82,12 +96,16 @@ be reachable, in increasing order of self-sufficiency:
 2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel — run beside
    the binary; tunnels compose at the HTTP layer, so independence from any one provider
    is structural, not a promise.
-3. **No public URL at all** — the design goal. Controllers dial out today; Slack
-   Socket Mode (planned, ships with the Go gateway) and Discord's bot gateway, when
-   it lands, are outbound connections too. Once those land, a LAN-only gateway is a
-   complete installation and only WhatsApp webhooks and remote portal/app access need
-   a URL; today's Slack integration is the Events API over the public webhook, so
-   Slack currently needs one as well.
+3. **No public URL at all** — real today, not aspirational. Controllers dial out, and
+   Slack **Socket Mode ships**: with an `xapp-…` app-level token the gateway dials out
+   to Slack over an outbound WebSocket, so a LAN-only gateway with no reachable address
+   runs Slack end to end. Discord's bot gateway, when it lands, is outbound too. Only
+   WhatsApp webhooks, the Telegram webhook, and remote portal/app access need a public
+   URL; a Slack-only install on an estate LAN needs none.
+
+The full option-by-option breakdown — public bind, any tunnel (incl. self-hosted
+`vulos-relayd`), the paid Vulos Relay convenience, and which channels need zero
+ingress — is in [Ingress & reachability](ingress.md).
 
 ## The contracts that must not break
 
@@ -107,7 +125,7 @@ Binaries can churn; these can only be extended.
 | --- | --- | --- |
 | Gateway language | Go | Single small static binary, ARM-friendly, embedded portal |
 | Database | SQLite | Zero-dependency self-hosting; one file to back up |
-| Frontend | Svelte 5 | One codebase → embedded portal + Tauri apps; small output |
-| Apps | Tauri v2 | Desktop + iOS + Android from one codebase |
+| Frontend | Svelte 5 (target) | One codebase → embedded portal + Tauri apps; small output. Today's shipped app is still React 19 — see [Components](#components) |
+| Apps | Tauri v2 | Desktop + iOS + Android from one codebase — the desktop shell (gateway picker) ships today |
 | Billing | None — no billing code at all | Everything is free; self-hosters pay their own providers directly |
 | License | MIT, everything | The whole system is the product; nothing is held back |

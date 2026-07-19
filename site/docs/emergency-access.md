@@ -36,6 +36,21 @@ internet down, at the gate: app ◄── mDNS / BLE ──► controller
 No step involves the internet, the gateway, or any whatsacc server. A recorded exchange
 is useless later: the nonce makes every challenge unique.
 
+## What's implemented
+
+The controller side of this path is **real and conformance-tested** in the reference
+agent ([`controller/`](https://github.com/vul-os/whatsacc/tree/main/controller)): the
+11-step offline-grant verification (signature, expiry, rights, single-use nonce,
+stale-clock handling), shared by both transports. **LAN/mDNS works today** — the agent
+advertises `_whatsacc._tcp` and serves grants over LAN HTTP, and the cross-module e2e
+harness redeems a real gateway-signed grant over the LAN with the gateway absent. The
+**BLE** path's framing codec and open→challenge→proof→result session are implemented and
+unit-tested at ATT MTUs 23/185/512; the **BLE radio (GATT peripheral) still needs
+hardware validation** — its BlueZ glue compiles behind `-tags ble` on Linux but has not
+been exercised on real hardware yet. The app (Tauri) side that pairs with it is the
+remaining build. Nothing here is faked: the verification logic that decides to open is
+the part that had to be right first, and it is.
+
 ## Revocation and expiry
 
 Grants are short-TTL and refreshed whenever the app opens with connectivity. Revoking a

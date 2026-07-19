@@ -18,21 +18,23 @@ detail.
 
 ## The six steps
 
-1. **Run the gateway.** One binary, one SQLite file, portal embedded:
-
-   > **Status — gateway in development.** The single-binary Go gateway is in
-   > development. Today the reference implementation runs as the Workers backend in
-   > this repo (`backend/` — see the repo README for dev setup); the commands below
-   > describe the target install experience and will go live with the gateway.
+1. **Run the gateway.** One binary, one SQLite file, portal seam embedded. The Go
+   gateway in `gateway/` implements this today — build it from source:
 
    ```sh
-   docker run -d --name whatsacc \
-     -p 8080:8080 -v whatsacc:/data \
-     ghcr.io/vul-os/whatsacc-gateway
+   git clone https://github.com/vul-os/whatsacc
+   cd whatsacc/gateway && go build ./cmd/gateway
+   ./gateway -data /var/lib/whatsacc -listen :8080
    ```
 
-   Or grab the release binary — `./whatsacc-gateway --data /var/lib/whatsacc`. Details,
-   reachability options and backups in [Run a gateway](self-host.md).
+   > **Status.** The gateway runs the product core now (auth, accounts, locations,
+   > access points, controller pairing + hub, the signed open path, admin console,
+   > rate limits, and the WhatsApp/Slack/Telegram channels). Still deferred: phone-OTP
+   > verify, analytics, Google OAuth / email-verify / password-reset, meters, and the
+   > real portal bundle. A Docker image builds from the `Dockerfile` in `gateway/`; the
+   > `ghcr.io/vul-os/whatsacc-gateway` image is CI-built but not auto-published yet.
+
+   Details, reachability options and backups in [Run a gateway](self-host.md).
 2. **Claim the admin account.** Open the portal and sign up — the first account you
    create is the owner account. If you're also the person *running* the gateway,
    claim the **instance admin** seat too: set `ADMIN_CLAIM_TOKEN` in the environment

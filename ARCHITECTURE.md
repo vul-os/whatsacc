@@ -1,7 +1,7 @@
 # whatsacc architecture
 
 > **Texts that open gates.** A decentralized access-control system where a chat message —
-> WhatsApp, Slack, Discord — opens a physical gate, door or barrier.
+> WhatsApp, Slack, Telegram, Discord soon — opens a physical gate, door or barrier.
 
 whatsacc has no cloud. It is just the **system**: a gateway you run, controllers at
 your gates, an app in your pocket — every line MIT-licensed, nothing hosted by us.
@@ -23,8 +23,9 @@ flowchart LR
 
     subgraph channels ["Chat channels"]
         WA["WhatsApp<br/>(Meta Cloud API)"]
-        DC["Discord bot"]
-        SL["Slack bot"]
+        TG["Telegram bot"]
+        SL["Slack bot<br/>(Events API / Socket Mode)"]
+        DC["Discord bot<br/>(coming)"]
     end
 
     subgraph gw ["GATEWAY — one Go binary · SQLite"]
@@ -42,8 +43,8 @@ flowchart LR
 
     APP["📱 whatsacc app<br/>Tauri · Svelte"]
 
-    R -- "“open”" --> WA & DC & SL
-    WA & DC & SL --> CH
+    R -- "“open”" --> WA & TG & SL & DC
+    WA & TG & SL & DC --> CH
     CH --> RE
     A -- HTTPS --> PORTAL
     APP -- HTTPS --> PORTAL
@@ -65,9 +66,10 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 
 | Component      | What it is                                                                | Runs on                              | Stack                          |
 | -------------- | ------------------------------------------------------------------------- | ------------------------------------ | ------------------------------ |
-| **gateway**    | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
-| **controller** | The unit wired to the gate relay; verifies signatures, drives the motor    | Pi-class board at the gate, Wi-Fi or GSM | Go agent (+ vendor firmware)  |
-| **app**        | Admin console + **emergency access** for residents                         | Desktop, iOS, Android                | Svelte 5 · Tauri v2            |
+| **gateway**    | The entire server: channels, rules, portal, API, device hub, audit — runs the product core today | Any VPS / Pi / server with a public URL | Go · SQLite · `go:embed` portal |
+| **controller** | The unit wired to the gate relay; verifies signatures, drives the motor. Reference agent is real and conformance-tested; GPIO relay + BLE radio are the hardware-only surfaces still stubbed | Pi-class board at the gate, Wi-Fi or GSM | Go agent, own module (`-tags gpio`/`-tags ble` for hardware) |
+| **e2e**        | Cross-module harness: boots real gateway + controller binaries and proves the money path over the wire | CI, dev machine | Go, subprocess-driven |
+| **app**        | Admin console + **emergency access** for residents. Ships today as `src/` + `src-tauri/` (gateway picker included); a Svelte 5 rewrite is a longer-term target, not started | Desktop, iOS, Android                | React 19 · Tauri v2 (target: Svelte 5) |
 | **site**       | Marketing landing + docs — static mini-site (house format), fully separate from the app | Any static host · Vulos console sync | static HTML + markdown docs    |
 | **proto**      | The versioned wire contracts (see §7)                                      | —                                    | Markdown + schemas             |
 
@@ -75,15 +77,18 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 
 ```
 whatsacc/
-├── backend/      # current API — Cloudflare Workers · Hono · Postgres (spec for the Go port)
-├── src/          # current portal + marketing — React 19 · Vite
+├── backend/      # Cloudflare Workers · Hono · Postgres — behavioural reference the gateway ports from,
+│                 # still ahead on: phone-OTP verify, analytics, OAuth/email-verify/password-reset, meters
+├── src/          # current portal + marketing — React 19 · Vite (wrapped by src-tauri/ for desktop)
+├── src-tauri/    # Tauri v2 desktop shell — gateway picker, wraps src/
 ├── scripts/      # screenshotter (Playwright product shots)
 ├── site/         # marketing mini-site — hand-written index.html + docs.html + markdown docs (static)
-├── proto/        # pairing · signed commands · grants · events contracts
-├── gateway/      # 🔨 next: Go, the whole product server
+├── proto/        # pairing · signed commands · grants · events contracts (+ vectors/ conformance fixtures)
+├── gateway/      # 🟢 shipped: Go, the whole product server (auth, rules, hub, admin, channels)
 │   └── migrations/   # SQLite schema, clean folded baseline
-├── controller/   # 🔨 planned: gate device agent + reference wiring
-└── app/          # 🔨 planned: Svelte 5 + Tauri v2 (also builds gateway's embedded portal)
+├── controller/   # 🟢 shipped: reference gate device agent (own Go module); GPIO/BLE need real hardware
+├── e2e/          # 🟢 shipped: cross-module suite, real gateway+controller binaries over the wire
+└── app/          # 🔨 not started: a dedicated Svelte 5 rewrite (today's app is src/ + src-tauri/)
 ```
 
 ---
@@ -100,8 +105,9 @@ resolves a sender to an identity, turns a message into an intent, and sends repl
 | Channel      | Identity            | Transport             | Friction to self-host        |
 | ------------ | ------------------- | --------------------- | ---------------------------- |
 | **WhatsApp** | phone number        | Meta Cloud API webhook | High — needs a verified WABA |
-| **Discord**  | user id             | bot gateway / webhook  | Minutes — bot token          |
-| **Slack**    | member id           | Events API             | Minutes — app manifest       |
+| **Slack**    | member id           | Events API webhook, or Socket Mode (outbound WSS, zero ingress) | Minutes — app manifest |
+| **Telegram** | chat id             | Webhook today (opens fully wired); long-polling on the roadmap | Minutes — BotFather token |
+| **Discord**  | user id             | bot gateway / webhook — **coming, not built** | Minutes — bot token          |
 
 Memberships are keyed on `(channel, external_id)`, not phone-number-only, so one person
 can be reachable on several channels.
@@ -182,10 +188,14 @@ WhatsApp channel always needs a public HTTPS URL Meta can reach.
    binary, forwarding to its port. Documented, not implemented. The paid, hosted
    **Vulos Relay** is the same tunnel model as a convenience, never a requirement — one
    feature-scoped ingress option among several, not a dependency.
-3. **Zero-infrastructure mode** — Slack Socket Mode and (once wired) Telegram
-   long-polling are *outbound* connections, and controllers dial out too. A gateway on
-   a LAN Pi with no public URL at all still does Slack + LAN portal + controllers.
-   Only WhatsApp (Meta webhooks) and remote app access need a public URL.
+3. **Zero-infrastructure mode** — real today for Slack. **Slack Socket Mode ships**:
+   set an app-level token and the gateway dials **out** to Slack over a single
+   WebSocket, no inbound port or URL needed. Telegram long-polling (the same idea for
+   that channel) is on the roadmap — today Telegram uses a webhook, so it still needs
+   a reachable URL. Controllers dial out unconditionally. A gateway on a LAN Pi with no
+   public URL at all already does Slack + LAN portal + controllers end to end. Only
+   WhatsApp (Meta webhooks), Telegram (until long-polling lands) and remote app access
+   need a public URL.
 
 Full option-by-option breakdown, including the WhatsApp-is-webhook-only reasoning and
 which channels need zero ingress today: [`site/docs/ingress.md`](site/docs/ingress.md).
@@ -211,7 +221,7 @@ own tenants, numbers, devices and audit log — with zero coordination between t
 | Command integrity | Ed25519-signed commands: nonce + expiry, controller pins gateway key at pairing |
 | Pairing          | Claim-token flow (admin creates claim → device redeems → keys exchanged)    |
 | Emergency grants | Short-TTL signed capability bound to app keypair; nonce challenge-response  |
-| Channel ingress  | Webhook signature verification per channel (Meta HMAC, Slack signing secret…) |
+| Channel ingress  | Per-channel verification (Meta HMAC, Slack signed-request scheme + replay window, Telegram secret-token header) |
 | Tenancy          | App-layer org scoping in SQLite (replaces Postgres RLS)                     |
 | Transport        | TLS terminated by the gateway itself — any tunnel in front only ever sees ciphertext when run in passthrough mode |
 | Audit            | Append-only event log: every open, denial, pairing, config change           |
@@ -260,16 +270,23 @@ Per-location **settings toggles, off by default**:
 | --------------------- | ------------------------------ | ------------------------------------------------------------------- |
 | Gateway language      | **Go** (was Deno/TS)           | Single small static binary, ARM-friendly, `go:embed` portal        |
 | Database              | **SQLite** (was Neon Postgres + RLS) | Zero-dependency self-hosting; one file to back up; RLS existed for shared-cloud tenancy we no longer have |
-| Frontend              | **Svelte 5** (was React 19)    | One codebase → embedded portal + Tauri desktop/mobile; small output |
-| Apps                  | **Tauri v2**                   | Desktop + iOS + Android from the Svelte codebase                    |
+| Frontend              | **Svelte 5** (target; today's shipped app is still React 19) | One codebase → embedded portal + Tauri desktop/mobile; small output |
+| Apps                  | **Tauri v2**                   | Desktop + iOS + Android; the desktop shell (gateway picker) ships today wrapping the current React codebase |
 | Billing               | **None**                       | Out of scope by design — operators charge their residents outside the system if they want to |
 | License               | **MIT, everything**            | The whole system is open — there is nothing else                    |
 
 ## 10. Migration path from the current codebase
 
-The Cloudflare Workers/Hono backend (~2.9k lines of routes) is the **spec**: auth,
-locations, access rules, devices/pairing and WhatsApp flows port to Go nearly
-mechanically. The folded Postgres migrations map to a clean SQLite baseline. The React
-landing/docs carry their brand (Fraunces/Inter/JetBrains Mono, ink-on-paper, arch
-motif) into `site/` and `app/`. The vitest suite's cases (unit, integration,
-security, contract) are ported alongside the routes they cover.
+The Cloudflare Workers/Hono backend (~2.9k lines of routes) was the **spec**, and the
+port is substantially done: auth, locations, access rules, controller pairing/hub and
+the WhatsApp/Slack/Telegram flows now run natively in the Go gateway, on a clean folded
+SQLite baseline (no Postgres, no RLS — tenancy is app-layer). What the backend still
+does that the gateway defers: phone-OTP verify, analytics endpoints, Google
+OAuth/email-verify/password-reset, meters, and the real portal bundle (the gateway
+embeds a placeholder behind `-tags portal` today). The React landing/docs brand
+(Fraunces/Inter/JetBrains Mono, ink-on-paper, arch motif) already lives in `site/`; a
+dedicated `app/` (Svelte 5) has not been started — the desktop app today is `src/` +
+`src-tauri/` (React 19 + Tauri v2), which already ships a gateway picker so one build
+can point at any gateway. The backend's test suite (unit, integration, security,
+contract) is the reference the gateway's own Go tests, plus the cross-module `e2e/`
+harness, were built against.

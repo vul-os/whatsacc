@@ -12,36 +12,43 @@ and Meta's per-conversation fees if you run a WhatsApp channel on your own numbe
 
 ## Install
 
-> **Status — gateway in development.** The single-binary Go gateway is in
-> development. Today the reference implementation runs as the Workers backend in
-> this repo (`backend/` — see the repo README for dev setup); the commands below
-> describe the target install experience and will go live with the gateway.
+> **Status — the Go gateway exists and runs today.** The single-binary Go gateway in
+> [`gateway/`](https://github.com/vul-os/whatsacc/tree/main/gateway) implements the
+> product core now: auth, accounts/locations/access-points, controller pairing and the
+> WebSocket device hub, the signed open path, admin console, rate limits, and the
+> WhatsApp / Slack / Telegram channels. **Building from source is the reliable path
+> today** — see the commands below. Still deferred (and honest about it): the phone-OTP
+> verify routes, analytics endpoints, Google OAuth / email-verify / password-reset
+> ceremony, movement/meter records, and dropping the real portal bundle in for the
+> placeholder. The mature Cloudflare Workers backend in `backend/` remains the
+> behavioural reference the gateway is ported from.
 
-**Docker** (recommended while pre-1.0):
-
-```sh
-docker run -d --name whatsacc \
-  -p 8080:8080 \
-  -v whatsacc:/data \
-  ghcr.io/vul-os/whatsacc-gateway
-```
-
-**Bare binary** — grab the release for your platform (linux/amd64, linux/arm64 for a
-Pi, darwin) and run it:
-
-```sh
-./whatsacc-gateway --data /var/lib/whatsacc
-```
-
-**From source**:
+**From source** (works today):
 
 ```sh
 git clone https://github.com/vul-os/whatsacc
 cd whatsacc/gateway && go build ./cmd/gateway
+./gateway -data /var/lib/whatsacc -listen :8080
 ```
 
-> Image and binary names are settling as the Go gateway approaches 1.0 — check the
-> repository README for the current tags before scripting anything.
+Pure-Go SQLite (`modernc.org/sqlite`, no CGO), so `CGO_ENABLED=0 GOARCH=arm64`
+cross-compiles cleanly for a Pi.
+
+**Docker** — build the image locally from the `Dockerfile` in `gateway/`:
+
+```sh
+cd whatsacc/gateway && docker build -t whatsacc-gateway .
+docker run -d --name whatsacc \
+  -p 8080:8080 \
+  -v whatsacc:/data \
+  whatsacc-gateway
+```
+
+> The `ghcr.io/vul-os/whatsacc-gateway` image is built by CI but **not auto-published
+> yet** — its workflow is manual-only. Build locally with the `Dockerfile` above, or
+> pull the published image once a release cuts it. Image and binary names are still
+> settling pre-1.0 — check the repository README for current tags before scripting
+> anything.
 
 On first boot the gateway:
 
@@ -71,7 +78,7 @@ ones:
 | --- | --- |
 | `WACC_PUBLIC_URL` | The URL the world reaches you at. Used for webhooks, invite links, the app. |
 | `WACC_DATA_DIR` | Where `whatsacc.db` and keys live. Back this directory up. |
-| `WACC_CHANNEL_*` | Per-channel credentials — see [Chat channels](channels.md). |
+| `WHATSAPP_*` / `SLACK_*` / `TELEGRAM_*` | Per-channel credentials (e.g. `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` for Socket Mode) — see [Chat channels](channels.md). |
 | `ADMIN_CLAIM_TOKEN` | One-time secret to claim the **instance admin** seat on first run — redeemable exactly once, dead forever after; unset = nobody can claim. See [Instance admin](admin.md). |
 | `RATE_OPEN_COOLDOWN_S` | Minimum seconds between successful opens per person per access point (default 10; `0` disables). |
 | `RATE_OPENS_PER_HOUR` | Successful opens per member per hour (default 30; `0` = kill switch). |
@@ -93,15 +100,15 @@ at the HTTP layer. Pick whichever of these fits your life:
   HTTPS to a local port works, run beside the binary. whatsacc has no structural
   dependency on any provider — **Vulos Relay** (the paid, hosted version of that same
   tunnel software) is one option among these, never a requirement.
-- **No public URL at all** — the design goal: a gateway on the estate LAN as a
-  complete installation. Controllers already dial out. Slack **Socket Mode** — the
-  gateway dialing out to Slack, no request URL needed — ships with the Go gateway
-  (planned); Discord's bot gateway will dial out the same way when it lands.
-  *Today* the Slack integration is the **Events API** over the public webhook
-  (`/webhooks/slack`), so chat channels still need a reachable URL — as do
-  **WhatsApp webhooks** (Meta must reach you, since the Cloud API is webhook-only —
-  see [Ingress & reachability](ingress.md) for the full breakdown) and **portal/app
-  access from outside the property**.
+- **No public URL at all** — a gateway on the estate LAN as a complete installation,
+  and this is **real today**. Controllers dial out, and Slack **Socket Mode** ships:
+  set `SLACK_APP_TOKEN` (an `xapp-…` token) and the gateway dials out to Slack over an
+  outbound WebSocket with no request URL, so a LAN-only Pi runs Slack end to end.
+  Discord's bot gateway will dial out the same way when it lands. Without
+  `SLACK_APP_TOKEN`, Slack falls back to the **Events API** webhook (`/webhooks/slack`),
+  which needs a reachable URL — as do **WhatsApp webhooks** (Meta must reach you, since
+  the Cloud API is webhook-only — see [Ingress & reachability](ingress.md) for the full
+  breakdown), the Telegram webhook, and **portal/app access from outside the property**.
 
 Controllers connect to the gateway too — but they dial out from the gate side, so they
 work behind NAT and CGNAT'd 4G SIMs with zero inbound ports at the gate.

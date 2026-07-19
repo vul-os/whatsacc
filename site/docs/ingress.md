@@ -22,20 +22,22 @@ designed to need no inbound connection whatsoever — see below.
 
 These need nothing public at all — not a port, not a tunnel, not a domain:
 
-- **Slack Socket Mode** — the gateway opens a single **outbound** WebSocket to Slack
-  (`apps.connections.open` → dial the returned `wss://` URL) and receives every event
-  over it. Slack never connects to you. Ships with the Go gateway (see
-  [Chat channels](channels.md) for status); *today's* Slack integration is still the
-  Events API webhook.
+- **Slack Socket Mode** — **shipped.** The gateway opens a single **outbound** WebSocket
+  to Slack (`apps.connections.open` → dial the returned `wss://` URL) and receives every
+  event over it. Slack never connects to you. Set `SLACK_APP_TOKEN` (an `xapp-…` token)
+  and it's on; leave it unset and Slack falls back to the Events API webhook (see
+  [Chat channels](channels.md)).
 - **Telegram long-polling** — Telegram's Bot API supports `getUpdates` polling as an
   alternative to registering a webhook, entirely outbound, no public URL needed. It's
   the natural zero-ingress path for Telegram and is on the roadmap for this channel;
-  *today* whatsacc's beta Telegram integration receives updates via webhook (see
-  [Chat channels](channels.md)), so it still needs a reachable URL for now.
+  *today* whatsacc's Telegram integration (opens fully wired through the shared pipeline)
+  receives updates via webhook (see [Chat channels](channels.md)), so it still needs a
+  reachable URL for now.
 
-Once both land, a gateway on a LAN Pi with no public IP, no port-forward and no domain
-name will run Slack and Telegram end to end, serve the portal on the LAN, and drive
+With Slack Socket Mode a gateway on a LAN Pi with no public IP, no port-forward and no
+domain name already runs Slack end to end, serves the portal on the LAN, and drives
 controllers — a genuinely complete installation with nothing exposed to the internet.
+Once Telegram long-polling lands, that channel joins it.
 Controllers already dial out today (WebSocket push, with long-poll as a fallback
 transport — the `proto/` contracts are transport-agnostic by design), so they never
 need ingress regardless. Only the WhatsApp channel needs a public HTTPS endpoint
@@ -99,10 +101,10 @@ any other tunnel, and Vulos operates the reachability fabric for you.
 
 | Channel | Ingress needed? | Notes |
 | --- | --- | --- |
-| Slack (Socket Mode) | **None** | Outbound WSS only — ships with the Go gateway |
+| Slack (Socket Mode) | **None** | **Shipped** — outbound WSS only; set `SLACK_APP_TOKEN` |
 | Telegram (long-polling) | **None** | Outbound HTTP polling only — roadmap for this channel |
-| Slack (Events API, today's default) | Public HTTPS | Until Socket Mode ships, see [Chat channels](channels.md) |
-| Telegram (webhook, today's default) | Public HTTPS | Beta; until long-polling lands, see [Chat channels](channels.md) |
+| Slack (Events API) | Public HTTPS | The default when no `SLACK_APP_TOKEN` is set — see [Chat channels](channels.md) |
+| Telegram (webhook, today's default) | Public HTTPS | Opens fully wired; until long-polling lands, see [Chat channels](channels.md) |
 | WhatsApp (Meta Cloud API) | **Public HTTPS, always** | Meta's design — see above, no way around it |
 | Portal / app access from off-LAN | Public HTTPS (optional) | Only if residents/staff need it outside the property |
 | Controllers | **None** | Always dial out to the gateway |

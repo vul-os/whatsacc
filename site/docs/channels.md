@@ -12,8 +12,8 @@ records.
 | Channel | Identity | Status | Self-host friction |
 | --- | --- | --- | --- |
 | WhatsApp | phone number | Shipped | **High** — verified Meta business + WABA + number |
-| Slack | member id | Shipped (Events API) | Minutes — an app manifest + signing secret |
-| Telegram | chat id | **Beta** — receives, logs and replies; opens not yet wired | Minutes — a BotFather token + webhook secret |
+| Slack | member id | Shipped — Events API **and Socket Mode** | Minutes — an app manifest + signing secret |
+| Telegram | chat id | Shipped — opens wired through the shared pipeline | Minutes — a BotFather token + webhook secret |
 | Discord | user id | **Coming** | Minutes — a bot token |
 
 ## WhatsApp (Meta Cloud API)
@@ -83,19 +83,32 @@ The five-minute channel, and the recommended first channel for self-hosters:
 3. Configure the gateway:
 
 ```sh
-WACC_CHANNEL_SLACK_BOT_TOKEN=xoxb-…
-WACC_CHANNEL_SLACK_SIGNING_SECRET=…
+SLACK_BOT_TOKEN=xoxb-…
+SLACK_SIGNING_SECRET=…
 ```
 
 Every incoming event is verified against the signing secret (Slack's signed-request
-scheme, timestamp-checked against replay); anything unverifiable is dropped and logged.
+scheme, timestamp-checked against replay, with a 300 s window; requests missing the
+signature or timestamp headers are never skipped); anything unverifiable is dropped
+and logged.
 
-The current integration is the Events API over that public webhook, so Slack must be
-able to reach your gateway's URL. **Socket Mode** — the gateway dialing out to Slack
-over an outbound WebSocket, so a LAN-only gateway with no reachable address still
-receives every message — is the design goal for zero-URL installs and ships with the
-Go gateway (planned). When it lands you'll enable it in the app manifest and give the
-gateway the app-level token (`WACC_CHANNEL_SLACK_APP_TOKEN`).
+### Socket Mode — the zero-URL install
+
+**Socket Mode is shipped.** Set `SLACK_APP_TOKEN` to an app-level token (`xapp-…`) and
+the gateway **dials out** to Slack over a single outbound WebSocket
+(`apps.connections.open` → `wss://…`) instead of receiving webhooks — it acks each
+envelope and feeds the payload through the *same* handlers the Events API webhook uses.
+A gateway on a LAN with **no public URL at all** runs Slack fully: this is what makes
+"a Pi on the estate LAN is a complete installation" real. Enable Socket Mode in the app
+manifest, mint the app-level token, and set:
+
+```sh
+SLACK_APP_TOKEN=xapp-…   # optional — presence enables Socket Mode (no public URL needed)
+```
+
+With no `SLACK_APP_TOKEN`, the gateway stays on the Events API webhook
+(`/webhooks/slack`), which needs a reachable URL. Either mode works; Socket Mode is the
+one that needs zero ingress — see [Ingress & reachability](ingress.md).
 
 Residents then DM the app — or use a channel you allow — with `open`. Their Slack
 member id is their identity; invite members from the portal's **Members** page by id or
@@ -104,24 +117,24 @@ Slack a favourite for gated workplaces and co-working spaces.
 
 Slack replies support the same numbered pickers and quota warnings as WhatsApp.
 
-## Telegram — beta
+## Telegram
 
-A Telegram channel ships in the backend today, deliberately marked beta because it is
-honestly incomplete:
+Telegram is wired to the **real open path** in the Go gateway — it exceeds the older
+Workers backend, where Telegram was an honest stub that only logged and acknowledged:
 
 - **What works now** — the gateway receives updates on `/webhooks/telegram`,
   verifying the `X-Telegram-Bot-Api-Secret-Token` header against your configured
-  webhook secret (mismatches are rejected). Every chat and message — inbound and
-  outbound — is recorded, the shared per-sender flood throttle applies, and the bot
-  replies to texts.
-- **What doesn't yet** — replies are a stub: texting `open` gets a bare
-  acknowledgement, not the rules pipeline, and no gate actuates. Telegram chats are
-  not yet linked to member profiles. Opens land when the channel is wired into the
-  same open pipeline Slack's buttons use.
+  webhook secret (mismatches are rejected). A linked user texting `open` runs the
+  **same rules-and-signing pipeline** as every other channel: identity resolution,
+  time windows, quotas, then the Ed25519-signed command to the controller. When several
+  gates are available the reply is an **inline-keyboard picker**, and tapping a button
+  re-enters the same verdict path. Every chat and message is recorded and the shared
+  per-sender flood throttle applies.
 
-Long-polling (`getUpdates`) is also viable for Telegram and needs **no public URL at
-all** — see [Ingress & reachability](ingress.md). The webhook path below is the
-current wiring.
+Long-polling (`getUpdates`) — an entirely outbound alternative that needs **no public
+URL at all** — is on the roadmap for this channel; today's wiring is the webhook path
+below, so Telegram currently needs a reachable URL. See
+[Ingress & reachability](ingress.md).
 
 Setup:
 
@@ -166,6 +179,7 @@ honest reply rather than silence.
 ## Writing a new channel
 
 The seam is deliberately small: resolve sender → identity, message → intent, reply →
-send. If you want Signal or SMS, the Slack implementation is the reference to copy —
-and the beta Telegram channel above is a live example of a channel partway through
-that build. Contributions welcome — the gateway is MIT.
+send. Every open on every channel funnels through the one open-path choke point — a
+channel decides how to ask and how to reply, never whether the gate may open. If you
+want Signal or SMS, the three shipped channels (WhatsApp, Slack, Telegram) are the
+reference to copy. Contributions welcome — the gateway is MIT.
