@@ -162,3 +162,36 @@ jobs:
         if: steps.mod.outputs.present == 'true'
         working-directory: controller
         run: go test ./...
+
+  e2e:
+    name: e2e (cross-module, real binaries over the wire)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The e2e harness builds and drives the real gateway + controller
+      # binaries; skip cleanly until all three modules are present on this ref.
+      - name: Detect e2e module
+        id: mod
+        run: |
+          if [ -f e2e/go.mod ] && [ -f gateway/go.mod ] && [ -f controller/go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "e2e/gateway/controller modules not all present — nothing to check yet"
+          fi
+      - uses: actions/setup-go@v5
+        if: steps.mod.outputs.present == 'true'
+        with:
+          # e2e/go.mod pins the newest Go (matches gateway); the 1.25 toolchain
+          # also builds the controller module (go 1.23) fine.
+          go-version-file: e2e/go.mod
+      - name: go vet
+        if: steps.mod.outputs.present == 'true'
+        working-directory: e2e
+        run: go vet ./...
+      - name: go test
+        if: steps.mod.outputs.present == 'true'
+        working-directory: e2e
+        env:
+          CGO_ENABLED: "0"
+        run: go test -count=1 -timeout 900s ./...
