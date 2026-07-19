@@ -52,6 +52,7 @@ type AccessLog struct {
 	UserID        string
 	Command       string
 	Source        string
+	Lat, Long     *float64
 	Success       bool
 	Error         string
 	TS            int64
@@ -299,10 +300,10 @@ func (s *Store) InsertAccessLog(ctx context.Context, l AccessLog) (string, error
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO access_logs (id, access_point_id, location_id, account_id, user_id,
-		                          command, source, success, error, ts, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                          command, source, lat, long, success, error, ts, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullable(l.AccessPointID), nullable(l.LocationID), nullable(l.AccountID), nullable(l.UserID),
-		l.Command, l.Source, boolInt(l.Success), nullable(l.Error), ts, t)
+		l.Command, l.Source, nullFloat(l.Lat), nullFloat(l.Long), boolInt(l.Success), nullable(l.Error), ts, t)
 	return id, err
 }
 

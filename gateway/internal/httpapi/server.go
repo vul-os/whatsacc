@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/vul-os/whatsacc/gateway/internal/hub"
 	"github.com/vul-os/whatsacc/gateway/internal/keys"
 	"github.com/vul-os/whatsacc/gateway/internal/portal"
 	"github.com/vul-os/whatsacc/gateway/internal/store"
@@ -19,16 +21,25 @@ import (
 // Config is what the server needs beyond its collaborators.
 type Config struct {
 	Version         string
+	Env             string // reported by /health (backend APP_ENV parity)
 	PublicURL       string
 	AdminClaimToken string // empty = claim disabled (fail-closed)
 	JWTSecret       []byte
+	// AckTimeout bounds how long an open request waits for the device's
+	// cmd.ack before recording 'undelivered'. Zero = default 5 s.
+	AckTimeout time.Duration
+	// RateLimits is the env layer of the rate-limit config (defaults
+	// merged in main via store.ParseRateLimitConfig). Zero value = defaults.
+	RateLimits store.RateLimitConfig
 }
 
-// Server wires the store, signing keys and config into an http.Handler.
+// Server wires the store, signing keys, device hub and config into an
+// http.Handler.
 type Server struct {
 	cfg   Config
 	store *store.Store
 	keys  *keys.Keys
+	hub   *hub.Hub
 	log   *slog.Logger
 }
 
@@ -37,8 +48,20 @@ func New(cfg Config, st *store.Store, ks *keys.Keys, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{cfg: cfg, store: st, keys: ks, log: log}
+	if cfg.AckTimeout <= 0 {
+		cfg.AckTimeout = 5 * time.Second
+	}
+	if cfg.Env == "" {
+		cfg.Env = "self-hosted"
+	}
+	if (cfg.RateLimits == store.RateLimitConfig{}) {
+		cfg.RateLimits = store.RateLimitDefaults
+	}
+	return &Server{cfg: cfg, store: st, keys: ks, hub: hub.New(), log: log}
 }
+
+// Hub exposes the device hub (tests + channel integrations).
+func (s *Server) Hub() *hub.Hub { return s.hub }
 
 // Router builds the mux. Later-ported route groups (accounts, locations,
 // access, devices, channels, admin console) attach here.
@@ -58,6 +81,49 @@ func (s *Server) Router() http.Handler {
 	// instance admin first-run claim (spec: backend/src/routes/admin.ts)
 	mux.Handle("GET /v1/admin/claim", s.requireAuth(s.handleClaimState))
 	mux.Handle("POST /v1/admin/claim", s.requireAuth(s.handleClaim))
+
+	// accounts + members + invites (spec: backend/src/routes/accounts.ts)
+	mux.Handle("GET /v1/accounts", s.requireAuth(s.handleAccountsList))
+	mux.Handle("POST /v1/accounts", s.requireAuth(s.handleAccountCreate))
+	// literal "invites" segment wins over {id} in the 1.22 mux
+	mux.Handle("POST /v1/accounts/invites/{token}/accept", s.requireAuth(s.handleInviteAccept))
+	mux.Handle("GET /v1/accounts/{id}", s.requireAuth(s.handleAccountGet))
+	mux.Handle("PATCH /v1/accounts/{id}", s.requireAuth(s.handleAccountPatch))
+	mux.Handle("GET /v1/accounts/{id}/members", s.requireAuth(s.handleMembersList))
+	mux.Handle("POST /v1/accounts/{id}/invites", s.requireAuth(s.handleInviteCreate))
+
+	// locations + limits (spec: backend/src/routes/locations.ts)
+	mux.Handle("GET /v1/accounts/{id}/locations", s.requireAuth(s.handleLocationsList))
+	mux.Handle("POST /v1/accounts/{id}/locations", s.requireAuth(s.handleLocationCreate))
+	mux.Handle("POST /v1/locations", s.requireAuth(s.handleTopLevelLocationCreate))
+	mux.Handle("GET /v1/locations/{id}", s.requireAuth(s.handleLocationGet))
+	mux.Handle("PATCH /v1/locations/{id}", s.requireAuth(s.handleLocationPatch))
+	mux.Handle("DELETE /v1/locations/{id}", s.requireAuth(s.handleLocationDelete))
+	mux.Handle("GET /v1/locations/{id}/limits", s.requireAuth(s.handleLocationLimitsGet))
+	mux.Handle("PATCH /v1/locations/{id}/limits", s.requireAuth(s.handleLocationLimitsPatch))
+
+	// access points (spec: backend/src/routes/access.ts)
+	mux.Handle("GET /v1/access-points", s.requireAuth(s.handleAccessPointsList))
+	mux.Handle("POST /v1/access-points", s.requireAuth(s.handleAccessPointCreate))
+	mux.Handle("GET /v1/access-points/{id}", s.requireAuth(s.handleAccessPointGet))
+
+	// the open path + temporary grants (spec: backend access.ts logAccess)
+	mux.Handle("POST /v1/access-points/{id}/open", s.requireAuth(s.handleAccessPointOpen))
+	mux.Handle("POST /v1/access-points/{id}/close", s.requireAuth(s.handleAccessPointClose))
+	mux.Handle("GET /v1/grants", s.requireAuth(s.handleGrantsList))
+	mux.Handle("POST /v1/grants", s.requireAuth(s.handleGrantCreate))
+	mux.Handle("GET /v1/grants/{id}", s.requireAuth(s.handleGrantGet))
+	mux.Handle("POST /v1/grants/{id}/revoke", s.requireAuth(s.handleGrantRevoke))
+
+	// devices + pairing + controller transport (spec: backend devices.ts +
+	// proto/pairing.md)
+	mux.Handle("GET /v1/devices", s.requireAuth(s.handleDevicesList))
+	mux.Handle("POST /v1/devices", s.requireAuth(s.handleDeviceCreate))
+	mux.HandleFunc("POST /api/pair/redeem", s.handlePairRedeem)
+	mux.HandleFunc("GET /api/controller/ws", s.handleControllerWS)
+	mux.HandleFunc("POST /api/controller/challenge", s.handleControllerChallenge)
+	mux.HandleFunc("POST /api/controller/poll", s.handleControllerPoll)
+	mux.HandleFunc("POST /api/controller/ack", s.handleControllerAck)
 
 	// embedded portal seam — everything unmatched falls through to it
 	mux.Handle("/", portal.Handler())
