@@ -531,8 +531,17 @@ dbTest('protections: concurrent revokes of the two last admins leave exactly one
 
   // TOCTOU probe: without the advisory lock both transactions read "one
   // other active admin" and both revokes succeed → ZERO admins. With the
-  // lock they serialize: exactly one wins, the loser hits the last-admin
-  // guard (400) — or 403 if its auth re-read races after the winner commits.
+  // lock they serialize: exactly one wins. The loser's denial shape depends
+  // on where it loses the race:
+  //   403 — its requireAuth live re-read of is_platform_admin lands after
+  //         the winner commits, so the admin gate rejects it outright;
+  //   404 — it passes the gate first, then inside its transaction (after
+  //         the advisory lock) the table-derived app.is_platform_admin()
+  //         is already false for the demoted actor, so the users_self RLS
+  //         policy hides the target row → user_not_found;
+  //   400 — cannot_revoke_last_admin from the in-tx guard (only reachable
+  //         shapes where the loser's actor is still an admin).
+  // All three are fail-closed; the invariant asserted below is what matters.
   const [r1, r2] = await Promise.all([
     app.request('POST', `/admin/users/${admin1.user_id}/platform-admin`, {
       token: admin2.access_token,
@@ -546,7 +555,10 @@ dbTest('protections: concurrent revokes of the two last admins leave exactly one
   const statuses = [r1.status, r2.status];
   assertEquals(statuses.filter((s) => s === 200).length, 1, `exactly one revoke may win, got ${statuses}`);
   const loser = [r1, r2].find((r) => r.status !== 200)!;
-  assert(loser.status === 400 || loser.status === 403, `loser must be 400/403, got ${loser.status}`);
+  assert(
+    loser.status === 400 || loser.status === 403 || loser.status === 404,
+    `loser must be denied with 400/403/404, got ${loser.status}`,
+  );
   if (loser.status === 400) {
     assertEquals((loser.body as { error: string }).error, 'cannot_revoke_last_admin');
   }
