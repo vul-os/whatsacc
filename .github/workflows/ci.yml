@@ -77,6 +77,18 @@ jobs:
           APP_ENV=test
           APP_PUBLIC_URL=http://test.local
           EOF
+      # whatsacc_internal is created out-of-band by the DB bootstrap in real
+      # deployments (baseline migration comment ~:1447); a fresh CI Postgres
+      # doesn't have it, and SECURITY DEFINER functions are owned by it.
+      - name: Bootstrap DB roles
+        run: |
+          PGPASSWORD=whatsacc psql -h localhost -U whatsacc -d whatsacc_test -v ON_ERROR_STOP=1 -c "
+            DO \$\$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'whatsacc_internal') THEN
+                CREATE ROLE whatsacc_internal NOLOGIN BYPASSRLS;
+              END IF;
+              GRANT whatsacc_internal TO current_user;
+            END \$\$;"
       - run: npm run migrate
       - run: npm run test:integration
       - run: npm run test:security
