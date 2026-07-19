@@ -6,15 +6,40 @@ import { withAnonDb, withUserDb } from '../middleware/rls.ts';
 import { BadRequest, Conflict, NotFound, TooManyRequests } from '../lib/errors.ts';
 import { getEnv } from '../lib/env.ts';
 import { randomCode } from '../lib/random.ts';
-import { hashToken } from '../lib/refresh.ts';
+import { consumeOtpStartLimit, consumeOtpVerifyLimit } from '../lib/rate-limit.ts';
 import { getAvailableAccessPoints } from '../lib/access-lookup.ts';
 import { sendWhatsAppInteractive, sendWhatsAppText, type WhatsAppInteractive } from '../lib/whatsapp.ts';
 
 const e164 = z.string().regex(/^\+[1-9]\d{6,14}$/, 'invalid_e164');
 
-// OTP challenge parameters: 6-digit code, 10-minute expiry, 5 attempts.
-const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
+// OTP challenge parameters: 6-digit code, 10-minute expiry, 5 attempts per
+// challenge (plus persistent otp_start / otp_verify hourly rate limits that
+// survive challenge restarts — see src/lib/rate-limit.ts).
+export const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
+
+/**
+ * Text the OTP to the number being verified. When WHATSAPP_* creds are unset
+ * (local/dev/tests) this is a fast no-op — the code row still exists so the
+ * flow can be completed out-of-band. The code is deliberately never logged
+ * and never returned in any response. Shared with the invite-accept flow
+ * (src/routes/accounts.ts), which links phones unverified and starts the
+ * same challenge.
+ */
+export async function sendVerificationCodeText(phoneE164: string, codePlain: string): Promise<void> {
+  const to = phoneE164.startsWith('+') ? phoneE164.slice(1) : phoneE164;
+  try {
+    const sent = await sendWhatsAppText(
+      to,
+      `Your whatsacc verification code is ${codePlain}. It expires in 10 minutes. If you didn't request this, ignore this message.`,
+    );
+    if (!sent.ok && sent.error !== 'whatsapp_credentials_unset') {
+      console.warn('[whatsapp-send] verification code failed:', sent.error ?? 'unknown_error');
+    }
+  } catch (err) {
+    console.warn('[whatsapp-send] verification code failed:', (err as Error).message);
+  }
+}
 
 const addPhoneSchema = z
   .object({
@@ -144,12 +169,11 @@ function phonesRouter() {
 
     // A verified phone is the WhatsApp webhook's identity root, so a phone
     // NEVER becomes verified just by being typed in: new numbers start
-    // unverified, get an OTP challenge over WhatsApp, and only /verify (or
-    // the invite-accept flow, which proves control by delivering the accept
-    // token to that number) flips verified_at. Unverified phones also cannot
-    // be made primary.
+    // unverified, get an OTP challenge over WhatsApp, and only /verify flips
+    // verified_at (the invite-accept flow also links phones UNVERIFIED and
+    // funnels into this same challenge). Unverified phones also cannot be
+    // made primary.
     const codePlain = randomCode(6);
-    const codeHash = await hashToken(codePlain);
     const result = await withUserDb(c, async (tx) => {
       const [row] = await tx<{ id: string; verified_at: Date | null }[]>`
         insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
@@ -161,9 +185,18 @@ function phonesRouter() {
       const verified = row!.verified_at !== null;
       let challenge = false;
       if (!verified) {
+        // Persistent per-user cap on challenge starts: every (re)add of an
+        // unverified number mints a fresh code with attempts = 0, so without
+        // this an attacker could restart the challenge forever. The throw
+        // rolls the whole tx back — nothing to keep on a denial (the tryBump
+        // deny consumes nothing).
+        const startLimit = await consumeOtpStartLimit(tx, user.sub);
+        if (!startLimit.allowed) {
+          throw TooManyRequests('otp_rate_limited', startLimit.retryAfterS);
+        }
         const expires = new Date(Date.now() + VERIFICATION_CODE_TTL_MS);
         const started = await tx<{ ok: boolean }[]>`
-          select app.phone_verification_start(${row!.id}::uuid, ${codeHash}, ${expires}) as ok
+          select app.phone_verification_start(${row!.id}::uuid, ${codePlain}, ${expires}) as ok
         `;
         challenge = started[0]?.ok === true;
       }
@@ -171,22 +204,7 @@ function phonesRouter() {
     });
 
     if (result.challenge) {
-      // Send the code to the number being verified. When WHATSAPP_* creds
-      // are unset (local/dev/tests) this is a fast no-op — the code row
-      // still exists so the flow can be completed out-of-band. The code is
-      // deliberately never logged and never returned in the response.
-      const to = phone_e164.startsWith('+') ? phone_e164.slice(1) : phone_e164;
-      try {
-        const sent = await sendWhatsAppText(
-          to,
-          `Your whatsacc verification code is ${codePlain}. It expires in 10 minutes. If you didn't request this, ignore this message.`,
-        );
-        if (!sent.ok && sent.error !== 'whatsapp_credentials_unset') {
-          console.warn('[whatsapp-send] verification code failed:', sent.error ?? 'unknown_error');
-        }
-      } catch (err) {
-        console.warn('[whatsapp-send] verification code failed:', (err as Error).message);
-      }
+      await sendVerificationCodeText(phone_e164, codePlain);
     }
     return c.json({ id: result.id, verification_required: !result.verified }, 201);
   });
@@ -196,12 +214,17 @@ function phonesRouter() {
     const id = c.req.param('id');
     const { code } = c.req.valid('json');
     if (!/^\d{6}$/.test(code)) throw BadRequest('invalid_code');
-    const codeHash = await hashToken(code);
 
     // The failure branches must NOT throw inside the transaction — a throw
     // rolls the tx back and would undo the attempt-counter increment that
     // makes the 5-attempt lockout real. Map to HTTP errors after commit.
-    const outcome = await withUserDb(c, async (tx) => {
+    type VerifyOutcome = {
+      status: string;
+      verifiedNow: boolean;
+      phone_e164: string;
+      retryAfterS?: number;
+    };
+    const outcome = await withUserDb(c, async (tx): Promise<VerifyOutcome> => {
       const rows = await tx<{ id: string; phone_e164: string; verified_at: Date | null }[]>`
         select id, phone_e164, verified_at
         from profile_phone_numbers
@@ -212,9 +235,26 @@ function phonesRouter() {
       if (!phone) return { status: 'not_found' as string, verifiedNow: false, phone_e164: '' };
       if (phone.verified_at) return { status: 'already_verified', verifiedNow: false, phone_e164: phone.phone_e164 };
 
+      // Persistent per-phone-row cap on verify attempts. The per-challenge
+      // attempt counter resets on every challenge restart; this one does
+      // not, so restarts cannot buy unlimited guesses within the window.
+      // Checked (and consumed) only after ownership is proven above, so a
+      // stranger probing ids cannot burn someone else's budget. Returned as
+      // an outcome (no throw): a denial consumed nothing, and earlier writes
+      // in this tx must survive.
+      const verifyLimit = await consumeOtpVerifyLimit(tx, id);
+      if (!verifyLimit.allowed) {
+        return {
+          status: 'rate_limited',
+          verifiedNow: false,
+          phone_e164: phone.phone_e164,
+          retryAfterS: verifyLimit.retryAfterS,
+        };
+      }
+
       const consumed = await tx<{ status: string }[]>`
         select app.phone_verification_consume(
-          ${id}::uuid, ${codeHash}, ${VERIFICATION_MAX_ATTEMPTS}
+          ${id}::uuid, ${code}, ${VERIFICATION_MAX_ATTEMPTS}
         ) as status
       `;
       const status = consumed[0]?.status ?? 'no_code';
@@ -227,6 +267,8 @@ function phonesRouter() {
         break;
       case 'not_found':
         throw NotFound('phone_not_found');
+      case 'rate_limited':
+        throw TooManyRequests('otp_rate_limited', outcome.retryAfterS ?? 3600);
       case 'locked':
         throw TooManyRequests('too_many_attempts', VERIFICATION_CODE_TTL_MS / 1000);
       case 'expired':

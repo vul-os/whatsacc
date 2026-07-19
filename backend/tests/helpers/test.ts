@@ -6,7 +6,7 @@ const SKIP = resolveTestDatabaseUrl() === null;
 
 export const dbAvailable = !SKIP;
 
-export function dbTest(name: string, fn: () => Promise<void>): void {
+export function dbTest(name: string, fn: () => Promise<void>, timeoutMs?: number): void {
   const runner = SKIP ? test.skip : test;
-  runner(name, fn);
+  runner(name, fn, timeoutMs);
 }

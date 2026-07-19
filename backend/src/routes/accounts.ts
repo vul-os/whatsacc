@@ -10,6 +10,9 @@ import { escapeHtml, renderEmail, sendEmail } from '../lib/email.ts';
 import { getEnv } from '../lib/env.ts';
 import { bootstrapPersonalAccount } from './auth.ts';
 import { sendWhatsAppText } from '../lib/whatsapp.ts';
+import { randomCode } from '../lib/random.ts';
+import { consumeOtpStartLimit } from '../lib/rate-limit.ts';
+import { sendVerificationCodeText, VERIFICATION_CODE_TTL_MS } from './phones.ts';
 
 const createAccountSchema = z
   .object({
@@ -198,8 +201,14 @@ function accountsRouter() {
       console.warn('[email-send] invite failed:', (err as Error).message);
     }
 
+    // SECURITY: the accept token (inside acceptUrl) is NEVER returned to the
+    // inviter — it is delivered to the INVITEE only (email + WhatsApp). The
+    // create response used to echo accept_url, which let the inviter accept
+    // their own invite. Dev/test ergonomics: with delivery mocked/unset,
+    // tests recover the token by overwriting token_hash via the admin
+    // handle, exactly like they force OTP codes.
     return c.json(
-      { id: result.invite_id, accept_url: acceptUrl, email_sent: emailSent, whatsapp_sent: whatsappSent },
+      { id: result.invite_id, email_sent: emailSent, whatsapp_sent: whatsappSent },
       201,
     );
   });
@@ -239,16 +248,10 @@ function accountsRouter() {
         throw BadRequest('invite_email_mismatch');
       }
 
-      const profilePhoneRows = await tx<{ phone_e164: string; verified_at: Date | null }[]>`
-        select phone_e164, verified_at
-        from profile_phone_numbers
-        where profile_id = ${user.sub}
-      `;
-
-      const effectivePhone = phone_e164 ?? inv.phone_e164 ?? profilePhoneRows.find((p) => p.verified_at)?.phone_e164;
       if (phone_e164 && inv.phone_e164 && phone_e164 !== inv.phone_e164) {
         throw BadRequest('invite_phone_mismatch', 'Phone number must match the number this invitation was sent to');
       }
+      const effectivePhone = phone_e164 ?? inv.phone_e164;
 
       await tx`
         insert into account_members (account_id, user_id, role, status)
@@ -267,19 +270,67 @@ function accountsRouter() {
         where id = ${inv.id}
       `;
 
+      // SECURITY (design choice, documented on purpose): accepting an invite
+      // NEVER verifies a phone number. The accept token is dual-delivered —
+      // the SAME secret goes out over email AND WhatsApp — so possessing it
+      // proves nothing about controlling the phone: the acceptor may have
+      // followed the emailed link while the WhatsApp copy sat unread on
+      // someone else's handset. Channel attribution cannot be reconstructed
+      // after the fact (whatsapp_sent only records that Meta ACCEPTED the
+      // outbound message, not that the acceptor read it there), so the
+      // "WhatsApp-delivered token as proof of phone control" exception is
+      // unsound and deliberately NOT implemented — auto-verify here
+      // previously allowed a self-invite to claim (and durably squat, via
+      // the one-verified-owner unique index) any unclaimed number. A
+      // body-supplied phone_e164 is attacker-typed input and is likewise
+      // never trusted. Instead: link the phone UNVERIFIED (and non-primary —
+      // unverified phones cannot be primary) and start the standard OTP
+      // challenge; only /phones/me/phones/:id/verify flips verified_at.
+      let otp: { phoneE164: string; codePlain: string } | null = null;
+      let verificationRequired = false;
       if (effectivePhone) {
-        await tx`
+        const [phoneRow] = await tx<{ id: string; verified_at: Date | null }[]>`
           insert into profile_phone_numbers (profile_id, phone_e164, is_primary, verified_at)
-          values (${user.sub}, ${effectivePhone}, true, now())
+          values (${user.sub}, ${effectivePhone}, false, null)
           on conflict (profile_id, phone_e164)
-          do update set is_primary = true, verified_at = coalesce(profile_phone_numbers.verified_at, now())
+          do update set is_primary = profile_phone_numbers.is_primary
+          returning id, verified_at
         `;
+        if (phoneRow && phoneRow.verified_at === null) {
+          verificationRequired = true;
+          // Charge the same otp_start budget as POST /me/phones: invites are
+          // single-use, but MINTING them is cheap for a self-inviter, so an
+          // uncharged challenge start here would be both an OTP-text pump at
+          // an arbitrary number and an attempt-counter reset that dodges the
+          // start limit. Denial is SOFT (skip the challenge, keep the
+          // accept): membership must not fail because of OTP throttling —
+          // the invitee can start verification later via POST /me/phones.
+          const startLimit = await consumeOtpStartLimit(tx, user.sub);
+          if (startLimit.allowed) {
+            const codePlain = randomCode(6);
+            const expires = new Date(Date.now() + VERIFICATION_CODE_TTL_MS);
+            const started = await tx<{ ok: boolean }[]>`
+              select app.phone_verification_start(${phoneRow.id}::uuid, ${codePlain}, ${expires}) as ok
+            `;
+            if (started[0]?.ok === true) otp = { phoneE164: effectivePhone, codePlain };
+          }
+        }
       }
 
-      return { account_id: inv.account_id, role: inv.role };
+      return { account_id: inv.account_id, role: inv.role, otp, verificationRequired };
     });
 
-    return c.json(result);
+    // Send the OTP after commit (same ergonomics as POST /me/phones: no-op
+    // without WhatsApp creds; the code is never logged or returned).
+    if (result.otp) {
+      await sendVerificationCodeText(result.otp.phoneE164, result.otp.codePlain);
+    }
+
+    return c.json({
+      account_id: result.account_id,
+      role: result.role,
+      phone_verification_required: result.verificationRequired,
+    });
   });
 
   return app;

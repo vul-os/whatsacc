@@ -491,6 +491,68 @@ export async function guardedCheckOpenLimits(
 }
 
 // ---------------------------------------------------------------------------
+// Phone-OTP flow limits
+// ---------------------------------------------------------------------------
+// Persistent fixed-window counters for the phone verification flow
+// (src/routes/phones.ts). These exist because the per-challenge attempt cap
+// alone is resettable: POST /me/phones re-add restarts the challenge with a
+// fresh code and attempts = 0, so without a persistent counter an attacker
+// could grind the 10^6 code space indefinitely.
+//
+//   otp_start  — challenges started per USER per hour (also bounds how many
+//                fresh codes / WhatsApp sends one user can trigger).
+//   otp_verify — verify attempts per PHONE ROW per hour, surviving challenge
+//                restarts within the window.
+//
+// FAILURE MODE: unlike the gate-open path these are NOT fail-open — an OTP
+// verification is an identity claim, not physical access, so a counter-store
+// error propagates (request fails closed).
+
+export const OTP_START_MAX_PER_HOUR = 5;
+export const OTP_VERIFY_MAX_PER_HOUR = 15;
+
+export type OtpLimitDecision = { allowed: true } | { allowed: false; retryAfterS: number };
+
+async function consumeOtpLimit(
+  tx: TxSql,
+  scope: 'otp_start' | 'otp_verify',
+  subject: string,
+  cap: number,
+  now: Date,
+): Promise<OtpLimitDecision> {
+  const hourStart = fixedWindowStart(now, HOUR_S);
+  const count = await tryBump(tx, scope, subject, hourStart, cap);
+  if (count === null) {
+    return { allowed: false, retryAfterS: secondsUntilWindowEnd(now, HOUR_S) };
+  }
+  return { allowed: true };
+}
+
+/** Consume one OTP-challenge start for a user; deny past the hourly cap. */
+export async function consumeOtpStartLimit(
+  tx: TxSql,
+  userId: string,
+  now: Date = new Date(),
+): Promise<OtpLimitDecision> {
+  return await consumeOtpLimit(tx, 'otp_start', `user:${userId}`, OTP_START_MAX_PER_HOUR, now);
+}
+
+/** Consume one OTP verify attempt for a phone row; deny past the hourly cap. */
+export async function consumeOtpVerifyLimit(
+  tx: TxSql,
+  phoneRowId: string,
+  now: Date = new Date(),
+): Promise<OtpLimitDecision> {
+  return await consumeOtpLimit(
+    tx,
+    'otp_verify',
+    `phone_row:${phoneRowId}`,
+    OTP_VERIFY_MAX_PER_HOUR,
+    now,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Chat flood throttle
 // ---------------------------------------------------------------------------
 

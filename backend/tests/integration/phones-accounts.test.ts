@@ -30,13 +30,13 @@ async function listPhones(app: AppHandle, token: string): Promise<PhoneRow[]> {
   return (r.body as { phones: PhoneRow[] }).phones;
 }
 
-type CodeRow = { code_hash: string; attempts: number; expires_at: Date };
+type CodeRow = { code_hash: string; salt: string; attempts: number; expires_at: Date };
 
 /** Read the pending OTP challenge row for a phone (admin context). */
 async function verificationCodeRow(phoneId: string): Promise<CodeRow | null> {
   const rows = await adminSql(
     async (tx) => await tx<CodeRow[]>`
-      select code_hash, attempts, expires_at
+      select code_hash, salt, attempts, expires_at
       from phone_verification_codes
       where phone_id = ${phoneId}
     `,
@@ -48,14 +48,34 @@ async function verificationCodeRow(phoneId: string): Promise<CodeRow | null> {
  * Overwrite the stored OTP hash with the hash of a known code so the test
  * can complete the challenge deterministically (the plaintext code is never
  * stored, logged, or returned by the API — only sent over WhatsApp).
+ * Stored hash = SHA-256(salt || code); forcing salt = '' makes it the plain
+ * SHA-256 of the code, which hashToken() computes.
  */
 async function forceVerificationCode(phoneId: string, code: string): Promise<void> {
   const codeHash = await hashToken(code);
   await adminSql(async (tx) => {
     await tx`
       update phone_verification_codes
-      set code_hash = ${codeHash}
+      set salt = '', code_hash = ${codeHash}
       where phone_id = ${phoneId}
+    `;
+  });
+}
+
+/**
+ * Overwrite an invite's token hash with the hash of a known token. The
+ * create-invite response deliberately no longer returns the accept token /
+ * accept_url (the inviter must never hold the invitee's accept secret), so
+ * tests recover determinism the same way they force OTP codes: through the
+ * admin handle.
+ */
+async function forceInviteToken(inviteId: string, tokenPlain: string): Promise<void> {
+  const tokenHash = await hashToken(tokenPlain);
+  await adminSql(async (tx) => {
+    await tx`
+      update account_invites
+      set token_hash = ${tokenHash}
+      where id = ${inviteId}
     `;
   });
 }
@@ -170,10 +190,14 @@ dbTest('phones: add sends the OTP over WhatsApp; the connected rundown moves to 
     assertExists(codeMatch, `OTP text must carry the code: ${otpMsg.text.body}`);
     const code = codeMatch![1]!;
 
-    // The stored row holds the HASH of exactly that code.
+    // The stored row holds the SALTED hash of exactly that code — a fresh
+    // per-challenge salt, never the bare SHA-256 of the 6-digit code
+    // (unsalted hashes over a 10^6 space are a precomputed-table lookup).
     const row = await verificationCodeRow(phoneId);
     assertExists(row);
-    assertEquals(row!.code_hash, await hashToken(code));
+    assert(row!.salt.length > 0, 'challenge must carry a per-challenge salt');
+    assertEquals(row!.code_hash, await hashToken(row!.salt + code));
+    assert(row!.code_hash !== (await hashToken(code)), 'hash must not be the unsalted SHA-256');
 
     // Wrong code → 400 invalid_code, nothing verified, nothing sent.
     const wrong = await verifyPhone(app, u.access_token, phoneId, code === '000000' ? '000001' : '000000');
@@ -424,7 +448,7 @@ dbTest('accounts: member listing returns every member (email + display name) wit
 // Accounts: invites
 // ---------------------------------------------------------------------------
 
-dbTest('accounts: invite → accept joins the account, links the phone, and is single-use', async () => {
+dbTest('accounts: invite → accept joins the account, links the phone UNVERIFIED, OTP completes it, single-use', async () => {
   await resetData();
   const app = await bootTestApp();
   const restore = setWhatsAppSendEnv();
@@ -442,20 +466,28 @@ dbTest('accounts: invite → accept joins the account, links the phone, and is s
     assertEquals(invite.status, 201);
     const inviteBody = invite.body as {
       id: string;
-      accept_url: string;
       email_sent: boolean;
       whatsapp_sent: boolean;
     };
-    assert(inviteBody.accept_url.includes('/accept-invite?token='), inviteBody.accept_url);
     assertEquals(inviteBody.whatsapp_sent, true, 'WhatsApp invite ping (mocked) must be sent');
-    const token = new URL(inviteBody.accept_url).searchParams.get('token')!;
 
-    // The WhatsApp ping carries the accept link to the invited phone.
+    // FIXED (was pinned): the create response used to echo accept_url — the
+    // accept token in the INVITER's hands, enabling self-invite accepts. The
+    // token now travels only to the invitee (email + WhatsApp).
+    assert(!('accept_url' in (invite.body as Record<string, unknown>)), 'accept_url must not be returned');
+    assert(!invite.text.includes('accept-invite?token='), 'accept token must not leak to the inviter');
+
+    // The WhatsApp ping carries the accept link to the invited phone — the
+    // invitee's delivery channel, from which the test (as the invitee)
+    // recovers the token.
     const waCalls = outbound.to('graph.facebook.com');
     assertEquals(waCalls.length, 1);
     const wa = waCalls[0]!.body as { to: string; text: { body: string } };
     assertEquals(wa.to, '27831112250');
-    assert(wa.text.body.includes('accept your invitation'.replace('accept your', 'Accept your')), wa.text.body);
+    assert(wa.text.body.includes('Accept your invitation'), wa.text.body);
+    const urlMatch = /https?:\/\/\S*accept-invite\?token=([^\s&]+)/.exec(wa.text.body);
+    assertExists(urlMatch, `WhatsApp invite must carry the accept link: ${wa.text.body}`);
+    const token = decodeURIComponent(urlMatch![1]!);
 
     // The invited person registers with the SAME email, then accepts.
     const invitee = await registerUser(app, { email: inviteEmail });
@@ -466,6 +498,11 @@ dbTest('accounts: invite → accept joins the account, links the phone, and is s
     assertEquals(accept.status, 200);
     assertEquals((accept.body as { account_id: string; role: string }).account_id, owner.account_id);
     assertEquals((accept.body as { role: string }).role, 'member');
+    assertEquals(
+      (accept.body as { phone_verification_required: boolean }).phone_verification_required,
+      true,
+      'accept must demand OTP verification for the linked phone',
+    );
 
     // Membership is live: the account shows up in the invitee's list.
     const accounts = (
@@ -477,18 +514,44 @@ dbTest('accounts: invite → accept joins the account, links the phone, and is s
     assertExists(joined);
     assertEquals(joined!.role, 'member');
 
-    // The invite's phone number was linked to the invitee, verified+primary,
-    // and location memberships were fanned out to the account's locations.
+    // FIXED (was pinned): accept used to auto-verify the phone (verified_at
+    // = now(), is_primary = true) even though the accept token is dual-
+    // delivered over email — possession never proved control of the number.
+    // Now: linked UNVERIFIED + non-primary, with a pending OTP challenge,
+    // and the standard verify flow completes it.
     const linked = await adminSql(
-      async (tx) => await tx<{ phone_e164: string; is_primary: boolean; verified_at: Date | null }[]>`
-        select phone_e164, is_primary, verified_at from profile_phone_numbers
+      async (tx) => await tx<{ id: string; phone_e164: string; is_primary: boolean; verified_at: Date | null }[]>`
+        select id, phone_e164, is_primary, verified_at from profile_phone_numbers
         where profile_id = ${invitee.user_id}
       `,
     );
     assertEquals(linked.length, 1);
     assertEquals(linked[0]!.phone_e164, invitePhone);
-    assertEquals(linked[0]!.is_primary, true);
-    assertExists(linked[0]!.verified_at);
+    assertEquals(linked[0]!.is_primary, false, 'unverified phones cannot be primary');
+    assertEquals(linked[0]!.verified_at, null, 'accept must NOT auto-verify the phone');
+    const phoneId = linked[0]!.id;
+
+    // Accept started the standard challenge and texted the code to the
+    // invited number.
+    const challenge = await verificationCodeRow(phoneId);
+    assertExists(challenge, 'accept must start an OTP challenge');
+    const otpCalls = outbound.to('graph.facebook.com');
+    assertEquals(otpCalls.length, 2, 'accept must send the OTP text');
+    const otpMsg = otpCalls[1]!.body as { to: string; text: { body: string } };
+    assertEquals(otpMsg.to, '27831112250');
+    const codeMatch = /verification code is (\d{6})/.exec(otpMsg.text.body);
+    assertExists(codeMatch, `OTP text must carry the code: ${otpMsg.text.body}`);
+
+    // The real OTP flow completes verification (the code from the WhatsApp
+    // text works as-is).
+    assertEquals((await verifyPhone(app, invitee.access_token, phoneId, codeMatch![1]!)).status, 204);
+    const verified = await adminSql(
+      async (tx) => await tx<{ verified_at: Date | null }[]>`
+        select verified_at from profile_phone_numbers where id = ${phoneId}
+      `,
+    );
+    assertExists(verified[0]!.verified_at, 'OTP must complete the invite-linked phone');
+
     const locMembers = await adminSql(
       async (tx) => await tx<{ count: string }[]>`
         select count(*)::text as count
@@ -525,7 +588,10 @@ dbTest('accounts: invite guards — wrong email, wrong phone, expiry, unknown to
   });
   assertEquals(invite.status, 201);
   const inviteId = (invite.body as { id: string }).id;
-  const token = new URL((invite.body as { accept_url: string }).accept_url).searchParams.get('token')!;
+  // The token is delivered to the invitee only — recover determinism via the
+  // admin handle (same pattern as forcing OTP codes).
+  const token = `guarded-token-${Date.now()}`;
+  await forceInviteToken(inviteId, token);
 
   // Wrong account: only the invited email may accept.
   const mismatch = await app.request('POST', `/accounts/invites/${encodeURIComponent(token)}/accept`, {
@@ -591,7 +657,8 @@ dbTest('accounts: re-inviting an existing member with a new role updates the rol
       json: { email: memberEmail, role: 'admin', phone_e164: '+27831112270' },
     });
     assertEquals(invite.status, 201);
-    const token = new URL((invite.body as { accept_url: string }).accept_url).searchParams.get('token')!;
+    const token = `promote-token-${Date.now()}`;
+    await forceInviteToken((invite.body as { id: string }).id, token);
 
     const accept = await app.request('POST', `/accounts/invites/${encodeURIComponent(token)}/accept`, {
       token: member.access_token,
