@@ -11,7 +11,7 @@ there is only one binary.
 | Command integrity | Ed25519-signed commands with nonce + expiry; the controller pins the gateway's key at pairing |
 | Pairing | Claim-token flow: admin creates a claim, the device redeems it once, keys are exchanged |
 | Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response |
-| Channel ingress | Per-channel webhook signature verification (Meta HMAC, Slack signing secret) — fail closed |
+| Channel ingress | Per-channel verification (Meta HMAC, Slack signed-request scheme + replay window, Telegram secret-token header) — fail closed |
 | Tenancy | Tenant-isolated at the database layer — app-layer org scoping on every SQLite query in the Go gateway; the current Postgres reference enforces forced row-level security |
 | Transport | TLS terminated by the gateway itself; tunnels stay content-blind via SNI passthrough where supported |
 | Audit | Append-only event log: every open, denial, pairing and config change |
@@ -68,7 +68,7 @@ the grant TTL; see [Emergency access](emergency-access.md) for the full trade-of
 
 ## Abuse limits
 
-Every open path — portal, API, WhatsApp, Slack — funnels through one enforcement
+Every open path — portal, API, WhatsApp, Slack, Telegram — funnels through one enforcement
 point that applies rate limits (cooldowns, hourly caps) and any admin-set quotas, so
 no channel can be picked to bypass them. Every denial is audit-logged with its
 reason, and the internal counters are tenant-isolated at the database layer (the

@@ -15,7 +15,8 @@ nothing else. whatsacc has no billing, so no limit here is ever about money.
    per-location, set by admins in the portal. Off until you set one.
 
 Both are enforced at a single choke point that every open path funnels through —
-portal, API, WhatsApp, Slack — so picking a different channel never bypasses them.
+portal, API, WhatsApp, Slack, Telegram — so picking a different channel never bypasses
+them.
 `close` commands are **never** limited: closing a gate is the safe direction and is
 never refused.
 

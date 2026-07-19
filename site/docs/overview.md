@@ -1,7 +1,8 @@
 # whatsacc documentation
 
 **Texts that open gates.** whatsacc is a decentralized access-control system: a chat
-message — WhatsApp or Slack today, Discord soon — opens a physical gate, door or barrier.
+message — WhatsApp, Slack or Telegram today, Discord soon — opens a physical gate, door
+or barrier.
 
 There is no cloud center — and no hosted service. whatsacc is a network of independent
 **gateways**; anyone can run one, and every gateway is somebody's own. whatsacc.com is
@@ -41,11 +42,12 @@ nothing held back.
   conversations. See [Chat channels](channels.md).
 - **Reachability is your choice**: a public IP with the gateway's built-in ACME, any
   tunnel you already trust running beside the binary (including a self-hosted,
-  no-account-needed `vulos-relayd`, or the paid Vulos Relay convenience) — and, once
-  Slack Socket Mode ships with the Go gateway (planned), no public URL at all.
-  Controllers already dial out; today's Slack integration is the Events API webhook,
-  so chat channels still need a reachable URL. WhatsApp always needs one — Meta's
-  Cloud API is webhook-only. Full breakdown: [Ingress & reachability](ingress.md).
+  no-account-needed `vulos-relayd`, or the paid Vulos Relay convenience) — or, with
+  **Slack Socket Mode (shipped)**, no public URL at all: the gateway dials out to Slack
+  over a WebSocket instead of receiving webhooks. Controllers already dial out too.
+  Telegram and WhatsApp still need a reachable URL today (Telegram webhook, WhatsApp's
+  Cloud API is webhook-only by Meta's design) — long-polling for Telegram is on the
+  roadmap. Full breakdown: [Ingress & reachability](ingress.md).
 
 ## Where to go next
 

@@ -11,70 +11,78 @@ The API is served by the gateway itself — every gateway, the same way — unde
 
 ## Authentication
 
-Tokens will be issued in the portal under **Settings → API tokens** — that surface is
-**planned**, shipping with the API-token system (tracked in the repo todo). Tokens are
-scoped to specific locations and to read or read-write.
+**Today**, the gateway only issues short-lived bearer session tokens from
+`POST /v1/auth/login` / `/v1/auth/refresh` — the same tokens the portal itself uses —
+sent as:
 
 ```
-Authorization: Bearer wacc_live_<token>
+Authorization: Bearer <session_token>
 ```
 
-Every gateway issues its own tokens — there is no central token authority.
+**Planned**: long-lived, location-scoped, read/read-write **API tokens** issued from
+the portal under **Settings → API tokens** (tracked in the repo todo), shaped like
+`Authorization: Bearer wacc_live_<token>`. Until that ships, integrating means logging
+in a service account and refreshing its session token like any other client.
+
+Every gateway issues its own tokens/sessions — there is no central token authority.
 
 ## Open an access point
+
+This one is real today, authenticated with the bearer session token from
+`POST /v1/auth/login` (not a scoped `wacc_live_…` API token yet — see
+[Authentication](#authentication)):
 
 ```
 POST /v1/access-points/:id/open
 
 {
-  "actor": { "channel": "api", "reference": "pm-software-tenant-42" },
-  "location_signal": { "lat": -29.858, "lng": 31.021 }
+  "lat": -29.858,
+  "long": 31.021,
+  "source": "web"
 }
 ```
 
-The request runs the same rules pipeline as a chat message: membership, time window,
-geofence (the `location_signal` is optional unless the location's geofence demands
-one), quota — then a signed command to the controller. The response reports the
-verdict and, when opened, the controller's acknowledgement.
+`source` is one of `web`, `whatsapp`, `api` (default `web`); `lat`/`long` are optional
+unless the access point's rules demand a location signal. The request runs the same
+rules pipeline as a chat message — membership, rate limits/quota — then signs and
+dispatches a command to the controller. The response reports the outcome:
+
+```
+200 OK
+{ "ok": true, "command": "open", "delivery": "acked" }
+```
+
+`delivery` is one of `acked`, `undelivered`, `queued` (offline, long-poll fallback) or
+`no_device` (access point has no controller attached yet — the open still succeeds).
+A disallowed request gets `403` (`account_suspended` / `user_disabled`) or `429`
+(`rate_limited` / `quota_exceeded`, with `Retry-After`) instead of `200`.
 
 ## List events
 
-```
-GET /v1/events?location=loc_oak&since=2026-06-01T00:00:00Z
-
-200 OK
-{
-  "events": [
-    { "id": "ev_01J…", "kind": "open", "at": "2026-06-04T14:02:11Z",
-      "actor": { "channel": "whatsapp", "external_id": "+27…" },
-      "access_point": "ap_main", "verdict": "allowed" }
-  ],
-  "next": "cursor…"
-}
-```
-
-Event kinds include `open`, `denied`, `paired`, `device.online`, `device.offline`,
-`member.added`, `member.revoked`, `config.changed`. Everything in the audit log is
-readable here, scoped to your token.
+**Not implemented as a token-scoped surface yet.** Today the audit log is readable
+only through the admin console/API (`GET /v1/admin/audit`, `GET
+/v1/admin/audit/actions` — instance-admin only, see [Instance admin](admin.md)), not
+via a per-account, per-token events feed. A scoped `GET /v1/events` for regular API
+tokens is planned alongside the API-token system below, not shipped.
 
 ## Webhooks
 
-Subscriptions will live under **Settings → Webhooks** — this surface is **planned**,
-shipping with the API-token system (tracked in the repo todo) — covering
-`open.succeeded`, `open.denied`, `device.offline` and `member.revoked`. Payloads are
-signed with HMAC-SHA256; verify with the secret shown when you create the
-subscription. Deliveries retry with backoff for a day, then park.
+**Not implemented.** Outbound webhook subscriptions (`open.succeeded`, `open.denied`,
+`device.offline`, `member.revoked`) are planned, tracked in the repo todo, and ship
+alongside the API-token system — there is no `Settings → Webhooks` surface yet and
+no HMAC-signed delivery today.
 
 ## Devices
 
 ```
-GET  /v1/devices                 # controllers, their access points, online state
-POST /v1/devices/claims          # create a pairing claim token
-DELETE /v1/devices/:id           # revoke a controller (kills its key server-side)
+GET  /v1/devices                 # controllers, their access points, online + claim state
+POST /v1/devices                 # account admin: create a device + one-shot pairing claim token
 ```
 
-The pairing claim created here is the same one the portal's **Devices → Pair new**
-produces — see [Controllers](controllers.md) for the flow it feeds.
+`POST /v1/devices` is the pairing claim creation route — the same one the portal's
+**Devices → Pair new** calls — see [Controllers](controllers.md) for the redemption
+flow (`POST /pair/redeem`) it feeds. There is no revoke-by-DELETE endpoint yet;
+revoking a controller's key is a planned admin-ops surface.
 
 ## Rate limits
 

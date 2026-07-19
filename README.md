@@ -37,7 +37,7 @@ solve that outside the system.
 
 ```mermaid
 flowchart LR
-    R["🧍 Resident"] -- "“open”" --> CH["WhatsApp · Slack · Discord soon"]
+    R["🧍 Resident"] -- "“open”" --> CH["WhatsApp · Slack · Telegram · Discord soon"]
     CH --> GW["Gateway<br/>one Go binary · SQLite<br/>rules · portal · audit"]
     APP["📱 App (Tauri)<br/>admin + emergency"] --> GW
     GW -- "signed command<br/>(outbound wss)" --> C["Controller at the gate<br/>Wi-Fi / GSM 4G"]

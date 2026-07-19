@@ -5,18 +5,18 @@ The short list of things that actually go wrong, and what to do about each.
 ## Chat
 
 **I text `open` and get no reply at all.**
-The gateway never got the message. First check you're texting the number (or Slack app)
-shown in the portal under **Settings → Channels**. Then check the channel is actually
-reaching your gateway — verify your public URL is up
-(`curl https://your-gate.example/healthz`), and re-check the webhook URL in the
-Meta/Slack console. Tunnel users: is the tunnel actually connected? (Slack Socket
-Mode, when it ships with the Go gateway, will remove the URL requirement for Slack —
-today Slack uses the Events API webhook.)
+The gateway never got the message. First check you're texting the number (or Slack/Telegram
+app) shown in the portal under **Settings → Channels**. If you're on Slack **Socket
+Mode**, check `SLACK_APP_TOKEN` is set and the gateway logs show the outbound
+connection is up — there's no webhook URL to check in that mode. Otherwise (Slack
+Events API, Telegram, WhatsApp — all webhook-based today), verify your public URL is
+up (`curl https://your-gate.example/healthz`) and re-check the webhook URL in the
+Meta/Slack/Telegram console. Tunnel users: is the tunnel actually connected?
 
 **I get "I don't recognise this number/account".**
 Your chat identity isn't a member anywhere on this gateway. An admin adds you under
 **Members** — for WhatsApp by phone number (exact international format, `+27…`), for
-Slack by member id or invite link.
+Slack by member id or invite link, for Telegram by chat id.
 
 **Replies arrive but the gate doesn't move.**
 Look at the reply — whatsacc always says why. `outside geofence (4.2 km)` means the
