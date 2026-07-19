@@ -88,17 +88,20 @@ at the HTTP layer. Pick whichever of these fits your life:
 
 - **A public VPS or IP** — nothing else needed. Terminate TLS in the gateway (it
   manages its own certificates via built-in ACME) or behind your own reverse proxy.
-- **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, or your own:
-  anything that forwards HTTPS to a local port works, run beside the binary. whatsacc
-  has no structural dependency on any provider.
+- **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, a self-hosted
+  `vulos-relayd` (open-source, no account needed), or your own: anything that forwards
+  HTTPS to a local port works, run beside the binary. whatsacc has no structural
+  dependency on any provider — **Vulos Relay** (the paid, hosted version of that same
+  tunnel software) is one option among these, never a requirement.
 - **No public URL at all** — the design goal: a gateway on the estate LAN as a
   complete installation. Controllers already dial out. Slack **Socket Mode** — the
   gateway dialing out to Slack, no request URL needed — ships with the Go gateway
   (planned); Discord's bot gateway will dial out the same way when it lands.
   *Today* the Slack integration is the **Events API** over the public webhook
   (`/webhooks/slack`), so chat channels still need a reachable URL — as do
-  **WhatsApp webhooks** (Meta must reach you) and **portal/app access from outside
-  the property**.
+  **WhatsApp webhooks** (Meta must reach you, since the Cloud API is webhook-only —
+  see [Ingress & reachability](ingress.md) for the full breakdown) and **portal/app
+  access from outside the property**.
 
 Controllers connect to the gateway too — but they dial out from the gate side, so they
 work behind NAT and CGNAT'd 4G SIMs with zero inbound ports at the gate.
@@ -107,7 +110,9 @@ work behind NAT and CGNAT'd 4G SIMs with zero inbound ports at the gate.
 
 Slack is the five-minute path; WhatsApp needs a verified Meta business number (WABA);
 Discord is coming. All of it is covered step-by-step in [Chat channels](channels.md),
-and the WABA process in detail in [Linking WhatsApp](linking-whatsapp.md).
+and the WABA process in detail in [Linking WhatsApp](linking-whatsapp.md). If you're
+deciding whether you need a public URL at all for the channels you want, see
+[Ingress & reachability](ingress.md).
 
 ## Backup and restore
 

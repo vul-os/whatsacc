@@ -40,10 +40,12 @@ nothing held back.
   verified Meta business number (a WABA), and Meta bills you directly for your own
   conversations. See [Chat channels](channels.md).
 - **Reachability is your choice**: a public IP with the gateway's built-in ACME, any
-  tunnel you already trust running beside the binary — and, once Slack Socket Mode
-  ships with the Go gateway (planned), no public URL at all. Controllers already dial
-  out; today's Slack integration is the Events API webhook, so chat channels still
-  need a reachable URL.
+  tunnel you already trust running beside the binary (including a self-hosted,
+  no-account-needed `vulos-relayd`, or the paid Vulos Relay convenience) — and, once
+  Slack Socket Mode ships with the Go gateway (planned), no public URL at all.
+  Controllers already dial out; today's Slack integration is the Events API webhook,
+  so chat channels still need a reachable URL. WhatsApp always needs one — Meta's
+  Cloud API is webhook-only. Full breakdown: [Ingress & reachability](ingress.md).
 
 ## Where to go next
 

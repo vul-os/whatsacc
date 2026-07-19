@@ -171,15 +171,24 @@ Meta Business + WABA + phone number. Every gateway operator brings their own —
 is never in the loop, and Meta bills the operator directly for their own conversations.
 
 **Reachability is kept deliberately simple.** The gateway binds a listener and serves
-HTTPS, full stop — no tunnel protocol, no relay dependency, no driver framework:
+HTTPS, full stop — no tunnel protocol, no relay dependency, no driver framework. WhatsApp
+is the reason a public endpoint is ever needed at all: the Meta Cloud API is
+**webhook-only** (Meta calls out to you; there is no long-poll alternative), so a
+WhatsApp channel always needs a public HTTPS URL Meta can reach.
 
 1. **Direct** (default) — a VPS or any public IP; the binary does ACME itself.
-2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel — run beside
-   the binary, forwarding to its port. Documented, not implemented.
-3. **Zero-infrastructure mode** — Slack Socket Mode and Discord's bot gateway are
-   *outbound* connections, and controllers dial out too. A gateway on a LAN Pi with no
-   public URL at all still does Slack + Discord + LAN portal + controllers. Only
-   WhatsApp (Meta webhooks) and remote app access need a public URL.
+2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, or a
+   self-hosted `vulos-relayd` (open-source, no Vulos account needed) — run beside the
+   binary, forwarding to its port. Documented, not implemented. The paid, hosted
+   **Vulos Relay** is the same tunnel model as a convenience, never a requirement — one
+   feature-scoped ingress option among several, not a dependency.
+3. **Zero-infrastructure mode** — Slack Socket Mode and (once wired) Telegram
+   long-polling are *outbound* connections, and controllers dial out too. A gateway on
+   a LAN Pi with no public URL at all still does Slack + LAN portal + controllers.
+   Only WhatsApp (Meta webhooks) and remote app access need a public URL.
+
+Full option-by-option breakdown, including the WhatsApp-is-webhook-only reasoning and
+which channels need zero ingress today: [`site/docs/ingress.md`](site/docs/ingress.md).
 
 **Money is out of scope.** There is no billing code anywhere in the system. An operator
 who wants to charge their residents does it however they like — outside whatsacc.
@@ -232,6 +241,18 @@ Per-location **settings toggles, off by default**:
 - **Needs controller I/O** (protocol supports now, ship later): gate-held-open alerts,
   visitor button → "someone at the gate, reply OPEN", lockdown mode.
 - **Non-goals for v1**: license-plate recognition, multi-party approval, occupancy caps.
+- **Research idea, not committed**: a **DMTAP channel adapter**, behind the same
+  `internal/channels/` seam every other channel implements — "send a signed DMTAP
+  message → gate opens." Unlike every channel above, it would depend on nobody: no
+  Meta, no Slack workspace, no BotFather token, no phone number at all — just a
+  keypair and a DMTAP-speaking counterparty, verified the same way controller commands
+  already are (signature, not a third party's account system). It would also stretch
+  what a "visitor" can be granted access as: today grants resolve to an E.164 number or
+  a channel member id; a DMTAP identity resolves to a raw key or a `name@domain`, so a
+  visitor pass could be issued to either without a phone number or a chat account of
+  any kind. Sketch only — no seam interface, no wire format, no schedule.
+
+
 
 ## 9. Tech decisions (and what we migrated away from)
 

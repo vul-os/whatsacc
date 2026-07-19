@@ -13,6 +13,8 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 [![Architecture](https://img.shields.io/badge/read-ARCHITECTURE.md-d6624d.svg)](ARCHITECTURE.md)
 [![Part of Vulos](https://img.shields.io/badge/suite-vulos.org-2c5f4f.svg)](https://vulos.org)
 
+<sub>Part of the <strong><a href="https://vulos.org">VulOS</a></strong> open-source family — see [Part of VulOS](#part-of-vulos) below for exactly how.</sub>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/portal-dashboard.png" />
   <img src="site/screenshots/portal-dashboard.png" width="840" alt="The whatsacc management portal — tap-to-open access points, live activity" />
@@ -22,13 +24,15 @@ WhatsApp first, Slack today, Discord soon. Geofenced, audited, built for trust.
 
 ---
 
-There is **no cloud center**. whatsacc is a decentralized network of independent
-**gateways**: a gateway is one MIT-licensed Go binary (SQLite inside, management portal
-embedded) that anyone can run — a VPS, a Pi in the guardhouse, anywhere with a public
-URL. There is **no hosted service and no billing system** — whatsacc.com is the project
-site, not a cloud. You bring your own WhatsApp number or Slack workspace; Meta bills you
-directly for your own conversations. Operators who want to charge their residents solve
-that outside the system.
+## What is whatsacc?
+
+whatsacc is a decentralized network of independent **gateways**: a gateway is one
+MIT-licensed Go binary (SQLite inside, management portal embedded) that anyone can
+run — a VPS, a Pi in the guardhouse, anywhere with a public URL. There is **no cloud
+center, no hosted service and no billing system** — whatsacc.com is the project site,
+not a cloud. You bring your own WhatsApp number or Slack workspace; Meta bills you
+directly for your own conversations. Operators who want to charge their residents
+solve that outside the system.
 
 ```mermaid
 flowchart LR
@@ -40,9 +44,38 @@ flowchart LR
     APP -. "internet down?<br/>LAN/BLE offline grant" .-> C
 ```
 
-## Three ways in
+**The resilience story:** the app's emergency path works with **no internet at all** —
+the gateway pre-issues short-lived signed grants, and the app proves them straight to
+the controller over LAN or Bluetooth, no gateway and no Meta involved. This is not a
+fallback bolted on after the fact; it's a first-class access path, tested and
+documented in [Emergency access](site/docs/emergency-access.md).
 
-Ranked by how people actually behave:
+## Part of VulOS
+
+**Vulos = free, open-source software + two paid services.** The Vulos OS, all its
+apps, and the app store are OSS and free — you self-host them on a box you provision
+and pay for yourself; Vulos bills only for **Vulos Relay** (reachability) and **backup
+storage**. There is no compute, mail, or app-store billing.
+
+The suite: **Vulos OS** (the web-native desktop shell) · **Vulos Office** (docs,
+sheets, slides, PDF, whiteboards) · **Vulos Files** · **Vulos Relay** · **llmux**
+(sovereign AI gateway) — with mail/calendar/contacts as bring-your-own via
+**lilmail**, and chat/video over established third-party protocols (Matrix/Element,
+Jitsi).
+
+whatsacc is **not** one of those apps, and it isn't hosted inside the Vulos OS shell —
+it's a sibling open-source product under the same [`github.com/vul-os`](https://github.com/vul-os)
+family, solving a different problem (physical access control) with the same values:
+standalone-first, MIT everything, no hard dependency on anything else in the family.
+The one real touchpoint is optional: when a self-hosted gateway needs a public
+endpoint for its WhatsApp channel, **Vulos Relay** is one convenient tunnel option
+among several (alongside cloudflared, frp, or a self-hosted `vulos-relayd` — see
+[Ingress & reachability](site/docs/ingress.md)) — never a requirement. whatsacc runs
+to completion with nothing but a box.
+
+## Features
+
+Three ways in, ranked by how people actually behave:
 
 1. **Chat** — text `open` to the gateway's number or bot. The rules engine checks
    identity, location, access point, time windows and quotas, then pushes an
@@ -53,11 +86,14 @@ Ranked by how people actually behave:
    over LAN/BLE with a nonce challenge. Also the admin console.
 3. **Web portal** — unlimited fallback, always.
 
-The full design — components, security model, wire contracts, hosted-vs-self-hosted
-economics — lives in **[ARCHITECTURE.md](ARCHITECTURE.md)**. The wire contracts that
-controllers and apps depend on are versioned in [`proto/`](proto/).
+Plus: geofencing, per-location time windows and quotas, an append-only audit log,
+Ed25519-signed device commands, claim-token controller pairing, and an
+instance-admin seat for operators. The full design — components, security model, wire
+contracts, hosted-vs-self-hosted economics — lives in
+**[ARCHITECTURE.md](ARCHITECTURE.md)**. The wire contracts that controllers and apps
+depend on are versioned in [`proto/`](proto/).
 
-## A look around
+## Screenshots
 
 | Access points & controllers | Analytics |
 | :---: | :---: |
@@ -74,27 +110,14 @@ app with realistic data:
 npm run screenshotter   # boots the app with mocked data → site/screenshots/{,dark/}
 ```
 
-## Monorepo
+## Quick start (standalone)
 
-| Directory     | What                                                             | Status |
-| ------------- | ---------------------------------------------------------------- | ------ |
-| `site/`       | Landing + 14-chapter docs — house mini-site format, self-contained, light/dark | ✅ |
-| `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events | ✅ v0 draft |
-| `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
-| `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
-| `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
-| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes | 🚧 skeleton, porting from `backend/` |
-| `controller/` | Gate device agent + reference wiring                             | 🔨 planned |
-| `app/`        | Svelte 5 + Tauri v2 — admin console + offline emergency access   | 🔨 planned |
-
-The running stack is the behavioral reference: its routes, tenancy semantics, chat
-flows and test suites define what the Go gateway must do.
-
-## Quickstart (current stack)
-
-Prereqs: Node 20+, Postgres 16+ (local).
+whatsacc runs entirely on your own machine — nothing to sign up for, no shared cloud,
+no Vulos account required. Prereqs: Node 20+, Postgres 16+ (local).
 
 ```bash
+git clone https://github.com/vul-os/whatsacc && cd whatsacc
+
 npm install                     # frontend deps
 cd backend && npm install       # backend deps
 cd ..
@@ -109,6 +132,11 @@ npm run dev                     # API via wrangler on :8787 (env from .dev.vars)
 cd .. && npm run dev            # Vite portal on :5173
 ```
 
+That's the whole install — no chat channel is required to run the portal and explore
+it. Attaching WhatsApp or Slack (bring your own number/workspace, Meta/Slack bill you
+directly) is covered in [Run a gateway](site/docs/self-host.md) and
+[Chat channels](site/docs/channels.md) once you're ready to open a real gate.
+
 Tests, from `backend/`:
 
 ```bash
@@ -121,24 +149,83 @@ npm run test:contract           # opt-in: real Resend test API when keys are set
 
 Contract suites skip cleanly without keys — see [`site/docs/`](site/docs/) for details.
 
-## Docs
+## How it works
 
-The full documentation ships in this repo at [`site/docs/`](site/docs/) — getting
-started, linking WhatsApp, running your own gateway, channels, controllers and pairing,
-offline emergency access, security model, API reference, troubleshooting. `site/` is a
-plain static site — host it anywhere; it also syncs into the
+Everything server-side is **one binary** (today: the Cloudflare Workers backend in
+`backend/`, the spec for the Go port in `gateway/`). The gateway receives channel
+webhooks, runs the rules, serves the portal and the app's API, holds the audit log, and
+pushes signed open commands to controllers. Controllers dial **out** to the gateway, so
+they work behind NAT and on CGNAT'd 4G SIMs with zero inbound ports.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor R as Resident
+    participant CH as Channel (WhatsApp/Slack/…)
+    participant GW as Gateway (rules · signing · audit)
+    participant C as Controller
+    R->>CH: "open"
+    CH->>GW: webhook / socket event
+    GW->>GW: resolve identity → rules: location · time · quota
+    GW->>C: signed open command (outbound wss to gateway)
+    C-->>GW: ack
+    GW->>CH: reply in-thread
+```
+
+The full component breakdown, security model and the "decentralized, not federated"
+philosophy are in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
+## Configuration
+
+Configuration is environment variables — `.env` / `.env.example` at the repo root for
+the current stack, `backend/.dev.vars.example` for the Workers dev server. The Go
+gateway's target configuration (data directory, per-channel credentials, rate-limit
+tuning, admin claim token) is documented in
+[Run a gateway → Configuration](site/docs/self-host.md#configuration).
+
+## Documentation
+
+| Doc | What |
+| --- | --- |
+| [Getting started](site/docs/getting-started.md) | Fastest path to your first opened gate |
+| [Run a gateway](site/docs/self-host.md) | Full self-host walkthrough, install, backup/restore |
+| [Ingress & reachability](site/docs/ingress.md) | Which channels need a public URL, and the honest options if yours does |
+| [Chat channels](site/docs/channels.md) | WhatsApp, Slack, Telegram (beta), Discord (coming) |
+| [Controllers](site/docs/controllers.md) | Wiring a gate device |
+| [Emergency access](site/docs/emergency-access.md) | The offline LAN/BLE grant path |
+| [Architecture](site/docs/architecture.md) · [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design |
+| [Security](site/docs/security.md) · [SECURITY.md](SECURITY.md) | Security model + disclosure |
+| [API reference](site/docs/api.md) | HTTP surface |
+
+The full set ships in this repo at [`site/docs/`](site/docs/) — `site/` is a plain
+static site, host it anywhere; it also syncs into the
 [Vulos console](https://vulos.org/products/whatsacc/docs) as the product mini-site.
 
-## Part of the Vulos suite
+## Development
 
-whatsacc is a standalone open-source product in the [Vulos](https://vulos.org) suite —
-sovereign software you can run yourself. Reachability stays simple: a public IP with
-built-in ACME, or any tunnel you already trust (cloudflared, frp) beside the binary.
-On a LAN with Slack Socket Mode, no public URL is needed at all.
+| Directory     | What                                                             | Status |
+| ------------- | ---------------------------------------------------------------- | ------ |
+| `site/`       | Landing + docs — house mini-site format, self-contained, light/dark | ✅ |
+| `proto/`      | Versioned wire contracts: pairing, signed commands, offline grants, events | ✅ v0 draft |
+| `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
+| `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
+| `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
+| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes, channel seam | 🚧 in progress, porting from `backend/` |
+| `controller/` | Gate device agent + reference wiring                             | 🚧 in progress |
+| `e2e/`        | End-to-end suites against the Go gateway + controller             | 🚧 in progress |
+| `app/`        | Svelte 5 + Tauri v2 — admin console + offline emergency access   | 🔨 planned |
+
+The running Workers stack is the behavioral reference: its routes, tenancy semantics,
+chat flows and test suites define what the Go gateway must do. Build/test commands per
+directory: see the test block under [Quick start](#quick-start-standalone) for
+`backend/`, and `cd gateway && make check` (or `go test ./...`) for the Go gateway once
+you're working there.
+
+Dev setup, test suites and style live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing & security
 
-Dev setup, test suites and style live in [CONTRIBUTING.md](CONTRIBUTING.md).
+Small, focused PRs against `main` — see [CONTRIBUTING.md](CONTRIBUTING.md).
 Vulnerabilities — this product opens physical gates — go privately via
 [SECURITY.md](SECURITY.md), never the public tracker.
 

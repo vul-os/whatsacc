@@ -31,7 +31,11 @@ fails. Replies use the Cloud API send endpoint — including interactive numbere
 for gate pickers.
 
 The full walkthrough, including number advice and failure modes, is in
-[Linking WhatsApp](linking-whatsapp.md).
+[Linking WhatsApp](linking-whatsapp.md). WhatsApp is the one channel that always needs
+a public HTTPS endpoint — Meta's Cloud API only speaks webhooks, there is no
+alternative — see [Ingress & reachability](ingress.md) for the honest options (public
+bind, any tunnel including a self-hosted `vulos-relayd`, or the paid Vulos Relay
+convenience).
 
 ## Slack
 
@@ -114,6 +118,10 @@ honestly incomplete:
   acknowledgement, not the rules pipeline, and no gate actuates. Telegram chats are
   not yet linked to member profiles. Opens land when the channel is wired into the
   same open pipeline Slack's buttons use.
+
+Long-polling (`getUpdates`) is also viable for Telegram and needs **no public URL at
+all** — see [Ingress & reachability](ingress.md). The webhook path below is the
+current wiring.
 
 Setup:
 

@@ -72,6 +72,11 @@
       "file": "channels.md"
     },
     {
+      "id": "ingress",
+      "title": "Ingress & reachability",
+      "file": "ingress.md"
+    },
+    {
       "id": "admin",
       "title": "Instance admin",
       "file": "admin.md"
@@ -130,7 +135,8 @@
       "title": "Run a gateway",
       "pages": [
         "self-host",
-        "channels"
+        "channels",
+        "ingress"
       ]
     },
     {
