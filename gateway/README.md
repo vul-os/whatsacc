@@ -5,10 +5,20 @@ device hub, audit — backed by **one SQLite file**. See `../ARCHITECTURE.md`
 for the full picture; the Cloudflare Workers backend in `../backend/` is the
 behavioral spec this is being ported from.
 
-## Status: skeleton
+## Status: product core ported
 
-This is an honest, compiling, tested skeleton that establishes the
-architecture the port grows into. It is not yet a usable product server.
+The product core is ported from the Workers backend onto Go + SQLite: accounts
+/ members / invites, locations / quotas, access points, devices + pairing +
+the controller WebSocket hub, **the open path** (verdict → signed envelope →
+device), temporary grants, and the platform-admin console. `go build ./...`,
+`go vet ./...`, `go test ./...` are green (default build); `-tags portal`
+builds and tests green too.
+
+Remaining (not blocking the core): channel webhooks (WhatsApp/Telegram/Slack),
+phone-OTP verify routes, analytics endpoints, maintenance/meter records +
+device-fed movement metering, Google OAuth / email-verify / password-reset
+ceremony, and dropping the real Vite bundle into `internal/portal/dist/`. See
+the porting map below.
 
 **Works today**
 
@@ -41,13 +51,21 @@ vectors. Documented deviation: general (non-integer) number formatting is
 rejected rather than implemented — envelopes only carry integers and strings.
 When `proto/vectors/` lands, point the tests at it and extend if needed.
 
-**Schema subset** (`internal/store/migrations/0001_baseline.sql`): users,
-profiles, accounts, account_members, locations, access_points, devices,
-access_logs, refresh_tokens, instance_settings. Deferred (listed in the
-migration header): countries, oauth_identities, password/email token tables,
-profile_phone_numbers, account_invites, location_members, location_settings,
-device_commands, all channel chat/message tables, maintenance/meters,
-temporary_access_grants, rate-limit tables, admin_audit_log.
+**Schema** (folded migrations, `internal/store/migrations/`):
+
+- `0001_baseline.sql` — users, profiles, accounts, account_members, locations,
+  access_points, devices, access_logs, refresh_tokens, instance_settings.
+- `0002_members_invites_settings.sql` — location_members, location_settings
+  (quota columns), account_invites, profile_phone_numbers (+ one-verified-owner
+  unique index).
+- `0003_openpath.sql` — temporary_access_grants (+ access-point join),
+  rate_limit_counters, rate_limit_cooldowns.
+- `0004_admin_audit.sql` — admin_audit_log.
+
+Still deferred (ported with their routes): countries, oauth_identities,
+password/email token tables, device_commands (dispatch is in-memory via the
+hub for now), channel chat/message tables, maintenance_events +
+access_point_meters (movement metering).
 
 ## Build / run / test
 
@@ -74,20 +92,35 @@ bearer token. Exactly one caller can ever win; the mechanism burns forever.
 
 | Backend (spec) | Gateway | Status |
 | --- | --- | --- |
-| `routes/auth.ts` register/login/refresh/logout/me | `internal/httpapi/auth.go` | skeleton (core done; verify-email, password reset, Google OAuth, invites, profile patch pending) |
+| `routes/auth.ts` register/login/refresh/logout/me | `internal/httpapi/auth.go` | core done (verify-email, password reset, Google OAuth, profile patch pending) |
 | `routes/admin.ts` claim | `internal/httpapi/admin.go` | done |
-| `routes/admin.ts` overview/accounts/users/limits/audit | `internal/httpapi/admin.go` | planned (needs admin_audit_log + rate-limit tables) |
-| `routes/accounts.ts` | `internal/httpapi/accounts.go` | planned |
-| `routes/locations.ts` | `internal/httpapi/locations.go` | planned |
-| `routes/access.ts` (access points, open/close, grants, maintenance) | `internal/httpapi/access.go` + rules engine pkg | planned — open path emits signed envelopes via `internal/keys` |
-| `routes/devices.ts` (+ `proto/pairing.md`) | `internal/httpapi/devices.go` + device hub (wss dial-out) | planned |
+| `routes/admin.ts` overview/accounts/users/limits(+kill-switch)/audit | `internal/httpapi/adminops.go` + `store/admin.go` | **done** |
+| `routes/accounts.ts` (list/create/get/rename, members, invites) | `internal/httpapi/accounts.go` + `store/{members,invites}.go` | **done** (accept never auto-verifies phones) |
+| `routes/locations.ts` (CRUD, limits/quotas, usage) | `internal/httpapi/locations.go` + `store/locations.go` | **done** |
+| `routes/access.ts` access points + **open/close** + grants | `internal/httpapi/{access,open}.go` + `store/{accesspoints,openpath,grants}.go` | **done** — open path signs envelopes (`internal/keys`) and dispatches via the hub; maintenance/meters deferred |
+| `lib/rate-limit.ts` | `store/ratelimit.go` + `store/openpath.go` | **done** (SQLite atomic try-bump; exact-once under concurrency) |
+| `routes/devices.ts` (+ `proto/pairing.md`) | `internal/httpapi/devices.go` + `internal/hub` | **done** — claim/redeem, WS challenge/auth, ack correlation, HTTPS long-poll fallback |
 | `routes/whatsapp.ts` / `slack.ts` / `telegram.ts` | `internal/channel/` seam (per ARCHITECTURE §3a) | planned |
 | `routes/analytics.ts` | `internal/httpapi/analytics.go` | planned |
-| `routes/phones.ts` | with profile_phone_numbers migration | planned |
-| React portal (`../src`) | Svelte build embedded via `internal/portal` | placeholder seam wired |
+| `routes/phones.ts` (OTP verify) | with profile_phone_numbers migration | planned (schema + invite-side linking done; verify routes pending) |
+| React portal (`../src`, Vite) | embedded via `internal/portal` (`-tags portal`) | **seam done** — placeholder default; `make portal && make build-portal` embeds the real bundle |
 
-Backend vitest cases (unit/integration/security/contract) get ported alongside
-each route group.
+Backend vitest cases (unit/integration/security/contract) are ported alongside
+each route group as store-level + `httptest` handler tests, including the
+open-path verdict matrix and concurrency hammers.
+
+### Device transport (Stage 2/3)
+
+`internal/hub` is the live registry (`device_id` → WebSocket, via
+`github.com/coder/websocket` — chosen over gorilla for its context-native API
+and zero transitive deps). An allowed open is signed (`internal/keys`) and
+pushed to the access point's controller; the reply `cmd.ack` is correlated by
+envelope nonce and the outcome (`acked` / `undelivered` / `queued` /
+`no_device`) is written back onto the `access_logs` row. Offline controllers
+fall back to the HTTPS long-poll (`/api/controller/{challenge,poll,ack}`),
+each poll gated by a single-use, signed `ws.auth` proof. `hub.VerifyAuth` is
+the production twin of the `proto/vectors/pairing.json` reference verifier and
+is tested against those vectors.
 
 ## Layout
 
@@ -95,8 +128,22 @@ each route group.
 gateway/
 ├── cmd/gateway/          # main: config, bootstrap, serve
 ├── internal/store/       # SQLite + embedded migrations + tenancy-scoped methods
-│   └── migrations/       # clean folded baseline (SQLite)
-├── internal/httpapi/     # net/http 1.22-pattern router, auth, admin claim
+│   └── migrations/       # folded baseline + 0002..0004 (SQLite)
+├── internal/httpapi/     # net/http 1.22-pattern router; auth, accounts,
+│                         #   locations, access, open path, devices, admin
+├── internal/hub/         # device registry, ws.challenge/auth, ack correlation
 ├── internal/keys/        # Ed25519 identity, JCS, signed command envelopes
-└── internal/portal/      # go:embed portal seam (placeholder page)
+└── internal/portal/      # go:embed portal seam: static/ default, dist/ (-tags portal)
 ```
+
+### Build modes
+
+```sh
+go build ./...                       # default: portal placeholder
+make portal && make build-portal     # embed the real React bundle (-tags portal)
+```
+
+`make portal` runs `npm run build` in the repo root and copies `dist/` into
+`internal/portal/dist/`; `make build-portal` then builds with `-tags portal`.
+A committed `dist/index.html` placeholder keeps the tagged build compilable
+before that copy runs.

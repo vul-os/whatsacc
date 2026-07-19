@@ -72,8 +72,16 @@ func register(t *testing.T, h http.Handler, email string) (access, refresh strin
 func TestHealth(t *testing.T) {
 	h := newTestServer(t, "")
 	rec, out := doJSON(t, h, "GET", "/health", "", nil)
+	// Shape parity with backend/src/app.ts so the Tauri picker
+	// (src/lib/gateway.ts testGatewayUrl) accepts it: {ok, env, db_now}.
 	if rec.Code != 200 || out["ok"] != true || out["version"] != "test" {
 		t.Errorf("health: %d %v", rec.Code, out)
+	}
+	if out["env"] == nil || out["env"] == "" {
+		t.Errorf("health missing env: %v", out)
+	}
+	if _, ok := out["db_now"].(float64); !ok {
+		t.Errorf("health missing db_now: %v", out)
 	}
 }
 
@@ -90,8 +98,10 @@ func TestPortalPlaceholderServed(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "whatsacc gateway") {
-		t.Errorf("portal placeholder: %d", rec.Code)
+	// Build-agnostic: the default build serves the static/ placeholder, the
+	// -tags portal build serves dist/index.html — both contain "whatsacc".
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "whatsacc") {
+		t.Errorf("portal root: %d", rec.Code)
 	}
 }
 

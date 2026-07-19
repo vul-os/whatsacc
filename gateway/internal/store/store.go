@@ -9,6 +9,7 @@
 package store
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"embed"
@@ -54,6 +55,17 @@ func Open(dir string) (*Store, error) {
 
 // Close closes the underlying database.
 func (s *Store) Close() error { return s.db.Close() }
+
+// DBNow returns the database clock (unix seconds), proving the handle is live
+// — the /health probe (backend selected now() from Postgres for the same
+// purpose). A query error here is what flips /health to ok:false.
+func (s *Store) DBNow(ctx context.Context) (int64, error) {
+	var n int64
+	if err := s.db.QueryRowContext(ctx, `SELECT unixepoch()`).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
 
 func (s *Store) migrate() error {
 	if _, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (

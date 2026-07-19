@@ -82,6 +82,19 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("GET /v1/admin/claim", s.requireAuth(s.handleClaimState))
 	mux.Handle("POST /v1/admin/claim", s.requireAuth(s.handleClaim))
 
+	// platform-admin console (spec: backend admin.ts) — live-admin gated
+	mux.Handle("GET /v1/admin/overview", s.requireAdmin(s.handleAdminOverview))
+	mux.Handle("GET /v1/admin/accounts", s.requireAdmin(s.handleAdminAccounts))
+	mux.Handle("GET /v1/admin/accounts/{id}", s.requireAdmin(s.handleAdminAccountGet))
+	mux.Handle("PATCH /v1/admin/accounts/{id}", s.requireAdmin(s.handleAdminAccountPatch))
+	mux.Handle("GET /v1/admin/users", s.requireAdmin(s.handleAdminUsers))
+	mux.Handle("PATCH /v1/admin/users/{id}", s.requireAdmin(s.handleAdminUserPatch))
+	mux.Handle("POST /v1/admin/users/{id}/platform-admin", s.requireAdmin(s.handleAdminPlatformAdmin))
+	mux.Handle("GET /v1/admin/limits", s.requireAdmin(s.handleAdminLimitsGet))
+	mux.Handle("PATCH /v1/admin/limits", s.requireAdmin(s.handleAdminLimitsPatch))
+	mux.Handle("GET /v1/admin/audit", s.requireAdmin(s.handleAdminAudit))
+	mux.Handle("GET /v1/admin/audit/actions", s.requireAdmin(s.handleAdminAuditActions))
+
 	// accounts + members + invites (spec: backend/src/routes/accounts.ts)
 	mux.Handle("GET /v1/accounts", s.requireAuth(s.handleAccountsList))
 	mux.Handle("POST /v1/accounts", s.requireAuth(s.handleAccountCreate))
@@ -187,8 +200,20 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 // health + gateway key
 // ---------------------------------------------------------------------------
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": s.cfg.Version})
+// handleHealth mirrors backend/src/app.ts GET /health so the Tauri gateway
+// picker (src/lib/gateway.ts testGatewayUrl) can probe any gateway: it reads
+// {ok, env} and treats ok:false as an unhealthy DB. db_now proves the SQLite
+// handle is live (the backend selected now() from Postgres). On a DB error we
+// return ok:false + 500, exactly like the backend.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	dbNow, err := s.store.DBNow(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "env": s.cfg.Env, "db_now": dbNow, "version": s.cfg.Version,
+	})
 }
 
 func (s *Server) handleGatewayKey(w http.ResponseWriter, _ *http.Request) {

@@ -76,9 +76,13 @@ func run(dataDir, listen, publicURL, claimToken string, log *slog.Logger) error 
 
 	srv := httpapi.New(httpapi.Config{
 		Version:         Version,
+		Env:             envOr("WACC_ENV", "self-hosted"),
 		PublicURL:       publicURL,
 		AdminClaimToken: claimToken,
 		JWTSecret:       secret,
+		// Rate-limit env layer (db overrides via PATCH /v1/admin/limits sit on
+		// top; see store.ResolveRateLimitConfig).
+		RateLimits: store.ParseRateLimitConfig(os.Getenv),
 	}, st, ks, log)
 
 	log.Info("whatsacc gateway", "version", Version, "listen", listen,
