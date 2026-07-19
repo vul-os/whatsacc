@@ -1,0 +1,182 @@
+name: Release
+
+# On tag vX.Y.Z:
+#   - gateway binaries: linux/amd64, linux/arm64 (Pi), darwin/amd64, darwin/arm64
+#   - controller binaries: same matrix, only if controller/go.mod exists at run time
+#   - Tauri desktop app on macos-latest (.dmg + .app.zip) — UNSIGNED: no Apple
+#     signing identity or notarization is configured; macOS Gatekeeper will
+#     warn on first launch (right-click > Open).
+#   - one GitHub Release with all artifacts + SHA256SUMS.txt
+#
+# The container image for the same tag is published by docker.yml.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    name: detect optional components
+    runs-on: ubuntu-latest
+    outputs:
+      controller: ${{ steps.check.outputs.controller }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f controller/go.mod ]; then
+            echo "controller=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "controller=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  gateway:
+    name: gateway ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: gateway/go.mod
+          cache-dependency-path: gateway/go.sum
+      - name: Build
+        working-directory: gateway
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          name="whatsacc-gateway_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME}" \
+            -o "dist/${name}/whatsacc-gateway" ./cmd/gateway
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gateway-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: gateway/dist/*.tar.gz
+          if-no-files-found: error
+
+  controller:
+    name: controller ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: detect
+    if: needs.detect.outputs.controller == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: controller/go.mod
+      - name: Build
+        working-directory: controller
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          name="whatsacc-controller_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p "dist/${name}"
+          if [ -d cmd ]; then
+            for d in cmd/*/; do
+              go build -trimpath \
+                -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME}" \
+                -o "dist/${name}/$(basename "$d")" "./$d"
+            done
+          else
+            go build -trimpath \
+              -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME}" \
+              -o "dist/${name}/whatsacc-controller" .
+          fi
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controller-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: controller/dist/*.tar.gz
+          if-no-files-found: error
+
+  desktop:
+    name: desktop app (macOS, unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      # Unsigned build: no APPLE_SIGNING_IDENTITY / notarization secrets are
+      # set, so Tauri produces an unsigned .app/.dmg.
+      - name: Tauri build
+        run: npm run app:build
+      - name: Package bundles
+        run: |
+          mkdir -p dist-desktop
+          found=0
+          while IFS= read -r -d '' dmg; do
+            cp "$dmg" "dist-desktop/whatsacc_${GITHUB_REF_NAME}_macos_$(uname -m).dmg"
+            found=1
+          done < <(find src-tauri/target -type f -name '*.dmg' -path '*/bundle/*' -print0)
+          while IFS= read -r -d '' app; do
+            ditto -c -k --keepParent "$app" \
+              "dist-desktop/whatsacc_${GITHUB_REF_NAME}_macos_$(uname -m).app.zip"
+            found=1
+          done < <(find src-tauri/target -type d -name '*.app' -path '*/bundle/*' -print0)
+          if [ "$found" -eq 0 ]; then
+            echo "no Tauri bundles found under src-tauri/target" >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: dist-desktop/*
+          if-no-files-found: error
+
+  release:
+    name: publish GitHub release
+    needs: [detect, gateway, controller, desktop]
+    if: >-
+      ${{ !cancelled()
+          && needs.gateway.result == 'success'
+          && needs.desktop.result == 'success'
+          && (needs.controller.result == 'success' || needs.controller.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Container image: `ghcr.io/${{ github.repository_owner }}/whatsacc-gateway:${{ github.ref_name }}` (linux/amd64 + linux/arm64, published by the Docker workflow).
+
+            The macOS desktop app is **unsigned** (no Apple signing identity is configured): on first launch, right-click the app and choose Open.
+
+            `SHA256SUMS.txt` covers every attached file.

@@ -80,3 +80,73 @@ jobs:
       - run: npm run migrate
       - run: npm run test:integration
       - run: npm run test:security
+
+  gateway:
+    name: gateway (vet + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The gateway is being ported in-tree; skip cleanly if the module
+      # isn't present on this ref instead of failing the whole pipeline.
+      - name: Detect gateway module
+        id: mod
+        run: |
+          if [ -f gateway/go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "gateway/go.mod not found — nothing to check yet"
+          fi
+      - uses: actions/setup-go@v5
+        if: steps.mod.outputs.present == 'true'
+        with:
+          go-version-file: gateway/go.mod
+          cache-dependency-path: gateway/go.sum
+      - name: go vet
+        if: steps.mod.outputs.present == 'true'
+        working-directory: gateway
+        run: go vet ./...
+      - name: go build
+        if: steps.mod.outputs.present == 'true'
+        working-directory: gateway
+        env:
+          CGO_ENABLED: "0"
+        run: go build ./...
+      - name: go test
+        if: steps.mod.outputs.present == 'true'
+        working-directory: gateway
+        run: go test ./...
+
+  controller:
+    name: controller (vet + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # controller/ hasn't landed yet; skip cleanly until it exists.
+      - name: Detect controller module
+        id: mod
+        run: |
+          if [ -f controller/go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "controller/go.mod not found — nothing to check yet"
+          fi
+      - uses: actions/setup-go@v5
+        if: steps.mod.outputs.present == 'true'
+        with:
+          go-version-file: controller/go.mod
+      - name: go vet
+        if: steps.mod.outputs.present == 'true'
+        working-directory: controller
+        run: go vet ./...
+      - name: go build
+        if: steps.mod.outputs.present == 'true'
+        working-directory: controller
+        env:
+          CGO_ENABLED: "0"
+        run: go build ./...
+      - name: go test
+        if: steps.mod.outputs.present == 'true'
+        working-directory: controller
+        run: go test ./...
