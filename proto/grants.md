@@ -95,3 +95,45 @@ chat/portal paths still work when connectivity returns.
 
 Every offline open is queued as an audit event and uploaded on reconnect (events.md),
 including the full grant_id + proof material, so the audit trail has no offline hole.
+
+## Transports
+
+The redemption messages (`grant.open` / `grant.challenge` / `grant.proof` /
+`grant.result`) are transport-agnostic JSON. Two transports are specified; both
+carry the identical message layer, so verification code is shared.
+
+### LAN (primary)
+
+Controller advertises mDNS `_whatsacc._tcp` (TXT: `device=<device_id>`,
+`proto=0`) and serves plain HTTP on the advertised port: `POST /grant/open`
+(body `grant.open`) → `grant.challenge`; `POST /grant/proof` → `grant.result`.
+Plain HTTP is acceptable: every message is Ed25519-signed and single-use; the
+transport adds no trust.
+
+### BLE GATT (emergency — no network at all)
+
+For the darkest scenario — no Wi-Fi, no LAN, phone in hand at the gate — the
+controller MAY expose a BLE peripheral:
+
+- **Service UUID** `9f0a0001-8f7c-4b62-9d5e-7acc00000001` ("whatsacc-grant"),
+  advertised with local name `wacc-<first 8 hex of device_id>`.
+- Characteristics:
+  | UUID (`9f0a…`) | Name | Properties |
+  | --- | --- | --- |
+  | `…0002` | `rx` | Write / Write-without-response — app → controller frames |
+  | `…0003` | `tx` | Notify — controller → app frames |
+  | `…0004` | `info` | Read — JSON `{v:0, device_id, mtu}` |
+- **Framing**: each JSON message is sent as one logical frame, chunked to the
+  negotiated ATT MTU: 4-byte little-endian total length, then the UTF-8 JSON
+  bytes, split across as many writes/notifications as needed. A new frame on
+  `rx` aborts any partial previous frame. Max frame 8 KiB (`frame_too_large`).
+- **Sequence**: app writes `grant.open` → controller notifies
+  `grant.challenge` → app writes `grant.proof` → controller notifies
+  `grant.result`. Same cnonce validity (30 s) and single-use rules; the
+  controller drops the connection after result or timeout.
+- **Security**: BLE pairing/bonding is NOT used or trusted — the message-layer
+  Ed25519 signatures and the pinned-key model carry all authority, exactly as
+  on LAN. An attacker with radio access gains nothing beyond what the LAN
+  transport already exposes (deny-with-reason responses).
+- Advertising SHOULD only be enabled while the gate has power and MAY be
+  disabled by `config` (`ble_enabled: false`).
