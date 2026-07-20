@@ -8,7 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,10 @@ type Config struct {
 	// RateLimits is the env layer of the rate-limit config (defaults
 	// merged in main via store.ParseRateLimitConfig). Zero value = defaults.
 	RateLimits store.RateLimitConfig
+	// AuthRateLimits bounds the credential endpoints (login/register/
+	// refresh) and the admin claim against brute-force/DoS — see
+	// store.AuthRateLimitConfig's doc comment. Zero value = defaults.
+	AuthRateLimits store.AuthRateLimitConfig
 	// Channels holds the chat-channel credentials (WhatsApp/Slack/Telegram).
 	// Zero value = every channel refuses its webhook (fail-closed) and its
 	// sender is a config-unset no-op.
@@ -83,6 +89,9 @@ func New(cfg Config, st *store.Store, ks *keys.Keys, log *slog.Logger) *Server {
 	}
 	if (cfg.RateLimits == store.RateLimitConfig{}) {
 		cfg.RateLimits = store.RateLimitDefaults
+	}
+	if (cfg.AuthRateLimits == store.AuthRateLimitConfig{}) {
+		cfg.AuthRateLimits = store.AuthRateLimitDefaults
 	}
 	if cfg.Channels.PublicURL == "" {
 		cfg.Channels.PublicURL = cfg.PublicURL
@@ -151,6 +160,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /v1/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /v1/auth/refresh", s.handleRefresh)
 	mux.HandleFunc("POST /v1/auth/logout", s.handleLogout)
+	mux.Handle("POST /v1/auth/logout-all", s.requireAuth(s.handleLogoutAll))
 	mux.Handle("GET /v1/auth/me", s.requireAuth(s.handleMe))
 
 	// instance admin first-run claim (spec: backend/src/routes/admin.ts)
@@ -169,6 +179,7 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("PATCH /v1/admin/limits", s.requireAdmin(s.handleAdminLimitsPatch))
 	mux.Handle("GET /v1/admin/audit", s.requireAdmin(s.handleAdminAudit))
 	mux.Handle("GET /v1/admin/audit/actions", s.requireAdmin(s.handleAdminAuditActions))
+	mux.Handle("GET /v1/admin/audit/verify", s.requireAdmin(s.handleAdminAuditVerify))
 
 	// accounts + members + invites (spec: backend/src/routes/accounts.ts)
 	mux.Handle("GET /v1/accounts", s.requireAuth(s.handleAccountsList))
@@ -202,6 +213,10 @@ func (s *Server) Router() http.Handler {
 	mux.Handle("POST /v1/grants", s.requireAuth(s.handleGrantCreate))
 	mux.Handle("GET /v1/grants/{id}", s.requireAuth(s.handleGrantGet))
 	mux.Handle("POST /v1/grants/{id}/revoke", s.requireAuth(s.handleGrantRevoke))
+
+	// offline grants (spec: proto/grants.md) — the gateway-side issuance half
+	// of the emergency no-internet path; controller/internal/grants verifies.
+	mux.Handle("POST /v1/offline-grants", s.requireAuth(s.handleOfflineGrantIssue))
 
 	// devices + pairing + controller transport (spec: backend devices.ts +
 	// proto/pairing.md)
@@ -241,7 +256,19 @@ type ctxKey int
 
 const claimsKey ctxKey = 0
 
-// requireAuth verifies the Bearer access token and stashes claims in context.
+// requireAuth verifies the Bearer access token AND re-reads the user's LIVE
+// status from the users row before letting the request through.
+//
+// Before this, only requireAdmin (adminops.go) did the live re-read — its
+// own comment explains why: "the users row is re-read per request, so
+// revocation is immediate and the JWT's adm claim is never trusted for
+// gating." That discipline was not applied to ordinary auth, so a disabled
+// user's still-signature-valid access token kept working for up to its
+// full TTL (accessTTL, 15 minutes) after an admin disabled them — the
+// finding this closes. The cost is one extra query per authenticated
+// request (requireAdmin already pays it, and pays it TWICE now — once here
+// and once for its own is_platform_admin check — a small, accepted
+// redundancy on a self-hosted, requests-per-minute-not-per-second system).
 func (s *Server) requireAuth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := r.Header.Get("Authorization")
@@ -255,8 +282,54 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
+		u, err := s.store.UserByID(r.Context(), claims.Sub)
+		if err != nil || u.Status != "active" {
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		next(w, r.WithContext(context.WithValue(r.Context(), claimsKey, claims)))
 	})
+}
+
+// clientIP returns the TCP peer address (the host part of RemoteAddr) —
+// NEVER a client-supplied header. X-Forwarded-For / X-Real-IP are
+// deliberately not honored: this gateway has no configured trusted-proxy
+// allowlist, and without one, trusting a client-controlled header would
+// let an attacker mint a fresh "IP" on every request and defeat every
+// per-IP throttle in authratelimit.go outright. A reverse-proxy deployment
+// that wants per-real-client throttling needs a trusted-proxy config added
+// first — using an unvalidated header here would be a worse regression
+// than not supporting that deployment shape yet.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// authIPGate enforces an IP-scoped auth throttle (store.AuthRateLimitConfig)
+// before a credential-endpoint handler does any real work. It writes the
+// response itself on denial/error and returns false — callers just
+// `if !s.authIPGate(...) { return }`, the same shape as this package's
+// other gate helpers (memberRole, requireAccountAdmin, ...).
+//
+// Fails CLOSED on a counter-store error — see authratelimit.go's package
+// doc comment for why this deliberately diverges from openpath.go's
+// fail-open policy.
+func (s *Server) authIPGate(w http.ResponseWriter, r *http.Request, scope string, limit int64) bool {
+	ok, retry, err := s.store.CheckAuthRateLimit(r.Context(), scope, "ip:"+clientIP(r), limit, time.Now().Unix())
+	if err != nil {
+		s.log.Error("auth rate limit check failed", "scope", scope, "err", err)
+		writeErr(w, http.StatusServiceUnavailable, "rate_limit_unavailable")
+		return false
+	}
+	if !ok {
+		w.Header().Set("Retry-After", strconv.FormatInt(retry, 10))
+		writeErr(w, http.StatusTooManyRequests, "rate_limited")
+		return false
+	}
+	return true
 }
 
 func claimsFrom(r *http.Request) *Claims {

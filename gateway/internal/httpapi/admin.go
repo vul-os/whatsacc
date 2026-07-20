@@ -37,8 +37,16 @@ type claimReq struct {
 	Token string `json:"token"`
 }
 
-// POST /v1/admin/claim
+// POST /v1/admin/claim — IP-throttled (security assessment finding: this
+// was completely unthrottled). The claim token itself is a random secret
+// compared in constant time, so guessing it outright is already
+// infeasible; the throttle is still worth having as defense in depth and
+// to bound log/DB spam from a probing script, per the finding's explicit
+// ask to cover this route.
 func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
+	if !s.authIPGate(w, r, "claim_ip", s.cfg.AuthRateLimits.ClaimIPPerWindow) {
+		return
+	}
 	c := claimsFrom(r)
 	var req claimReq
 	if !readJSON(w, r, &req) {

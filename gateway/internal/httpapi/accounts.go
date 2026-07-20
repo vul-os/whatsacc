@@ -188,6 +188,7 @@ type inviteReq struct {
 // gateway yet, email_sent/whatsapp_sent report false and tests recover the
 // token via store.SetInviteTokenHash (backend parity for mocked delivery).
 func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
 	id := r.PathValue("id")
 	var req inviteReq
 	if !readJSON(w, r, &req) {
@@ -218,6 +219,15 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	// Durable trail for invite issuance — security assessment finding:
+	// this previously left nothing durable, so an admin session inviting a
+	// malicious member (with, say, an admin role) left no queryable
+	// record. The plaintext accept token is NEVER written here either,
+	// same as it is never returned in the HTTP response above.
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "invite_create", "account_invite", inviteID, true,
+		map[string]any{"account_id": id, "email": req.Email, "role": req.Role}); err != nil {
+		s.log.Error("invite create audit write failed", "invite_id", inviteID, "err", err)
 	}
 	// tokenPlain deliberately dropped here — delivery seam (email/WhatsApp)
 	// attaches later; the create response must never carry it.
@@ -266,6 +276,15 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	// Durable trail for a role grant via invite accept — same "attacker
+	// promotes a malicious member and leaves no trace" gap the finding
+	// named, just via the OTHER door (an accepted invite grants a role
+	// exactly like the platform-admin routes' role changes, which already
+	// audit — this one didn't).
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "invite_accept", "account", res.AccountID, true,
+		map[string]any{"role": res.Role}); err != nil {
+		s.log.Error("invite accept audit write failed", "account_id", res.AccountID, "err", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"account_id":                  res.AccountID,

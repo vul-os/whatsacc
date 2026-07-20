@@ -377,14 +377,20 @@ func TestLateAckReconcilesAccessLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The "undelivered" dispatch outcome is now a SEPARATE append-only
+	// follow-up row (store.RecordDispatchOutcome, which replaced the old
+	// mutate-in-place store.UpdateAccessLogError so the hash chain in
+	// store/audithash.go stays meaningful — see that file's doc comment)
+	// rather than a mutation of the original "open allowed" row. The
+	// follow-up row's own ReconcilesLogID names the true original.
 	origID := ""
 	for _, l := range logs {
-		if l.AccessPointID == apID && l.Command == "open" && l.Error == "undelivered" {
-			origID = l.ID
+		if l.AccessPointID == apID && l.Command == "open" && l.Error == "undelivered" && l.ReconcilesLogID != "" {
+			origID = l.ReconcilesLogID
 		}
 	}
 	if origID == "" {
-		t.Fatalf("original undelivered row not found: %+v", logs)
+		t.Fatalf("undelivered dispatch-outcome row not found: %+v", logs)
 	}
 
 	// The controller's genuine ack finally lands, well after the ack-wait
@@ -400,6 +406,12 @@ func TestLateAckReconcilesAccessLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// There are now TWO rows referencing origID: the earlier synchronous
+	// "undelivered" dispatch-outcome row (store.RecordDispatchOutcome) and
+	// this late-ack reconciliation row (store.ReconcileLateAck) — both are
+	// legitimate append-only follow-ups of the same original, and their ts
+	// can tie at whole-second resolution, so pick the late-ack one
+	// specifically rather than "whichever matches first".
 	var reconciled *store.AccessLog
 	deadline = time.Now().Add(3 * time.Second)
 	for reconciled == nil && time.Now().Before(deadline) {
@@ -408,7 +420,7 @@ func TestLateAckReconcilesAccessLog(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i := range logs {
-			if logs[i].ReconcilesLogID == origID {
+			if logs[i].ReconcilesLogID == origID && strings.HasPrefix(logs[i].Error, "late_ack:") {
 				reconciled = &logs[i]
 				break
 			}
@@ -423,17 +435,29 @@ func TestLateAckReconcilesAccessLog(t *testing.T) {
 			reconciled.Success, reconciled.Error)
 	}
 
-	// Append-only discipline: the original row must remain exactly as it
-	// was recorded at the time — "we never heard back" and "we heard back
-	// late, it did open" are two distinct rows, never collapsed into one.
+	// Append-only discipline: the ORIGINAL "open allowed" row must remain
+	// exactly as it was recorded at insert time forever — under the hash
+	// chain (store/audithash.go) this is no longer just a convention, it
+	// is DB-enforced (access_logs_immutable would abort any attempt to
+	// mutate it, and doing so anyway would invalidate every hash after
+	// it). "We couldn't reach the controller in time", "we heard back
+	// late, it did open", and the original "the request was allowed" are
+	// three distinct, equally durable facts, never collapsed into one row.
 	logs, err = st.AccessLogsByAccount(context.Background(), accountID, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
+	var origFound bool
 	for _, l := range logs {
-		if l.ID == origID && l.Error != "undelivered" {
-			t.Errorf("original row was mutated: error=%q, want unchanged 'undelivered'", l.Error)
+		if l.ID == origID {
+			origFound = true
+			if l.Error != "" || !l.Success || l.ReconcilesLogID != "" {
+				t.Errorf("original row was mutated: %+v", l)
+			}
 		}
+	}
+	if !origFound {
+		t.Fatal("original row disappeared")
 	}
 }
 

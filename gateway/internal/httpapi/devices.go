@@ -119,6 +119,16 @@ func (s *Server) handleDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
+	// Durable trail for device/claim issuance (security assessment finding:
+	// this previously left only a transient slog line — an attacker with
+	// an admin session pairing a rogue controller left no queryable trace).
+	// Best-effort per WriteAdminAudit's own contract: never blocks the
+	// create. The claim token itself is NEVER written to the audit log —
+	// only its existence and metadata.
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "device_claim_create", "device", d.ID, true,
+		map[string]any{"location_id": req.LocationID, "account_id": accountID, "claim_expires_at": expires}); err != nil {
+		s.log.Error("device create audit write failed", "device_id", d.ID, "err", err)
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":               d.ID,
 		"location_id":      d.LocationID,
@@ -175,6 +185,19 @@ func (s *Server) handlePairRedeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("device paired", "device", d.ID, "location", d.LocationID)
+	// Durable trail for a successful pairing redemption (security
+	// assessment finding: previously only a transient slog line — a
+	// rogue controller enrolling a key left no queryable, durable record).
+	// This route is unauthenticated by design (proto/pairing.md:
+	// authenticity is possession of the single-use claim token, not a
+	// user session), so there is no actor user id — actor_user_id is left
+	// empty on purpose, and detail carries what actually happened:
+	// which device, and the controller's own self-reported hw info (never
+	// the claim token itself, burned before this point anyway).
+	if err := s.store.WriteAdminAudit(r.Context(), "", "device_pair_redeem", "device", d.ID, true,
+		map[string]any{"location_id": d.LocationID, "controller_pubkey": req.ControllerPubkey, "hw": req.HW}); err != nil {
+		s.log.Error("pair redeem audit write failed", "device_id", d.ID, "err", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"v":              0,
 		"typ":            "pair.grant",

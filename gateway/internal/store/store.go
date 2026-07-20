@@ -52,6 +52,17 @@ func Open(dir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	// Backfill the audit hash chain (migration 0007) for any row written
+	// before the chain existed. MUST run before Open returns: the chain's
+	// invariant (InsertAccessLog/WriteAdminAudit always chain off the last
+	// row in rowid order) only holds if nothing can insert a fresh, already
+	// current-schema row while older rows are still un-hashed — and nothing
+	// can, because the server never starts accepting requests until Open
+	// returns. See internal/store/audithash.go.
+	if err := s.backfillHashChains(context.Background()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("backfill hash chains: %w", err)
+	}
 	return s, nil
 }
 

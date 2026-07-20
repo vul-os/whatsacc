@@ -153,12 +153,3 @@ func (s *Store) TouchDeviceSeen(ctx context.Context, deviceID string) error {
 		`UPDATE devices SET last_seen_at = ?, updated_at = ? WHERE id = ?`, now(), now(), deviceID)
 	return err
 }
-
-// UpdateAccessLogError back-fills the audit row's error tag with the
-// delivery outcome ('undelivered', 'ack:denied:<detail>') once the command's
-// fate is known — proto/commands.md §Acknowledgement.
-func (s *Store) UpdateAccessLogError(ctx context.Context, logID, errTag string) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE access_logs SET error = ? WHERE id = ?`, nullable(errTag), logID)
-	return err
-}

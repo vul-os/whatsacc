@@ -155,3 +155,38 @@ func (s *Store) RevokeRefreshFamily(ctx context.Context, familyID string) error 
 		now(), familyID)
 	return err
 }
+
+// execer covers *sql.DB and *sql.Tx — shared by a statement that needs to
+// run standalone AND inside an existing transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// revokeAllRefreshTokens is the shared primitive behind
+// RevokeAllRefreshTokensForUser and SetUserStatus's "disabled" transition
+// (which needs it inside its own tx alongside the users row update).
+func revokeAllRefreshTokens(ctx context.Context, x execer, userID string) error {
+	_, err := x.ExecContext(ctx,
+		`UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`, now(), userID)
+	return err
+}
+
+// RevokeAllRefreshTokensForUser kills EVERY live refresh-token family for
+// userID in one statement — POST /v1/auth/logout-all's "stolen phone"
+// answer. Unlike RevokeRefreshFamily (one family only — /v1/auth/logout,
+// and refresh reuse-detection), this ends every session the account has,
+// on every device, without the caller needing to know which one (if any)
+// is compromised.
+//
+// SCOPE, STATED HONESTLY: this revokes REFRESH tokens — it stops any
+// MORE 15-minute access tokens from being minted. It does not and cannot
+// invalidate an access token already issued: those are stateless signed
+// JWTs with no revocation list, so an attacker holding one keeps it until
+// its own (<=15 minute) expiry regardless. The bound on that exposure is
+// the access-token TTL itself (auth.go's accessTTL), not this call — the
+// live status check requireAuth now performs (server.go) is what makes an
+// ADMIN disabling the account immediate; this is the self-service version
+// for "I think one of my devices leaked a token" without needing an admin.
+func (s *Store) RevokeAllRefreshTokensForUser(ctx context.Context, userID string) error {
+	return revokeAllRefreshTokens(ctx, s.db, userID)
+}

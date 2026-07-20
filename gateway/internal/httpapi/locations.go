@@ -126,6 +126,10 @@ func (s *Server) handleLocationCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "location_create", "location", id, true,
+		map[string]any{"account_id": accountID, "name": req.Name, "type": req.Type}); err != nil {
+		s.log.Error("location create audit write failed", "location_id", id, "err", err)
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
@@ -211,6 +215,7 @@ type patchLocationReq struct {
 // plain member's UPDATE filtered to zero rows and surfaced as 404; we
 // reproduce that observable behavior (404, not 403) for non-admin members.
 func (s *Server) handleLocationPatch(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
 	id := r.PathValue("id")
 	var req patchLocationReq
 	if !readJSON(w, r, &req) {
@@ -241,12 +246,17 @@ func (s *Server) handleLocationPatch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "location_update", "location", id, true,
+		map[string]any{"account_id": accountID}); err != nil {
+		s.log.Error("location patch audit write failed", "location_id", id, "err", err)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // DELETE /v1/locations/{id} — owner/admin of the parent account; drops the
 // 1:1 account when no sibling locations remain.
 func (s *Server) handleLocationDelete(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
 	id := r.PathValue("id")
 	accountID, role, ok := s.locationScope(w, r, id)
 	if !ok {
@@ -260,6 +270,10 @@ func (s *Server) handleLocationDelete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "location_delete", "location", id, true,
+		map[string]any{"account_id": accountID, "account_dropped": dropped}); err != nil {
+		s.log.Error("location delete audit write failed", "location_id", id, "err", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": id, "account_dropped": dropped})
 }
@@ -332,6 +346,7 @@ func parseLimitField(raw json.RawMessage, maxV int64) (has bool, val *int64, ok 
 // PATCH /v1/locations/{id}/limits — admin-only. NULL clears a cap
 // (unlimited); omitted fields are left unchanged.
 func (s *Server) handleLocationLimitsPatch(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
 	id := r.PathValue("id")
 	var req patchLimitsReq
 	if !readJSON(w, r, &req) {
@@ -355,6 +370,13 @@ func (s *Server) handleLocationLimitsPatch(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "location_limits_update", "location", id, true,
+		map[string]any{
+			"max_opens_per_member_per_day":   quotas.MaxOpensPerMemberPerDay,
+			"max_opens_per_location_per_day": quotas.MaxOpensPerLocationPerDay,
+		}); err != nil {
+		s.log.Error("location limits patch audit write failed", "location_id", id, "err", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"location_id": id,

@@ -106,7 +106,9 @@ func (s *Server) dispatchCommand(ctx context.Context, command string, verdict *s
 	env, err := s.keys.SignCommand(command, verdict.AP.DeviceID, verdict.AP.ID, 30*time.Second, cause)
 	if err != nil {
 		s.log.Error("sign command", "err", err)
-		_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, "undelivered")
+		if _, rerr := s.store.RecordDispatchOutcome(ctx, verdict.LogID, "undelivered"); rerr != nil {
+			s.log.Error("record dispatch outcome", "log_id", verdict.LogID, "err", rerr)
+		}
 		return "undelivered"
 	}
 	outcome := s.hub.Dispatch(ctx, verdict.AP.DeviceID, env, s.cfg.AckTimeout, verdict.LogID)
@@ -117,10 +119,14 @@ func (s *Server) dispatchCommand(ctx context.Context, command string, verdict *s
 			if outcome.Detail != "" {
 				tag += ":" + outcome.Detail
 			}
-			_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, tag)
+			if _, rerr := s.store.RecordDispatchOutcome(ctx, verdict.LogID, tag); rerr != nil {
+				s.log.Error("record dispatch outcome", "log_id", verdict.LogID, "err", rerr)
+			}
 		}
 	case "undelivered":
-		_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, "undelivered")
+		if _, rerr := s.store.RecordDispatchOutcome(ctx, verdict.LogID, "undelivered"); rerr != nil {
+			s.log.Error("record dispatch outcome", "log_id", verdict.LogID, "err", rerr)
+		}
 	}
 	return outcome.Delivery
 }
@@ -332,6 +338,19 @@ func (s *Server) handleGrantCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
+	// Audit: issuing someone visitor access is exactly the kind of admin
+	// action WriteAdminAudit exists for (see offline_grants.go's identical
+	// reasoning for the offline counterpart). Best-effort per its contract —
+	// never blocks issuance.
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "grant_create", "grant", g.ID, true,
+		map[string]any{
+			"account_id":       accountID,
+			"phone_e164":       g.PhoneE164,
+			"access_point_ids": req.AccessPointIDs,
+			"ends_at":          endsAt,
+		}); err != nil {
+		s.log.Error("grant create audit write failed", "grant_id", g.ID, "err", err)
+	}
 	// Visitor WhatsApp notification: channel seam, not wired in the gateway
 	// yet (documented in README).
 	writeJSON(w, http.StatusCreated, grantJSON(*g))
@@ -356,6 +375,16 @@ func (s *Server) handleGrantRevoke(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	// Audit: revoking someone's access should leave the same durable trace
+	// issuing it did. Best-effort per WriteAdminAudit's contract — never
+	// blocks the revoke.
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "grant_revoke", "grant", revoked.ID, true,
+		map[string]any{
+			"account_id": revoked.AccountID,
+			"phone_e164": revoked.PhoneE164,
+		}); err != nil {
+		s.log.Error("grant revoke audit write failed", "grant_id", revoked.ID, "err", err)
 	}
 	writeJSON(w, http.StatusOK, grantJSON(*revoked))
 }

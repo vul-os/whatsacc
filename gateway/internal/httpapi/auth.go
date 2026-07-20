@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +47,9 @@ type registerReq struct {
 // POST /v1/auth/register — create user + profile + personal account with one
 // anchor location (invite_token path deferred with account_invites).
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if !s.authIPGate(w, r, "register_ip", s.cfg.AuthRateLimits.RegisterIPPerWindow) {
+		return
+	}
 	var req registerReq
 	if !readJSON(w, r, &req) {
 		return
@@ -103,20 +107,58 @@ type loginReq struct {
 }
 
 // POST /v1/auth/login
+//
+// Brute-force protection (security assessment finding — this endpoint had
+// NONE): a per-IP throttle (the HARD limit — every attempt counts, see
+// authIPGate) runs first, then a per-ACCOUNT soft-lockout check keyed on
+// the email — see store/authratelimit.go's package doc comment for why the
+// account-level check only ever counts FAILURES and is bounded to one
+// fixed window, specifically so an attacker can't cheaply lock a VICTIM
+// out by deliberately failing their login from elsewhere.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.authIPGate(w, r, "login_ip", s.cfg.AuthRateLimits.LoginIPPerWindow) {
+		return
+	}
 	var req loginReq
 	if !readJSON(w, r, &req) {
 		return
 	}
+	nowUnix := time.Now().Unix()
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	acctSubject := "email:" + email
+
+	if email != "" {
+		over, retry, err := s.store.AuthAttemptsOverCap(r.Context(), "login_acct", acctSubject,
+			s.cfg.AuthRateLimits.LoginAccountPerWindow, nowUnix)
+		if err != nil {
+			s.log.Error("login account rate limit check failed", "err", err)
+			writeErr(w, http.StatusServiceUnavailable, "rate_limit_unavailable")
+			return
+		}
+		if over {
+			w.Header().Set("Retry-After", strconv.FormatInt(retry, 10))
+			writeErr(w, http.StatusTooManyRequests, "rate_limited")
+			return
+		}
+	}
+
 	u, err := s.store.UserByEmail(r.Context(), req.Email)
 	if err != nil {
 		// Burn a verify anyway so user-not-found and bad-password take
-		// comparable time (no account enumeration by timing).
+		// comparable time (no account enumeration by timing) — unchanged.
 		VerifyPassword(req.Password, dummyHash)
+		if email != "" {
+			if ferr := s.store.RecordAuthFailure(r.Context(), "login_acct", acctSubject, nowUnix); ferr != nil {
+				s.log.Error("record auth failure", "err", ferr)
+			}
+		}
 		writeErr(w, http.StatusUnauthorized, "invalid_credentials")
 		return
 	}
 	if u.Status != "active" || u.PasswordHash == "" || !VerifyPassword(req.Password, u.PasswordHash) {
+		if ferr := s.store.RecordAuthFailure(r.Context(), "login_acct", acctSubject, nowUnix); ferr != nil {
+			s.log.Error("record auth failure", "err", ferr)
+		}
 		writeErr(w, http.StatusUnauthorized, "invalid_credentials")
 		return
 	}
@@ -148,6 +190,9 @@ type refreshReq struct {
 // rotated/revoked) token revokes its whole family (reuse detection, per the
 // backend's family model).
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	if !s.authIPGate(w, r, "refresh_ip", s.cfg.AuthRateLimits.RefreshIPPerWindow) {
+		return
+	}
 	var req refreshReq
 	if !readJSON(w, r, &req) {
 		return
@@ -200,6 +245,21 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		_ = s.store.RevokeRefreshFamily(r.Context(), rt.FamilyID)
 	}
 	// Idempotent: unknown tokens still get 200 (nothing to enumerate).
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// POST /v1/auth/logout-all — revoke EVERY refresh-token family for the
+// caller, not just the one the presented token belongs to (contrast
+// handleLogout, above). The "stolen phone" answer: end every session on
+// every device without needing to know which one leaked. Requires a live
+// access token — see store.RevokeAllRefreshTokensForUser's doc comment for
+// the honest bound on what this does and does not invalidate immediately.
+func (s *Server) handleLogoutAll(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
+	if err := s.store.RevokeAllRefreshTokensForUser(r.Context(), c.Sub); err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

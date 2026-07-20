@@ -94,12 +94,18 @@ func TestOpenEndpointVerdicts(t *testing.T) {
 		t.Errorf("close: %d %v", rec.Code, out)
 	}
 
-	// disabled user → 403 user_disabled
+	// disabled user → 401 unauthorized, caught by requireAuth's live status
+	// check BEFORE the request ever reaches the open-path choke point (see
+	// server.go's requireAuth: it now re-reads the users row on every
+	// authenticated request, the same discipline requireAdmin always had).
+	// openpath.go's own user_disabled branch inside LogAccess still exists
+	// and still matters — it is what protects the CHAT-channel paths, which
+	// resolve members by phone and never go through requireAuth at all —
+	// it is just no longer reachable via this JWT-authenticated HTTP route,
+	// where requireAuth now wins the race by rejecting earlier.
 	setUser(f.memberUserID, "disabled")
-	// (the member's token still validates structurally; the choke point
-	// checks the LIVE user row)
 	rec, out = doJSON(t, f.h, "POST", "/v1/access-points/"+f.apID+"/open", f.memberAccess, map[string]any{})
-	if rec.Code != http.StatusForbidden || out["error"] != "user_disabled" {
+	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("disabled open: %d %v", rec.Code, out)
 	}
 	setUser(f.memberUserID, "active")

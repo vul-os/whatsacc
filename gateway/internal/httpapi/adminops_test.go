@@ -153,12 +153,73 @@ func TestAdminUserDisableEnforcedAndGuards(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("disabled user refresh must fail: %d", rec.Code)
 	}
-	// their access token dies at the live /me gate too
+	// their STILL-UNEXPIRED access token dies at the live requireAuth gate
+	// too, immediately — not just at 15-minute natural expiry. This is the
+	// fix: requireAuth (server.go) now re-reads the users row on every
+	// authenticated request, exactly like requireAdmin already did, instead
+	// of only trusting the JWT's signature and exp. Before that fix this
+	// assertion failed (the old code left /me returning 200 for a disabled
+	// user for the rest of the token's 15-minute life).
 	rec, _ = doJSON(t, h, "GET", "/v1/auth/me", victim, nil)
-	// /me re-reads user; disabled users still resolve a claims record but the
-	// handler should 401 — verify via an open attempt which uses the live gate
-	// (we just assert refresh death above; /me may still 200 in this skeleton).
-	_ = rec
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("disabled user's still-valid access token must be rejected immediately: %d", rec.Code)
+	}
+}
+
+// TestLogoutAllRevokesEverySession proves POST /v1/auth/logout-all kills
+// ALL of a user's refresh-token families, not just one (contrast
+// /v1/auth/logout, which only burns the ONE family the presented token
+// belongs to) — the "stolen phone" answer: a user with N devices logged in
+// can end every session without knowing which one is compromised.
+func TestLogoutAllRevokesEverySession(t *testing.T) {
+	h := newTestServer(t, "")
+
+	// Two independent "device" sessions for the same account: register
+	// gives the first, login gives the second (issueTokensCtx mints a
+	// fresh refresh-token family every time).
+	rec, out := doJSON(t, h, "POST", "/v1/auth/register", "", map[string]any{
+		"email": "multi@x.com", "password": "hunter2hunter2", "location_name": "L",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: %d %s", rec.Code, rec.Body)
+	}
+	deviceARefresh := out["tokens"].(map[string]any)["refresh_token"].(string)
+
+	rec, out = doJSON(t, h, "POST", "/v1/auth/login", "", map[string]any{
+		"email": "multi@x.com", "password": "hunter2hunter2",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: %d %s", rec.Code, rec.Body)
+	}
+	deviceAAccess := out["tokens"].(map[string]any)["access_token"].(string)
+	deviceBRefresh := out["tokens"].(map[string]any)["refresh_token"].(string)
+
+	// Sanity: both refresh tokens still work before logout-all.
+	rec, _ = doJSON(t, h, "POST", "/v1/auth/refresh", "", map[string]any{"refresh_token": deviceARefresh})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("device A refresh before logout-all: %d", rec.Code)
+	}
+	rec, _ = doJSON(t, h, "POST", "/v1/auth/refresh", "", map[string]any{"refresh_token": deviceBRefresh})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("device B refresh before logout-all: %d", rec.Code)
+	}
+
+	rec, out = doJSON(t, h, "POST", "/v1/auth/logout-all", deviceAAccess, nil)
+	if rec.Code != http.StatusOK || out["ok"] != true {
+		t.Fatalf("logout-all: %d %v", rec.Code, out)
+	}
+
+	// Both families are dead now, including the SECOND one that was never
+	// presented to /logout-all directly — proving this is a per-USER
+	// revocation, not per-token/per-family like /v1/auth/logout.
+	rec, _ = doJSON(t, h, "POST", "/v1/auth/refresh", "", map[string]any{"refresh_token": deviceARefresh})
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("device A refresh after logout-all must fail: %d", rec.Code)
+	}
+	rec, _ = doJSON(t, h, "POST", "/v1/auth/refresh", "", map[string]any{"refresh_token": deviceBRefresh})
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("device B refresh after logout-all must fail: %d", rec.Code)
+	}
 }
 
 func TestAdminPlatformAdminLastAdminGuard(t *testing.T) {

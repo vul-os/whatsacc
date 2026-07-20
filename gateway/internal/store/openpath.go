@@ -339,9 +339,33 @@ func (s *Store) VisitorOpenWithGrant(ctx context.Context, envCfg RateLimitConfig
 // specified honestly" — v1 fix for the stated v0 gap)
 // ---------------------------------------------------------------------------
 
+// appendFollowupLog is the shared insert-don't-mutate primitive both
+// ReconcileLateAck and RecordDispatchOutcome use: it copies the immutable
+// identity fields (access point/location/account/user/command/source) off
+// an existing access_logs row and inserts a NEW row that references it via
+// ReconcilesLogID, carrying its own success/error/ts. The original row is
+// never touched — as of migration 0007 this is not just convention, the
+// access_logs_immutable trigger enforces it (see audithash.go).
+func (s *Store) appendFollowupLog(ctx context.Context, originalLogID string, success bool, errTag string, ts int64) (string, error) {
+	var l AccessLog
+	err := s.db.QueryRowContext(ctx,
+		`SELECT coalesce(access_point_id,''), coalesce(location_id,''), coalesce(account_id,''),
+		        coalesce(user_id,''), coalesce(command,''), coalesce(source,'')
+		 FROM access_logs WHERE id = ?`, originalLogID).
+		Scan(&l.AccessPointID, &l.LocationID, &l.AccountID, &l.UserID, &l.Command, &l.Source)
+	if err != nil {
+		return "", err // ErrNotFound: the original row is gone (should not happen)
+	}
+	l.Success = success
+	l.Error = errTag
+	l.TS = ts
+	l.ReconcilesLogID = originalLogID
+	return s.InsertAccessLog(ctx, l)
+}
+
 // ReconcileLateAck appends a NEW access_logs row recording a late-but-valid
 // cmd.ack for a dispatch whose row was already written (typically tagged
-// 'undelivered' by UpdateAccessLogError once the ack-wait deadline passed,
+// 'undelivered' by RecordDispatchOutcome once the ack-wait deadline passed,
 // but this also covers a dispatch that was never tagged at all). The
 // original row is left completely untouched — append-only discipline: "we
 // didn't hear back by the deadline" stays true forever, exactly as it was
@@ -356,24 +380,38 @@ func (s *Store) VisitorOpenWithGrant(ctx context.Context, envCfg RateLimitConfig
 // called). This method trusts its inputs; it performs no verification of
 // its own and must never be reachable from an unauthenticated path.
 func (s *Store) ReconcileLateAck(ctx context.Context, originalLogID, result, detail string, ackTS int64) (string, error) {
-	var l AccessLog
-	err := s.db.QueryRowContext(ctx,
-		`SELECT coalesce(access_point_id,''), coalesce(location_id,''), coalesce(account_id,''),
-		        coalesce(user_id,''), coalesce(command,''), coalesce(source,'')
-		 FROM access_logs WHERE id = ?`, originalLogID).
-		Scan(&l.AccessPointID, &l.LocationID, &l.AccountID, &l.UserID, &l.Command, &l.Source)
-	if err != nil {
-		return "", err // ErrNotFound: the original row is gone (should not happen)
-	}
 	tag := "late_ack:" + result
 	if detail != "" {
 		tag += ":" + detail
 	}
 	// The controller's own signed word on what actually happened: only
 	// opened/held/closed mean the gate did the thing; denied/error did not.
-	l.Success = result == "opened" || result == "held" || result == "closed"
-	l.Error = tag
-	l.TS = ackTS
-	l.ReconcilesLogID = originalLogID
-	return s.InsertAccessLog(ctx, l)
+	success := result == "opened" || result == "held" || result == "closed"
+	return s.appendFollowupLog(ctx, originalLogID, success, tag, ackTS)
+}
+
+// RecordDispatchOutcome appends a NEW access_logs row recording the
+// synchronous delivery outcome of a command dispatched immediately after
+// LogAccess allowed it (dispatchCommand, httpapi/open.go) — insert, never
+// mutate, exactly ReconcileLateAck's discipline applied to the SYNCHRONOUS
+// version of the same kind of fact. This replaces the old
+// store.UpdateAccessLogError, which mutated the original row's error column
+// in place — under the hash chain that would either have to be excluded
+// from hashing (silently untracked) or would invalidate every hash after
+// it (a chain that breaks on completely ordinary operation is worse than
+// no chain). Insert-don't-mutate is the only option consistent with the
+// original "the request was allowed" row's hash staying meaningful forever.
+//
+// success is always true here — a dispatch outcome (undelivered, or an
+// immediate ack:denied/ack:error) does not change whether the ORIGINAL
+// request was allowed (that is LogAccess's verdict, already recorded on
+// the original row); it only adds "and here is what happened when we tried
+// to reach the controller" as its own fact. This mirrors the exact
+// behaviour store.UpdateAccessLogError had before this change (it never
+// touched the success column either) — a deliberate parity choice, not an
+// oversight; ONLY a late-but-verified cmd.ack (ReconcileLateAck, above) is
+// entitled to report success=false, because that is the controller's own
+// signed word on whether the gate actually moved.
+func (s *Store) RecordDispatchOutcome(ctx context.Context, originalLogID, tag string) (string, error) {
+	return s.appendFollowupLog(ctx, originalLogID, true, tag, 0)
 }

@@ -132,6 +132,7 @@ type createAccessPointReq struct {
 // POST /v1/access-points — admin of the account owning the location (the
 // access_points WITH CHECK policy, pre-checked for a clean 403/404).
 func (s *Server) handleAccessPointCreate(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
 	var req createAccessPointReq
 	if !readJSON(w, r, &req) {
 		return
@@ -164,6 +165,16 @@ func (s *Server) handleAccessPointCreate(w http.ResponseWriter, r *http.Request)
 	case err != nil:
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
+	}
+	// Durable trail for access-point creation, including which controller
+	// (if any) it was bound to — the finding's "pair a rogue controller...
+	// and leave no queryable trace" gap applies just as much to binding an
+	// already-paired device to a NEW access point as it does to the pairing
+	// itself.
+	if err := s.store.WriteAdminAudit(r.Context(), c.Sub, "access_point_create", "access_point", d.ID, true,
+		map[string]any{"account_id": accountID, "location_id": req.LocationID, "name": req.Name,
+			"kind": req.Kind, "device_id": nilIfEmpty(deviceID)}); err != nil {
+		s.log.Error("access point create audit write failed", "access_point_id", d.ID, "err", err)
 	}
 	writeJSON(w, http.StatusCreated, accessPointJSON(*d))
 }

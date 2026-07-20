@@ -299,6 +299,13 @@ func (s *Store) DevicesByAccount(ctx context.Context, accountID string) ([]Devic
 // InsertAccessLog appends one audit row (denormalised account/location ids).
 // A non-empty l.ReconcilesLogID marks this row as a late-ack reconciliation
 // (see ReconcileLateAck) rather than an ordinary open/close attempt.
+//
+// Every insert also chains the row into the tamper-evident hash chain (see
+// internal/store/audithash.go): read-last-hash + insert run inside one
+// transaction so concurrent inserts can never interleave and fork the
+// chain (the store's single SQLite connection makes each individual
+// statement atomic, but NOT a read followed by a later write unless both
+// are in the same transaction).
 func (s *Store) InsertAccessLog(ctx context.Context, l AccessLog) (string, error) {
 	id := NewID()
 	t := now()
@@ -306,14 +313,44 @@ func (s *Store) InsertAccessLog(ctx context.Context, l AccessLog) (string, error
 	if ts == 0 {
 		ts = t
 	}
-	_, err := s.db.ExecContext(ctx,
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	prev, err := lastAccessLogRowHash(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+	fields := accessLogHashFields{
+		ID: id, AccountSnap: l.AccountID, LocationSnap: l.LocationID,
+		AccessPointSnap: l.AccessPointID, UserSnap: l.UserID,
+		Command: l.Command, Source: l.Source, Lat: l.Lat, Long: l.Long,
+		Success: l.Success, Error: l.Error, TS: ts, CreatedAt: t,
+		ReconcilesLogID: l.ReconcilesLogID,
+	}
+	rowHash, err := computeRowHash("access_logs", prev, fields.canonicalMap())
+	if err != nil {
+		return "", err
+	}
+
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO access_logs (id, access_point_id, location_id, account_id, user_id,
-		                          command, source, lat, long, success, error, ts, created_at, reconciles_log_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                          command, source, lat, long, success, error, ts, created_at, reconciles_log_id,
+		                          account_id_snapshot, location_id_snapshot, access_point_id_snapshot, user_id_snapshot,
+		                          prev_hash, row_hash)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullable(l.AccessPointID), nullable(l.LocationID), nullable(l.AccountID), nullable(l.UserID),
 		l.Command, l.Source, nullFloat(l.Lat), nullFloat(l.Long), boolInt(l.Success), nullable(l.Error), ts, t,
-		nullable(l.ReconcilesLogID))
-	return id, err
+		nullable(l.ReconcilesLogID),
+		l.AccountID, l.LocationID, l.AccessPointID, l.UserID,
+		prev, rowHash)
+	if err != nil {
+		return "", err
+	}
+	return id, tx.Commit()
 }
 
 // AccessLogsByAccount lists the account's audit rows, newest first.

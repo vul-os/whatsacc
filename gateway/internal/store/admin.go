@@ -70,9 +70,7 @@ func (s *Store) SetUserStatus(ctx context.Context, userID, status string) (*User
 		return nil, err
 	}
 	if status == "disabled" {
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
-			now(), userID); err != nil {
+		if err := revokeAllRefreshTokens(ctx, tx, userID); err != nil {
 			return nil, err
 		}
 	}
@@ -141,17 +139,48 @@ type AdminAuditEntry struct {
 // WriteAdminAudit appends one admin-action row (claims, suspensions, grants,
 // denied /admin probes). Callers treat failures as best-effort — a 403 never
 // depends on the audit write.
+//
+// Like InsertAccessLog, every write also extends the tamper-evident hash
+// chain (internal/store/audithash.go) inside one transaction so concurrent
+// writers can never fork the chain.
 func (s *Store) WriteAdminAudit(ctx context.Context, actorUserID, action, targetKind, targetID string, allowed bool, detail any) error {
 	raw, err := json.Marshal(detail)
 	if err != nil {
 		raw = []byte("{}")
 	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO admin_audit_log (id, actor_user_id, action, target_kind, target_id, allowed, detail, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		NewID(), nullable(actorUserID), action, nullable(targetKind), nullable(targetID),
-		boolInt(allowed), string(raw), now())
-	return err
+	id := NewID()
+	t := now()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	prev, err := lastAdminAuditRowHash(ctx, tx)
+	if err != nil {
+		return err
+	}
+	fields := adminAuditHashFields{
+		ID: id, ActorSnap: actorUserID, Action: action, TargetKind: targetKind,
+		TargetID: targetID, Allowed: allowed, Detail: string(raw), CreatedAt: t,
+	}
+	rowHash, err := computeRowHash("admin_audit_log", prev, fields.canonicalMap())
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO admin_audit_log (id, actor_user_id, action, target_kind, target_id, allowed, detail, created_at,
+		                              actor_user_id_snapshot, prev_hash, row_hash)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, nullable(actorUserID), action, nullable(targetKind), nullable(targetID),
+		boolInt(allowed), string(raw), t,
+		actorUserID, prev, rowHash)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // AdminAuditActions lists the admin-action trail, newest first.

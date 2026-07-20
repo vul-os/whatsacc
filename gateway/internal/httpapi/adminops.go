@@ -450,6 +450,39 @@ func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /v1/admin/audit/verify — walks both tamper-evident hash chains
+// (access_logs, admin_audit_log; see store/audithash.go) and reports the
+// FIRST broken link in each, if any. HONEST LIMIT, restated here because it
+// is the whole point: this proves whether ANYONE tampered without ALSO
+// recomputing every hash after their edit — it cannot rule that out. See
+// migrations/0007_audit_hash_chain.sql and store/audithash.go for the full
+// design. A cold-backup / no-server-boot version of the same check is the
+// `gateway verify-audit` CLI subcommand (cmd/gateway/main.go).
+func (s *Server) handleAdminAuditVerify(w http.ResponseWriter, r *http.Request) {
+	results, err := s.store.VerifyHashChains(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal")
+		return
+	}
+	ok := true
+	chains := make([]map[string]any, 0, len(results))
+	for _, res := range results {
+		row := map[string]any{"table": res.Table, "rows_checked": res.RowsChecked, "ok": res.OK}
+		if !res.OK {
+			ok = false
+			row["broken_at"] = map[string]any{
+				"index": res.Break.Index, "row_id": res.Break.RowID, "reason": res.Break.Reason,
+			}
+		}
+		chains = append(chains, row)
+	}
+	status := http.StatusOK
+	if !ok {
+		status = http.StatusConflict // the audit trail itself is in a broken/inconsistent state
+	}
+	writeJSON(w, status, map[string]any{"ok": ok, "chains": chains})
+}
+
 // GET /v1/admin/audit/actions — the admin-action trail.
 func (s *Server) handleAdminAuditActions(w http.ResponseWriter, r *http.Request) {
 	limit, offset := pageParams(r)
