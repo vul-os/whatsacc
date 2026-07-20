@@ -15,7 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 // Grant is the gateway-signed statement of a member's rights.
@@ -171,7 +172,13 @@ func (x *Exchange) HandleProof(raw []byte, env Env) (*Result, *Grant, *Proof) {
 	x.mu.Unlock()
 
 	// 1. Stale-clock rule (fixed 14 d constant, not derived from the grant).
-	if env.LastGatewaySync == 0 || env.Now-env.LastGatewaySync > wire.StaleClockLimitSeconds {
+	// clock.Stale also catches a wall clock reset BACKWARD past
+	// LastGatewaySync (RTC-less reboot) — a plain "elapsed > limit" check
+	// misses that case (negative elapsed never trips ">"), and this path
+	// used to rely on luck: the grant's own iat/exp window happened to
+	// reject the same bad "now" independently (proto/events.md "Clock
+	// after a power cut").
+	if clock.Stale(env.Now, env.LastGatewaySync, wire.StaleClockLimitSeconds) {
 		return deny(wire.ReasonStaleClock)
 	}
 	// 2. Not in lockdown.

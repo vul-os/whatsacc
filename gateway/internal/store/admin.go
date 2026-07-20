@@ -395,6 +395,12 @@ type AuditLogEntry struct {
 	AccessPointName string
 	UserID          string
 	UserEmail       string
+	// ReconcilesLogID mirrors AccessLog.ReconcilesLogID: "" for every
+	// ordinary row, else the id of the original row this one is a
+	// late-cmd.ack reconciliation of (see store.ReconcileLateAck). Exposed
+	// so the admin audit view can show the linkage instead of a mysterious
+	// unexplained extra row.
+	ReconcilesLogID string
 }
 
 // AdminAudit lists access_logs cross-tenant with the backend's kind filter:
@@ -430,7 +436,8 @@ func (s *Store) AdminAudit(ctx context.Context, kind string, limit, offset int) 
 		        coalesce(al.account_id,''), coalesce(a.name,''),
 		        coalesce(al.location_id,''), coalesce(l.name,''),
 		        coalesce(al.access_point_id,''), coalesce(ap.name,''),
-		        coalesce(al.user_id,''), coalesce(u.email,'')
+		        coalesce(al.user_id,''), coalesce(u.email,''),
+		        coalesce(al.reconciles_log_id,'')
 		 FROM access_logs al
 		 LEFT JOIN accounts a ON a.id = al.account_id
 		 LEFT JOIN locations l ON l.id = al.location_id
@@ -448,7 +455,8 @@ func (s *Store) AdminAudit(ctx context.Context, kind string, limit, offset int) 
 		var success int
 		if err := rows.Scan(&e.ID, &e.TS, &e.Command, &e.Source, &success, &e.Error,
 			&e.AccountID, &e.AccountName, &e.LocationID, &e.LocationName,
-			&e.AccessPointID, &e.AccessPointName, &e.UserID, &e.UserEmail); err != nil {
+			&e.AccessPointID, &e.AccessPointName, &e.UserID, &e.UserEmail,
+			&e.ReconcilesLogID); err != nil {
 			return nil, 0, err
 		}
 		e.Success = success == 1
@@ -498,6 +506,7 @@ func (s *Store) AdminAccountByID(ctx context.Context, id string) (*AdminAccountD
 			Success: l.Success, Error: l.Error,
 			AccountID: l.AccountID, LocationID: l.LocationID,
 			AccessPointID: l.AccessPointID, UserID: l.UserID,
+			ReconcilesLogID: l.ReconcilesLogID,
 		})
 	}
 	return &d, nil

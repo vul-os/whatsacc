@@ -12,8 +12,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/vul-os/whatsacc/gateway/internal/hub"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/hub"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Devices + pairing + controller transport, porting backend
@@ -321,12 +321,36 @@ func (s *Server) handleControllerUplink(ctx context.Context, deviceID string, pu
 		if err := jsonUnmarshal(msg, &ack); err != nil {
 			return
 		}
-		if !s.hub.ResolveAck(ack) {
-			s.log.Info("late ack", "device", deviceID, "nonce", ack.Nonce, "result", ack.Result)
+		if s.hub.ResolveAck(ack) {
+			return
 		}
+		s.handleLateAck(ctx, deviceID, ack)
 	case "event":
 		s.log.Info("controller event", "device", deviceID)
 	}
+}
+
+// handleLateAck is reached only after ResolveAck already reported no
+// waiter for this ack's nonce — either it is late (the ack-wait deadline
+// already passed) or it does not correspond to any dispatch this hub
+// remembers. By the time this runs the ack has ALREADY been verified
+// (VerifyFromController, above, in both callers) against the enrolled
+// device key; hub.LateAckReconcile only decides whether it is still
+// entitled to correct the record (matching nonce, matching device, within
+// hub.LateAckWindow) — see proto/commands.md "The lost-ack case, specified
+// honestly" for why this must not just be a log line.
+func (s *Server) handleLateAck(ctx context.Context, deviceID string, ack hub.Ack) {
+	logID, ok := s.hub.LateAckReconcile(ack, time.Now().Unix())
+	if !ok {
+		s.log.Info("late ack (no longer reconcilable)", "device", deviceID, "nonce", ack.Nonce, "result", ack.Result)
+		return
+	}
+	newLogID, err := s.store.ReconcileLateAck(ctx, logID, ack.Result, ack.Detail, ack.TS)
+	if err != nil {
+		s.log.Error("late ack reconcile failed", "device", deviceID, "orig_log_id", logID, "nonce", ack.Nonce, "err", err)
+		return
+	}
+	s.log.Info("late ack reconciled", "device", deviceID, "orig_log_id", logID, "reconcile_log_id", newLogID, "result", ack.Result)
 }
 
 // devicePub loads + decodes a device's enrolled key, fail-closed.
@@ -413,7 +437,9 @@ func (s *Server) handleControllerAck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.TouchDeviceSeen(r.Context(), ack.DeviceID)
-	s.hub.ResolveAck(ack)
+	if !s.hub.ResolveAck(ack) {
+		s.handleLateAck(r.Context(), ack.DeviceID, ack)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

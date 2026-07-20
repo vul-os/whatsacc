@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 func gatewayPub(t *testing.T) (string, ed25519.PublicKey) {
@@ -177,5 +177,60 @@ func TestStaleClockBoundary(t *testing.T) {
 	}
 	if got := run(0); got != wire.ReasonStaleClock {
 		t.Errorf("never synced: got %s", got)
+	}
+}
+
+// TestStaleClockBackwardReset proves the guard fires when the wall clock
+// has been reset BACKWARD past the last known gateway sync (the
+// RTC-less-reboot case in proto/events.md "Clock after a power cut"),
+// rather than relying on the presented grant's own iat/exp window to
+// coincidentally catch it. We pick a LastGatewaySync far in this
+// redemption's OWN future relative to `now` — exactly the state after a
+// bad backward wall-clock reset — while `now` still falls inside the
+// presented grant's own validity window (it is literally the
+// "grant-redeem-valid" vector, unmodified), so nothing except the
+// stale-clock guard itself is positioned to catch this. Before the fix,
+// "now - lastSynced > limit" with a very negative elapsed never fires, and
+// this test observes "opened" — a real bypass. After the fix it must
+// observe denied(stale_clock).
+func TestStaleClockBackwardReset(t *testing.T) {
+	dir, pub := gatewayPub(t)
+	f, err := vectorfile.Load(dir, "grants.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var valid *vectorfile.Vector
+	for i := range f.Vectors {
+		if f.Vectors[i].Name == "grant-redeem-valid" {
+			valid = &f.Vectors[i]
+			break
+		}
+	}
+	if valid == nil {
+		t.Fatal("grant-redeem-valid vector not found")
+	}
+	x := grants.NewExchange()
+	var open grants.Open
+	if err := json.Unmarshal(valid.Transcript.Open.Object, &open); err != nil {
+		t.Fatal(err)
+	}
+	var ch grants.Challenge
+	if err := json.Unmarshal(valid.Transcript.Challenge, &ch); err != nil {
+		t.Fatal(err)
+	}
+	x.InjectChallenge(&open, ch)
+	env := envFrom(valid.Check, pub)
+	// Backward reset: lastSynced sits far in "now"'s future, with a
+	// magnitude well beyond the 14 d limit — a "> limit" only check never
+	// fires here (the raw signed delta is very negative, not "> limit").
+	env.LastGatewaySync = valid.Check.Now + 2*wire.StaleClockLimitSeconds
+
+	res, g, _ := x.HandleProof(valid.Transcript.Proof.Object, env)
+	if res.Result != "denied" || res.Detail != wire.ReasonStaleClock {
+		t.Fatalf("backward clock reset: expected denied(%s), got %s(%s)",
+			wire.ReasonStaleClock, res.Result, res.Detail)
+	}
+	if g != nil {
+		t.Fatal("deny must not return a grant")
 	}
 }

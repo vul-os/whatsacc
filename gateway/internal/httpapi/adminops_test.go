@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // claimAdmin registers a user and wins the first-run claim, returning their
@@ -271,5 +273,115 @@ func TestAdminAuditFilters(t *testing.T) {
 	rec, _ = doJSON(t, h, "GET", "/v1/admin/audit?kind=bogus", adminAccess, nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("bad kind: %d", rec.Code)
+	}
+}
+
+// TestAdminAuditReconciliationLinkage proves that a late-cmd.ack
+// reconciliation row (store.ReconcileLateAck; see the
+// TestLateAckReconcilesAccessLog end-to-end regression in devices_test.go
+// for how one actually gets created off a real dispatch) surfaces its
+// reconciles_log_id linkage in both admin audit surfaces that query
+// access_logs directly — GET /v1/admin/audit and the recent_access_logs
+// block of GET /v1/admin/accounts/{id} — and that ordinary rows keep
+// serializing the field as JSON null (present key, not omitted, matching
+// every other optional field's convention here), never a mysterious
+// unexplained value.
+func TestAdminAuditReconciliationLinkage(t *testing.T) {
+	h, st := newTestServerWithStore(t, "op-token")
+	adminAccess := claimAdmin(t, h, "op@x.com")
+
+	victim, _ := register(t, h, "v@x.com")
+	acctV, locV := tenantIDs(t, h, victim)
+	rec, out := doJSON(t, h, "POST", "/v1/access-points", victim, map[string]any{
+		"location_id": locV, "name": "Gate", "kind": "gate",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("ap create: %d %v", rec.Code, out)
+	}
+	apV := out["id"].(string)
+
+	rec, out = doJSON(t, h, "POST", "/v1/access-points/"+apV+"/open", victim, map[string]any{})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("open: %d %v", rec.Code, out)
+	}
+
+	ctx := context.Background()
+	logs, err := st.AccessLogsByAccount(ctx, acctV, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	origID := ""
+	for _, l := range logs {
+		if l.AccessPointID == apV && l.Command == "open" {
+			origID = l.ID
+		}
+	}
+	if origID == "" {
+		t.Fatalf("original open row not found: %+v", logs)
+	}
+
+	// Build the reconciliation row directly via the store method the
+	// gateway's late-ack path calls (hub.LateAckReconcile + handleLateAck
+	// in devices.go) — exercising ReconcileLateAck itself rather than
+	// redriving the full WS dispatch/late-ack dance already covered by
+	// TestLateAckReconcilesAccessLog.
+	reconID, err := st.ReconcileLateAck(ctx, origID, "opened", "", time.Now().Unix())
+	if err != nil {
+		t.Fatalf("ReconcileLateAck: %v", err)
+	}
+
+	rec, out = doJSON(t, h, "GET", "/v1/admin/audit", adminAccess, nil)
+	if rec.Code != 200 {
+		t.Fatalf("admin audit: %d %v", rec.Code, out)
+	}
+	var origEntry, reconEntry map[string]any
+	for _, e := range out["entries"].([]any) {
+		m := e.(map[string]any)
+		switch m["id"] {
+		case origID:
+			origEntry = m
+		case reconID:
+			reconEntry = m
+		}
+	}
+	if origEntry == nil || reconEntry == nil {
+		t.Fatalf("expected both original (%s) and reconciliation (%s) rows in /v1/admin/audit: %v",
+			origID, reconID, out["entries"])
+	}
+	if origEntry["reconciles_log_id"] != nil {
+		t.Errorf("ordinary row must serialize reconciles_log_id as null, got %v", origEntry["reconciles_log_id"])
+	}
+	if reconEntry["reconciles_log_id"] != origID {
+		t.Errorf("reconciliation row reconciles_log_id = %v, want %v", reconEntry["reconciles_log_id"], origID)
+	}
+	if reconEntry["error"] != "late_ack:opened" || reconEntry["success"] != true {
+		t.Errorf("reconciliation row: success=%v error=%v", reconEntry["success"], reconEntry["error"])
+	}
+
+	// The account-detail surface (AdminAccountByID → recent_access_logs)
+	// queries access_logs independently (AccessLogsByAccount, not
+	// AdminAudit) — verify the same linkage isn't dropped there either.
+	rec, out = doJSON(t, h, "GET", "/v1/admin/accounts/"+acctV, adminAccess, nil)
+	if rec.Code != 200 {
+		t.Fatalf("admin account get: %d %v", rec.Code, out)
+	}
+	origEntry, reconEntry = nil, nil
+	for _, e := range out["recent_access_logs"].([]any) {
+		m := e.(map[string]any)
+		switch m["id"] {
+		case origID:
+			origEntry = m
+		case reconID:
+			reconEntry = m
+		}
+	}
+	if origEntry == nil || reconEntry == nil {
+		t.Fatalf("expected both rows in account detail recent_access_logs: %v", out["recent_access_logs"])
+	}
+	if origEntry["reconciles_log_id"] != nil {
+		t.Errorf("account-detail ordinary row must be null, got %v", origEntry["reconciles_log_id"])
+	}
+	if reconEntry["reconciles_log_id"] != origID {
+		t.Errorf("account-detail reconciliation row reconciles_log_id = %v, want %v", reconEntry["reconciles_log_id"], origID)
 	}
 }

@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 const (
@@ -35,6 +35,20 @@ const (
 	// GrantReserved is the reserved partition for grant_redeemed events.
 	GrantReserved = 1000
 )
+
+// overflowFileName is the last-resort local record for grant_redeemed
+// events that could not be enqueued into the reserved partition because it
+// is already full — proto/events.md's stated v0 gap: that needs roughly a
+// thousand undelivered offline opens to happen, already an extreme,
+// extended outage. It is deliberately NOT part of the ring/ack machinery
+// above: by the time anything lands here the reserved partition itself has
+// already saturated, so folding this into "just more queue" would only
+// relocate the same problem, not solve it. Its only job is making sure a
+// physical open this extreme still leaves SOME durable trace on the
+// device — recoverable from disk by an operator even though it never
+// reached the gateway automatically. See agent.OnRedeemed for the
+// actuation-safety reasoning this exists to support.
+const overflowFileName = "grant_overflow.jsonl"
 
 type entry struct {
 	Seq int64           `json:"seq"`
@@ -54,9 +68,10 @@ type partition struct {
 
 // Queue is the two-partition durable event queue.
 type Queue struct {
-	mu     sync.Mutex
-	normal *partition
-	grants *partition
+	mu           sync.Mutex
+	normal       *partition
+	grants       *partition
+	overflowPath string // last-resort grant_redeemed overflow log; see overflowFileName
 	// syncEveryWrite fsyncs after every append (default true): each event
 	// — especially grant_redeemed — must survive kill -9 / power loss
 	// (load-shedding reality). Bulk perf tests may disable it via
@@ -78,7 +93,7 @@ func Open(dir string) (*Queue, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Queue{normal: n, grants: g, syncEveryWrite: true}, nil
+	return &Queue{normal: n, grants: g, overflowPath: filepath.Join(qdir, overflowFileName), syncEveryWrite: true}, nil
 }
 
 // SetSyncForTest toggles fsync-per-append. TEST-ONLY: production keeps it on
@@ -178,6 +193,60 @@ func (q *Queue) Enqueue(kind string, raw []byte) error {
 		}
 	}
 	return q.normal.append(raw)
+}
+
+// EnqueueGrantRedeemed durably records one grant_redeemed event, preferring
+// the reserved partition (delivered to the gateway like any other event on
+// reconnect, per Drain/Ack above). If — and only if — the reserved
+// partition is already full, it falls back to appendOverflow, a minimal
+// always-on local overflow log, so the event this call describes is never
+// simply discarded. It returns an error only when BOTH the reserved
+// partition AND the overflow log fail to accept the write (e.g. the
+// filesystem itself is unwritable) — the caller (agent.OnRedeemed) decides
+// policy for that case. Per proto/events.md's "reserved partition full"
+// gap, this offline-emergency path must not fail-closed on an
+// audit-recording failure alone.
+func (q *Queue) EnqueueGrantRedeemed(raw []byte) error {
+	if err := q.Enqueue("grant_redeemed", raw); err == nil {
+		return nil
+	}
+	return q.appendOverflow(raw)
+}
+
+// appendOverflow appends one raw signed event to the overflow log, fsync'd
+// like every other durable write in this package. Opened/closed per call
+// rather than held open: this path is rare by construction (the reserved
+// partition must already be full), so the extra syscalls are immaterial.
+func (q *Queue) appendOverflow(raw []byte) error {
+	f, err := os.OpenFile(q.overflowPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return fmt.Errorf("events: overflow record failed: %w", err)
+	}
+	defer f.Close()
+	line := append(append([]byte(nil), raw...), '\n')
+	if _, err := f.Write(line); err != nil {
+		return fmt.Errorf("events: overflow record failed: %w", err)
+	}
+	return f.Sync()
+}
+
+// OverflowEntriesForTest reads back the raw lines written to the overflow
+// log. TEST-ONLY (mirrors SetSyncForTest).
+func (q *Queue) OverflowEntriesForTest() ([][]byte, error) {
+	raw, err := os.ReadFile(q.overflowPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var out [][]byte
+	for _, line := range bytes.Split(bytes.TrimRight(raw, "\n"), []byte("\n")) {
+		if len(line) > 0 {
+			out = append(out, line)
+		}
+	}
+	return out, nil
 }
 
 // Pending returns up to max undelivered events, grant partition first
@@ -335,6 +404,38 @@ func (r *Recorder) Record(kind string, data map[string]any) {
 	if err != nil {
 		log.Error("event record failed", "kind", kind, "err", err)
 	}
+}
+
+// RecordGrantRedeemed signs and durably records a grant_redeemed event
+// (proto/events.md), returning the error instead of only logging it —
+// unlike Record. Callers on this path (agent.OnRedeemed) need to know
+// whether the audit trail actually captured the event, because it is the
+// primary evidence of an offline emergency-access open: "did we manage to
+// record this at all" is a decision the caller must be able to see and act
+// on (see EnqueueGrantRedeemed for the reserved-partition/overflow
+// fallback this wraps).
+func (r *Recorder) RecordGrantRedeemed(data map[string]any) error {
+	log := r.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	raw, err := wire.SignEvent(r.Priv, &wire.Event{
+		V: wire.Version, Typ: "event",
+		EventID:  NewEventID(),
+		DeviceID: r.DeviceID,
+		Kind:     "grant_redeemed",
+		TS:       r.Clock.Now(),
+		Data:     data,
+	})
+	if err != nil {
+		log.Error("event record failed", "kind", "grant_redeemed", "err", err)
+		return err
+	}
+	if err := r.Queue.EnqueueGrantRedeemed(raw); err != nil {
+		log.Error("grant_redeemed durable record failed (reserved partition AND overflow log)", "err", err)
+		return err
+	}
+	return nil
 }
 
 // NewEventID returns a random UUIDv4 string (the event idempotency key).

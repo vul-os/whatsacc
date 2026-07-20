@@ -11,19 +11,19 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/bleperiph"
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/command"
-	"github.com/vul-os/whatsacc/controller/internal/events"
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/identity"
-	"github.com/vul-os/whatsacc/controller/internal/lanserver"
-	"github.com/vul-os/whatsacc/controller/internal/noncestore"
-	"github.com/vul-os/whatsacc/controller/internal/pairing"
-	"github.com/vul-os/whatsacc/controller/internal/relay"
-	"github.com/vul-os/whatsacc/controller/internal/state"
-	"github.com/vul-os/whatsacc/controller/internal/transport"
+	"github.com/vul-os/lintel/controller/internal/bleperiph"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/command"
+	"github.com/vul-os/lintel/controller/internal/events"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/identity"
+	"github.com/vul-os/lintel/controller/internal/lanserver"
+	"github.com/vul-os/lintel/controller/internal/noncestore"
+	"github.com/vul-os/lintel/controller/internal/pairing"
+	"github.com/vul-os/lintel/controller/internal/relay"
+	"github.com/vul-os/lintel/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/transport"
 )
 
 // Options configures an agent instance.
@@ -123,7 +123,7 @@ func (a *Agent) EnsurePaired(ctx context.Context) error {
 	}
 	pc := &pairing.Client{AllowInsecureWS: a.Opts.AllowInsecure}
 	g, err := pc.RedeemClaim(ctx, a.St, a.Opts.GatewayURL, a.Opts.ClaimToken,
-		a.ID.PublicKeyB64(), pairing.HW{Model: "wacc-ref", FW: fw, Ifaces: []string{"wifi"}})
+		a.ID.PublicKeyB64(), pairing.HW{Model: "lintel-ref", FW: fw, Ifaces: []string{"wifi"}})
 	if err != nil {
 		return err
 	}
@@ -148,10 +148,50 @@ func (a *Agent) GrantEnv() grants.Env {
 	}
 }
 
-// OnRedeemed actuates the relay and queues the grant_redeemed +opened audit
-// events for a successful offline redemption (never dropped before
-// delivery — reserved queue partition).
+// OnRedeemed durably records the grant_redeemed audit event BEFORE
+// actuating the relay, then actuates, then records "opened".
+//
+// Ordering (the defect fix): actuating first and recording after leaves a
+// window — a crash, power loss, or (see below) a full audit queue between
+// the two steps — where the gate has physically opened with zero durable
+// trace. Recording first closes that window for the common case: by the
+// time the relay is asked to move, the authorization that justified moving
+// it is already on durable storage (or, worst case, we know it is NOT and
+// can say so loudly).
+//
+// Safety tradeoff when the reserved grant-event partition is itself full
+// (proto/events.md's "reserved partition full" gap — needs on the order of
+// a thousand undelivered offline opens, already an extreme, extended
+// outage): this is the OFFLINE EMERGENCY access path. By construction
+// there is no gateway reachable to fall back to, so refusing to open here
+// trades "audit gap" for "person stranded outside a gate during a real
+// emergency" — a strictly worse failure mode for a physical access system.
+// We do NOT fail-closed on a full/unwritable audit queue. Instead
+// RecordGrantRedeemed (via events.Queue.EnqueueGrantRedeemed) degrades in
+// two steps before giving up: (1) the reserved partition, normally: (2) an
+// always-on local overflow log if the reserved partition is full — so even
+// the "partition full" case still leaves a durable, operator-recoverable
+// trace on the device without blocking the open. Only if BOTH of those
+// durable writes fail (e.g. the filesystem itself is unwritable — a rarer
+// and more severe condition than "1000 undelivered offline opens") does
+// this fall through with literally no audit record; even then the gate
+// still opens, and the failure is logged as loudly as this package can
+// manage, because an unaudited-but-granted open is judged the safer
+// outcome here than a stranded resident. If this tradeoff is ever
+// revisited, treat it as a product decision (see proto/events.md), not
+// something to silently flip in code.
 func (a *Agent) OnRedeemed(g *grants.Grant, p *grants.Proof) {
+	if err := a.Recorder.RecordGrantRedeemed(map[string]any{
+		"grant_id":     g.GrantID,
+		"cnonce":       p.Cnonce,
+		"access_point": p.AccessPoint,
+		"proof_sig":    p.Sig,
+	}); err != nil {
+		a.Log.Error("grant_redeemed UNRECORDED on both the reserved partition and the overflow log — "+
+			"proceeding with actuation anyway (offline emergency access path; see proto/events.md)",
+			"err", err, "grant_id", g.GrantID)
+	}
+
 	cfg := a.St.Config()
 	pulse := int64(command.DefaultPulseMs)
 	if v, ok := cfg["pulse_ms"]; ok && v > 0 {
@@ -162,12 +202,6 @@ func (a *Agent) OnRedeemed(g *grants.Grant, p *grants.Proof) {
 		a.Recorder.Record("denied", map[string]any{"reason": "hw:" + err.Error(), "ref": g.GrantID})
 		return
 	}
-	a.Recorder.Record("grant_redeemed", map[string]any{
-		"grant_id":     g.GrantID,
-		"cnonce":       p.Cnonce,
-		"access_point": p.AccessPoint,
-		"proof_sig":    p.Sig,
-	})
 	a.Recorder.Record("opened", map[string]any{"cause": "grant", "ref": g.GrantID})
 }
 

@@ -15,9 +15,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/vul-os/whatsacc/gateway/internal/hub"
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/hub"
+	"github.com/vul-os/lintel/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // newLiveServer boots the router on a real listener (WS dialing needs one)
@@ -102,7 +102,7 @@ func pairDevice(t *testing.T, ts *httptest.Server) (access, accountID, locationI
 	code, out = liveJSON(t, ts, "POST", "/api/pair/redeem", "", map[string]any{
 		"v": 0, "typ": "pair.redeem", "claim_token": claimToken,
 		"controller_pubkey": base64.RawURLEncoding.EncodeToString(pub),
-		"hw":                map[string]any{"model": "wacc-c1", "fw": "0.1.0", "ifaces": []string{"wifi"}},
+		"hw":                map[string]any{"model": "lintel-c1", "fw": "0.1.0", "ifaces": []string{"wifi"}},
 	})
 	if code != 200 {
 		t.Fatalf("redeem: %d %v", code, out)
@@ -270,7 +270,7 @@ func TestControllerWSHandshakeAndAck(t *testing.T) {
 	}
 	outcome := make(chan hub.AckOutcome, 1)
 	go func() {
-		outcome <- srv.Hub().Dispatch(ctx, deviceID, env, 3*time.Second)
+		outcome <- srv.Hub().Dispatch(ctx, deviceID, env, 3*time.Second, "test-log-id")
 	}()
 	_, cmdRaw, err := conn.Read(ctx)
 	if err != nil {
@@ -294,6 +294,146 @@ func TestControllerWSHandshakeAndAck(t *testing.T) {
 	got := <-outcome
 	if got.Delivery != "acked" || got.Result != "opened" {
 		t.Errorf("ack outcome: %+v", got)
+	}
+}
+
+// TestLateAckReconcilesAccessLog is the end-to-end regression test for the
+// defect: an "open" is dispatched to a connected-but-silent controller, the
+// ack-wait deadline elapses (access_logs tagged 'undelivered' — the caller
+// and the resident are told "couldn't reach the gate"), and only THEN does
+// the controller's genuine, correctly-signed cmd.ack arrive. Before the
+// fix, ResolveAck's false was only logged and the audit row stayed wrong
+// forever. After the fix, a NEW row appears referencing the original —
+// which itself must stay untouched (append-only: "we didn't hear back by
+// the deadline" remains true forever, exactly as recorded).
+func TestLateAckReconcilesAccessLog(t *testing.T) {
+	ts, srv, st := newLiveServer(t)
+	access, accountID, locationID, deviceID, priv := pairDevice(t, ts)
+
+	code, out := liveJSON(t, ts, "POST", "/v1/access-points", access, map[string]any{
+		"location_id": locationID, "name": "Gate", "kind": "gate", "device_id": deviceID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("ap create: %d %v", code, out)
+	}
+	apID := out["id"].(string)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	conn := dialWS(t, ts)
+	defer conn.Close(websocket.StatusNormalClosure, "done")
+
+	_, raw, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ch struct {
+		Cnonce string `json:"cnonce"`
+	}
+	if err := json.Unmarshal(raw, &ch); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Write(ctx, websocket.MessageText,
+		signAuth(t, priv, deviceID, ch.Cnonce, time.Now().Unix())); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for !srv.Hub().Connected(deviceID) {
+		if time.Now().After(deadline) {
+			t.Fatal("device never registered in hub")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	type openResult struct {
+		code     int
+		delivery string
+	}
+	openCh := make(chan openResult, 1)
+	go func() {
+		code, out := liveJSON(t, ts, "POST", "/v1/access-points/"+apID+"/open", access, map[string]any{})
+		d, _ := out["delivery"].(string)
+		openCh <- openResult{code, d}
+	}()
+
+	// The controller receives the command but — in this test — never acks
+	// on time, exactly reproducing the "connected but silent past the
+	// deadline" case.
+	_, cmdRaw, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cmd keys.Envelope
+	if err := json.Unmarshal(cmdRaw, &cmd); err != nil || cmd.Cmd != "open" {
+		t.Fatalf("command: %v %s", err, cmdRaw)
+	}
+
+	res := <-openCh
+	if res.code != http.StatusOK || res.delivery != "undelivered" {
+		t.Fatalf("expected undelivered open, got %+v", res)
+	}
+
+	logs, err := st.AccessLogsByAccount(context.Background(), accountID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	origID := ""
+	for _, l := range logs {
+		if l.AccessPointID == apID && l.Command == "open" && l.Error == "undelivered" {
+			origID = l.ID
+		}
+	}
+	if origID == "" {
+		t.Fatalf("original undelivered row not found: %+v", logs)
+	}
+
+	// The controller's genuine ack finally lands, well after the ack-wait
+	// deadline (500ms in this test server) but well inside hub.LateAckWindow.
+	ackMap := map[string]any{
+		"v": 0, "typ": "cmd.ack", "device_id": deviceID, "nonce": cmd.Nonce,
+		"result": "opened", "ts": time.Now().Unix(),
+	}
+	canonical, _ := keys.Canonicalize(ackMap)
+	ackMap["sig"] = base64.RawURLEncoding.EncodeToString(ed25519.Sign(priv, canonical))
+	ackRaw, _ := json.Marshal(ackMap)
+	if err := conn.Write(ctx, websocket.MessageText, ackRaw); err != nil {
+		t.Fatal(err)
+	}
+
+	var reconciled *store.AccessLog
+	deadline = time.Now().Add(3 * time.Second)
+	for reconciled == nil && time.Now().Before(deadline) {
+		logs, err := st.AccessLogsByAccount(context.Background(), accountID, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range logs {
+			if logs[i].ReconcilesLogID == origID {
+				reconciled = &logs[i]
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if reconciled == nil {
+		t.Fatal("late ack did not reconcile the access_logs row")
+	}
+	if !reconciled.Success || reconciled.Error != "late_ack:opened" {
+		t.Errorf("reconciliation row: success=%v error=%q, want success=true error=late_ack:opened",
+			reconciled.Success, reconciled.Error)
+	}
+
+	// Append-only discipline: the original row must remain exactly as it
+	// was recorded at the time — "we never heard back" and "we heard back
+	// late, it did open" are two distinct rows, never collapsed into one.
+	logs, err = st.AccessLogsByAccount(context.Background(), accountID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range logs {
+		if l.ID == origID && l.Error != "undelivered" {
+			t.Errorf("original row was mutated: error=%q, want unchanged 'undelivered'", l.Error)
+		}
 	}
 }
 
@@ -335,7 +475,7 @@ func TestControllerPollFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out := srv.Hub().Dispatch(context.Background(), deviceID, env, time.Second); out.Delivery != "queued" {
+	if out := srv.Hub().Dispatch(context.Background(), deviceID, env, time.Second, "test-log-id"); out.Delivery != "queued" {
 		t.Fatalf("expected queued: %+v", out)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/events"
+	"github.com/vul-os/lintel/controller/internal/events"
 )
 
 func mustOpen(t *testing.T, dir string) *events.Queue {
@@ -118,6 +118,68 @@ func TestRingDropsOldestButNeverGrants(t *testing.T) {
 	}
 	if err := q.Enqueue("grant_redeemed", []byte(`{"event_id":"overflow"}`)); err == nil {
 		t.Fatal("grant partition overflow must error, never drop")
+	}
+}
+
+// TestGrantOverflowFallback: once the reserved grant_redeemed partition is
+// full (Enqueue itself refuses to drop, proving the partition really is
+// saturated — see TestRingDropsOldestButNeverGrants), EnqueueGrantRedeemed
+// must NOT lose the record: it must fall back to the overflow log instead
+// of returning that error to the caller. This is the durable
+// "last-resort" trace the offline-emergency open path relies on (defect
+// fix in agent.OnRedeemed) — before this method existed, a full reserved
+// partition meant the record was simply gone.
+func TestGrantOverflowFallback(t *testing.T) {
+	dir := t.TempDir()
+	q := mustOpen(t, dir)
+	defer q.Close()
+	q.SetSyncForTest(false)
+	for i := 0; i < events.GrantReserved; i++ {
+		if err := q.Enqueue("grant_redeemed", []byte(fmt.Sprintf(`{"event_id":"g%d"}`, i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Sanity: the reserved partition really is full (Enqueue alone refuses).
+	if err := q.Enqueue("grant_redeemed", []byte(`{"event_id":"would-drop"}`)); err == nil {
+		t.Fatal("test setup: reserved partition unexpectedly accepted one more")
+	}
+
+	if err := q.EnqueueGrantRedeemed([]byte(`{"event_id":"overflow-1"}`)); err != nil {
+		t.Fatalf("EnqueueGrantRedeemed with a full reserved partition returned an error (record lost): %v", err)
+	}
+	entries, err := q.OverflowEntriesForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || string(entries[0]) != `{"event_id":"overflow-1"}` {
+		t.Fatalf("overflow log contents: %v", entries)
+	}
+
+	// A second overflow write appends rather than clobbering the first.
+	if err := q.EnqueueGrantRedeemed([]byte(`{"event_id":"overflow-2"}`)); err != nil {
+		t.Fatalf("second overflow write: %v", err)
+	}
+	entries, err = q.OverflowEntriesForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 overflow entries, got %d: %v", len(entries), entries)
+	}
+
+	// Below capacity, EnqueueGrantRedeemed uses the reserved partition, not
+	// the overflow log.
+	dir2 := t.TempDir()
+	q2 := mustOpen(t, dir2)
+	defer q2.Close()
+	if err := q2.EnqueueGrantRedeemed([]byte(`{"event_id":"normal-path"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if n, g := q2.Len(); n != 0 || g != 1 {
+		t.Fatalf("expected the reserved partition to take it: normal=%d grant=%d", n, g)
+	}
+	if entries, _ := q2.OverflowEntriesForTest(); len(entries) != 0 {
+		t.Fatalf("overflow log should be untouched on the normal path: %v", entries)
 	}
 }
 

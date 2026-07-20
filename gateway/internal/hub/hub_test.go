@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/hub"
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/hub"
+	"github.com/vul-os/lintel/gateway/internal/keys"
 )
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ func TestDispatchAckedRoundTrip(t *testing.T) {
 	env := signedEnvelope(t, "", "open", "dev-1", "ap-1")
 	done := make(chan hub.AckOutcome, 1)
 	go func() {
-		done <- h.Dispatch(context.Background(), "dev-1", env, 2*time.Second)
+		done <- h.Dispatch(context.Background(), "dev-1", env, 2*time.Second, "log-1")
 	}()
 
 	payload := <-send
@@ -166,16 +166,89 @@ func TestDispatchUndeliveredOnSilence(t *testing.T) {
 	_, _, unregister := h.Register("dev-2")
 	defer unregister()
 	env := signedEnvelope(t, "", "open", "dev-2", "ap-1")
-	out := h.Dispatch(context.Background(), "dev-2", env, 50*time.Millisecond)
+	out := h.Dispatch(context.Background(), "dev-2", env, 50*time.Millisecond, "log-2")
 	if out.Delivery != "undelivered" {
 		t.Errorf("silent device: %+v", out)
+	}
+}
+
+// TestLateAckReconciles proves the defect fix: a cmd.ack that arrives AFTER
+// the ack-wait deadline (so ResolveAck reports no waiter, exactly like the
+// pre-fix "late ack — log only" path) can still be routed back to the
+// dispatch's access_logs row via LateAckReconcile, instead of being
+// dropped. Before the fix this method did not exist and every late ack was
+// unrecoverable.
+func TestLateAckReconciles(t *testing.T) {
+	h := hub.New()
+	_, _, unregister := h.Register("dev-late")
+	defer unregister()
+	env := signedEnvelope(t, "", "open", "dev-late", "ap-1")
+
+	// Ack-wait deadline elapses with no ack: outcome is undelivered, exactly
+	// the case that used to make late acks unrecoverable (the pendingAck
+	// waiter is gone by the time the real ack shows up).
+	out := h.Dispatch(context.Background(), "dev-late", env, 20*time.Millisecond, "log-late-1")
+	if out.Delivery != "undelivered" {
+		t.Fatalf("expected undelivered, got %+v", out)
+	}
+
+	// The on-time path (ResolveAck) correctly reports nothing was waiting.
+	ack := hub.Ack{Typ: "cmd.ack", DeviceID: "dev-late", Nonce: env.Nonce, Result: "opened", TS: time.Now().Unix()}
+	if h.ResolveAck(ack) {
+		t.Fatal("ResolveAck should report no waiter for an already-timed-out dispatch")
+	}
+
+	// But the late ack still reconciles against the original log id.
+	logID, ok := h.LateAckReconcile(ack, time.Now().Unix())
+	if !ok || logID != "log-late-1" {
+		t.Fatalf("LateAckReconcile: ok=%v logID=%q, want ok=true logID=log-late-1", ok, logID)
+	}
+
+	// One-shot: reconciling twice for the same nonce must not succeed again.
+	if _, ok := h.LateAckReconcile(ack, time.Now().Unix()); ok {
+		t.Fatal("LateAckReconcile must be one-shot")
+	}
+}
+
+// TestLateAckReconcileWrongDeviceRejected: a nonce match alone is not
+// enough — the ack must also be addressed from the same device the
+// dispatch was sent to (defense in depth; VerifyFromController already
+// enforces this against the signing key upstream, but LateAckReconcile
+// must not trust a nonce collision/mismatch on its own).
+func TestLateAckReconcileWrongDeviceRejected(t *testing.T) {
+	h := hub.New()
+	_, _, unregister := h.Register("dev-a")
+	defer unregister()
+	env := signedEnvelope(t, "", "open", "dev-a", "ap-1")
+	h.Dispatch(context.Background(), "dev-a", env, 20*time.Millisecond, "log-a")
+
+	ack := hub.Ack{Typ: "cmd.ack", DeviceID: "dev-b", Nonce: env.Nonce, Result: "opened"}
+	if _, ok := h.LateAckReconcile(ack, time.Now().Unix()); ok {
+		t.Fatal("LateAckReconcile must not match a different device_id")
+	}
+}
+
+// TestLateAckReconcileWindowExpires: a "late" ack arriving after
+// hub.LateAckWindow has elapsed must NOT reconcile — bounded, not
+// arbitrarily long.
+func TestLateAckReconcileWindowExpires(t *testing.T) {
+	h := hub.New()
+	_, _, unregister := h.Register("dev-c")
+	defer unregister()
+	env := signedEnvelope(t, "", "open", "dev-c", "ap-1")
+	h.Dispatch(context.Background(), "dev-c", env, 20*time.Millisecond, "log-c")
+
+	ack := hub.Ack{Typ: "cmd.ack", DeviceID: "dev-c", Nonce: env.Nonce, Result: "opened"}
+	future := time.Now().Add(hub.LateAckWindow + time.Second).Unix()
+	if _, ok := h.LateAckReconcile(ack, future); ok {
+		t.Fatal("LateAckReconcile must not fire once LateAckWindow has elapsed")
 	}
 }
 
 func TestDispatchQueuedWhenOfflineAndDrained(t *testing.T) {
 	h := hub.New()
 	env := signedEnvelope(t, "", "open", "dev-3", "ap-1")
-	out := h.Dispatch(context.Background(), "dev-3", env, time.Second)
+	out := h.Dispatch(context.Background(), "dev-3", env, time.Second, "log-3")
 	if out.Delivery != "queued" {
 		t.Fatalf("offline device: %+v", out)
 	}

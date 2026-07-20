@@ -333,3 +333,47 @@ func (s *Store) VisitorOpenWithGrant(ctx context.Context, envCfg RateLimitConfig
 	}
 	return res, grantID, nil
 }
+
+// ---------------------------------------------------------------------------
+// Late cmd.ack reconciliation (proto/commands.md "The lost-ack case,
+// specified honestly" — v1 fix for the stated v0 gap)
+// ---------------------------------------------------------------------------
+
+// ReconcileLateAck appends a NEW access_logs row recording a late-but-valid
+// cmd.ack for a dispatch whose row was already written (typically tagged
+// 'undelivered' by UpdateAccessLogError once the ack-wait deadline passed,
+// but this also covers a dispatch that was never tagged at all). The
+// original row is left completely untouched — append-only discipline: "we
+// didn't hear back by the deadline" stays true forever, exactly as it was
+// recorded at the time. The new row is what makes "we heard back late, and
+// here is what it said" a visible, equally durable fact instead of being
+// silently collapsed into the first one.
+//
+// Caller contract: result/detail/ackTS come from an ack that MUST already
+// be fully verified — signature against the enrolled device key, and nonce
+// ownership + recency against the specific dispatch it claims to answer
+// (see hub.LateAckReconcile, which enforces both before this is ever
+// called). This method trusts its inputs; it performs no verification of
+// its own and must never be reachable from an unauthenticated path.
+func (s *Store) ReconcileLateAck(ctx context.Context, originalLogID, result, detail string, ackTS int64) (string, error) {
+	var l AccessLog
+	err := s.db.QueryRowContext(ctx,
+		`SELECT coalesce(access_point_id,''), coalesce(location_id,''), coalesce(account_id,''),
+		        coalesce(user_id,''), coalesce(command,''), coalesce(source,'')
+		 FROM access_logs WHERE id = ?`, originalLogID).
+		Scan(&l.AccessPointID, &l.LocationID, &l.AccountID, &l.UserID, &l.Command, &l.Source)
+	if err != nil {
+		return "", err // ErrNotFound: the original row is gone (should not happen)
+	}
+	tag := "late_ack:" + result
+	if detail != "" {
+		tag += ":" + detail
+	}
+	// The controller's own signed word on what actually happened: only
+	// opened/held/closed mean the gate did the thing; denied/error did not.
+	l.Success = result == "opened" || result == "held" || result == "closed"
+	l.Error = tag
+	l.TS = ackTS
+	l.ReconcilesLogID = originalLogID
+	return s.InsertAccessLog(ctx, l)
+}

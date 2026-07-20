@@ -56,6 +56,12 @@ type AccessLog struct {
 	Success       bool
 	Error         string
 	TS            int64
+	// ReconcilesLogID is "" for every ordinary row. It is set only on a
+	// reconciliation row inserted after the fact by a late-but-verified
+	// cmd.ack (see store.ReconcileLateAck): it names the original row this
+	// one corrects, so the two remain distinct, equally durable facts
+	// rather than one row silently overwriting the other.
+	ReconcilesLogID string
 }
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
@@ -291,6 +297,8 @@ func (s *Store) DevicesByAccount(ctx context.Context, accountID string) ([]Devic
 // ---------------------------------------------------------------------------
 
 // InsertAccessLog appends one audit row (denormalised account/location ids).
+// A non-empty l.ReconcilesLogID marks this row as a late-ack reconciliation
+// (see ReconcileLateAck) rather than an ordinary open/close attempt.
 func (s *Store) InsertAccessLog(ctx context.Context, l AccessLog) (string, error) {
 	id := NewID()
 	t := now()
@@ -300,10 +308,11 @@ func (s *Store) InsertAccessLog(ctx context.Context, l AccessLog) (string, error
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO access_logs (id, access_point_id, location_id, account_id, user_id,
-		                          command, source, lat, long, success, error, ts, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                          command, source, lat, long, success, error, ts, created_at, reconciles_log_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullable(l.AccessPointID), nullable(l.LocationID), nullable(l.AccountID), nullable(l.UserID),
-		l.Command, l.Source, nullFloat(l.Lat), nullFloat(l.Long), boolInt(l.Success), nullable(l.Error), ts, t)
+		l.Command, l.Source, nullFloat(l.Lat), nullFloat(l.Long), boolInt(l.Success), nullable(l.Error), ts, t,
+		nullable(l.ReconcilesLogID))
 	return id, err
 }
 
@@ -314,7 +323,8 @@ func (s *Store) AccessLogsByAccount(ctx context.Context, accountID string, limit
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, coalesce(access_point_id,''), coalesce(location_id,''), coalesce(account_id,''),
-		        coalesce(user_id,''), coalesce(command,''), coalesce(source,''), success, coalesce(error,''), ts
+		        coalesce(user_id,''), coalesce(command,''), coalesce(source,''), success, coalesce(error,''), ts,
+		        coalesce(reconciles_log_id,'')
 		 FROM access_logs WHERE account_id = ? ORDER BY ts DESC LIMIT ?`, accountID, limit)
 	if err != nil {
 		return nil, err
@@ -325,7 +335,7 @@ func (s *Store) AccessLogsByAccount(ctx context.Context, accountID string, limit
 		var l AccessLog
 		var success int
 		if err := rows.Scan(&l.ID, &l.AccessPointID, &l.LocationID, &l.AccountID, &l.UserID,
-			&l.Command, &l.Source, &success, &l.Error, &l.TS); err != nil {
+			&l.Command, &l.Source, &success, &l.Error, &l.TS, &l.ReconcilesLogID); err != nil {
 			return nil, err
 		}
 		l.Success = success != 0

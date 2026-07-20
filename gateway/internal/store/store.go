@@ -31,10 +31,12 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open opens (creating if needed) the SQLite database at dir/gateway.db and
-// applies pending migrations.
+// Open opens (creating if needed) the SQLite database at dir/lintel.db and
+// applies pending migrations. (Filename matches site/docs/self-host.md +
+// troubleshooting.md, which document lintel.db; there are no deployments
+// yet, so the code was made to match the docs rather than the reverse.)
 func Open(dir string) (*Store, error) {
-	path := filepath.Join(dir, "gateway.db")
+	path := filepath.Join(dir, "lintel.db")
 	// modernc.org/sqlite: pure Go, no CGO. WAL for concurrent readers,
 	// busy_timeout so writers queue instead of failing, FKs on.
 	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"

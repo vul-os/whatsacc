@@ -17,11 +17,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/keys"
 )
 
 // ChallengeTTL is pairing.md's 30 s cnonce validity.
 const ChallengeTTL = 30
+
+// LateAckWindow bounds how long after a dispatch a verified-but-late
+// cmd.ack may still reconcile the access_logs row (proto/commands.md "The
+// lost-ack case, specified honestly"). It has to comfortably cover the gap
+// between the short ack-wait deadline (a few seconds; commands.md default
+// 5 s) and the envelope's own worst-case validity — TTL ≤ 60 s plus
+// ±90 s skew on both bounds, so a controller can legitimately still be
+// acting on (and then acking) an envelope up to ~150 s after dispatch —
+// plus headroom for reconnect jitter (commands.md: "jittered exponential
+// backoff, seconds up to minutes"). It must NOT be "arbitrarily long": a
+// controller's signed ack has no business rewriting an audit row from a
+// shift that ended hours or days ago, and a large window only widens the
+// (already-authenticated) window for a compromised-but-still-enrolled
+// controller to backdate outcomes. 10 minutes gives roughly 4x headroom
+// over the worst-case envelope lifetime + jitter while staying tightly
+// scoped to "this is clearly the same dispatch," not a coincidence.
+const LateAckWindow = 10 * time.Minute
 
 // Challenge is one issued ws.challenge.
 type Challenge struct {
@@ -179,12 +196,24 @@ type pendingAck struct {
 	ch chan Ack
 }
 
+// recentDispatch is kept for LateAckWindow after a connected dispatch
+// starts waiting for its ack, independently of the short-lived pendingAck
+// waiter — so a cmd.ack that arrives after the ack-wait deadline (and thus
+// finds no pendingAck) can still be matched back to the access_logs row it
+// answers. See LateAckReconcile.
+type recentDispatch struct {
+	deviceID  string
+	logID     string
+	expiresAt int64 // unix seconds; past this, a late ack no longer reconciles
+}
+
 // Hub is the registry. All methods are safe for concurrent use.
 type Hub struct {
 	mu         sync.Mutex
 	conns      map[string]*liveConn      // device_id → live WS
 	queues     map[string][]queuedCmd    // device_id → offline queue (poll fallback)
 	pending    map[string]*pendingAck    // envelope nonce → ack waiter
+	recent     map[string]recentDispatch // envelope nonce → late-ack reconciliation target
 	challenges map[string]challengeState // cnonce → issued poll challenge
 }
 
@@ -200,6 +229,7 @@ func New() *Hub {
 		conns:      map[string]*liveConn{},
 		queues:     map[string][]queuedCmd{},
 		pending:    map[string]*pendingAck{},
+		recent:     map[string]recentDispatch{},
 		challenges: map[string]challengeState{},
 	}
 }
@@ -252,7 +282,13 @@ func (h *Hub) Connected(deviceID string) bool {
 // Offline devices get the payload queued (TTL = envelope exp) and "queued"
 // back immediately; connected-but-silent devices yield "undelivered" after
 // ackTimeout (proto: unacked past exp → undelivered).
-func (h *Hub) Dispatch(ctx context.Context, deviceID string, env *keys.Envelope, ackTimeout time.Duration) AckOutcome {
+//
+// logID is the access_logs row this dispatch is auditing (verdict.LogID);
+// it is remembered for LateAckWindow so a cmd.ack that arrives after
+// ackTimeout — too late for the pendingAck waiter below — can still be
+// routed back to the right row via LateAckReconcile instead of being
+// silently dropped.
+func (h *Hub) Dispatch(ctx context.Context, deviceID string, env *keys.Envelope, ackTimeout time.Duration, logID string) AckOutcome {
 	payload, err := json.Marshal(env)
 	if err != nil {
 		return AckOutcome{Delivery: "undelivered"}
@@ -268,6 +304,13 @@ func (h *Hub) Dispatch(ctx context.Context, deviceID string, env *keys.Envelope,
 	}
 	p := &pendingAck{ch: make(chan Ack, 1)}
 	h.pending[env.Nonce] = p
+	now := time.Now().Unix()
+	h.pruneRecentLocked(now)
+	h.recent[env.Nonce] = recentDispatch{
+		deviceID:  deviceID,
+		logID:     logID,
+		expiresAt: now + int64(LateAckWindow/time.Second),
+	}
 	h.mu.Unlock()
 
 	defer func() {
@@ -297,7 +340,9 @@ func (h *Hub) Dispatch(ctx context.Context, deviceID string, env *keys.Envelope,
 }
 
 // ResolveAck routes a verified cmd.ack to its waiting dispatcher. Returns
-// false when no dispatch was waiting (late ack — still fine to log).
+// false when no dispatch was waiting — either the ack is on time but the
+// dispatch already gave up some other way, or (the common case) it is
+// late: try LateAckReconcile next.
 func (h *Hub) ResolveAck(a Ack) bool {
 	h.mu.Lock()
 	p, ok := h.pending[a.Nonce]
@@ -310,6 +355,40 @@ func (h *Hub) ResolveAck(a Ack) bool {
 	default:
 	}
 	return true
+}
+
+// LateAckReconcile looks up the access_logs row a cmd.ack answers when
+// ResolveAck already reported no waiter (defect fix: late acks were
+// previously dropped after only a log line — see proto/commands.md "The
+// lost-ack case, specified honestly"). The caller MUST have already
+// verified the ack's signature against the enrolled device key (via
+// VerifyFromController, exactly as the on-time path does) before calling
+// this; LateAckReconcile performs no signature check of its own — it only
+// bounds WHICH dispatch an already-verified message is allowed to
+// reconcile: the exact nonce, the exact device that dispatch was sent to,
+// and within LateAckWindow of the original dispatch. A matched entry is
+// consumed (one-shot), so a duplicated/replayed late ack can reconcile a
+// row at most once.
+func (h *Hub) LateAckReconcile(a Ack, now int64) (logID string, ok bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.pruneRecentLocked(now)
+	rec, found := h.recent[a.Nonce]
+	if !found || rec.deviceID != a.DeviceID {
+		return "", false
+	}
+	delete(h.recent, a.Nonce)
+	return rec.logID, true
+}
+
+// pruneRecentLocked drops expired late-ack reconciliation targets. Callers
+// hold h.mu.
+func (h *Hub) pruneRecentLocked(now int64) {
+	for nonce, rec := range h.recent {
+		if rec.expiresAt < now {
+			delete(h.recent, nonce)
+		}
+	}
 }
 
 // pruneQueueLocked drops expired queued commands. Callers hold h.mu.

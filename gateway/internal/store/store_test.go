@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -14,6 +16,25 @@ func openTest(t *testing.T) *Store {
 	}
 	t.Cleanup(func() { s.Close() })
 	return s
+}
+
+// TestDatabaseFilenameMatchesDocs: site/docs/self-host.md and
+// troubleshooting.md document the SQLite file as lintel.db; Open must
+// create exactly that file (there are no deployments yet, so the code was
+// made to match the docs).
+func TestDatabaseFilenameMatchesDocs(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+	if _, err := os.Stat(filepath.Join(dir, "lintel.db")); err != nil {
+		t.Errorf("expected lintel.db in the data dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gateway.db")); err == nil {
+		t.Error("found gateway.db — filename must be lintel.db, not gateway.db")
+	}
 }
 
 func TestMigrateIdempotent(t *testing.T) {

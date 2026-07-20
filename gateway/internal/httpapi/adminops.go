@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // requireAdmin wraps a handler with the live platform-admin gate.
@@ -418,6 +418,7 @@ func auditEntriesJSON(entries []store.AuditLogEntry) []map[string]any {
 			"location_id": nilIfEmpty(e.LocationID), "location_name": nilIfEmpty(e.LocationName),
 			"access_point_id": nilIfEmpty(e.AccessPointID), "access_point_name": nilIfEmpty(e.AccessPointName),
 			"user_id": nilIfEmpty(e.UserID), "user_email": nilIfEmpty(e.UserEmail),
+			"reconciles_log_id": nilIfEmpty(e.ReconcilesLogID),
 		})
 	}
 	return out

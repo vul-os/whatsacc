@@ -74,6 +74,26 @@ func (c *Synced) SyncFromGateway(ts int64) {
 	}
 }
 
+// Stale reports whether a clock is too untrustworthy to use for an offline
+// decision — in EITHER direction, not just "too far forward". grants.md's
+// 14-day rule was specified as "now - lastSynced > limit", which only
+// catches a clock that has drifted forward too far. An RTC-less controller
+// rebooting after a power cut can come up with `now` reading BEFORE the
+// persisted lastSynced (a wall-clock reset backward, e.g. to the epoch or
+// some other stale default) — that produces a NEGATIVE elapsed time, which
+// never trips ">", so the naive check silently does not fire even though
+// the clock is exactly as untrustworthy as the forward-drift case
+// (proto/events.md "Clock after a power cut"). Stale treats a clock that
+// has never synced, OR whose elapsed time since lastSynced falls outside
+// [0, limit] in either direction, as stale.
+func Stale(now, lastSynced, limit int64) bool {
+	if lastSynced == 0 {
+		return true
+	}
+	elapsed := now - lastSynced
+	return elapsed < 0 || elapsed > limit
+}
+
 // Fake is a settable clock for tests and the simulator's offline demo.
 type Fake struct {
 	NowSec  int64
