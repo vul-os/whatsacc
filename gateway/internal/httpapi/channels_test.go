@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Slack is the channel value.
@@ -77,7 +77,7 @@ type SlackAction struct {
 
 // SlackMenu is the help/greeting text — backend slackMenu.
 func SlackMenu(profileName string) string {
-	hello := "Welcome to whatsacc."
+	hello := "Welcome to lintel."
 	if profileName != "" {
 		hello = "Hi " + profileName + "."
 	}

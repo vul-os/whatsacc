@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/channels"
 )
 
 func slackEvent(user, text, ts string) []byte {
@@ -95,7 +95,7 @@ func TestSlackUnlinkedUser(t *testing.T) {
 	e := setupChannels(t, permissiveRL())
 	slackPost(e.h, "/webhooks/slack", slackEvent("U-STRANGER", "open", "1700000000.3"))
 	sent := e.slack.all()
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "don't know which whatsacc profile") {
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "don't know which lintel profile") {
 		t.Fatalf("unlinked slack: %+v", sent)
 	}
 }

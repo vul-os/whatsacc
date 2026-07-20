@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/channels"
 )
 
 var slackHelpWords = map[string]bool{
@@ -133,7 +133,7 @@ func (s *Server) processSlackEvent(ctx contextT, teamID string, ev *channels.Sla
 		s.slackReply(ctx, chatID, channelID, channels.SlackMenu(displayName), nil)
 	case profileID == "":
 		s.slackReply(ctx, chatID, channelID, strings.Join([]string{
-			"I don't know which whatsacc profile this Slack user belongs to yet.",
+			"I don't know which lintel profile this Slack user belongs to yet.",
 			"Add Slack user ID " + ev.User + " in the web dashboard, then send \"menu\".",
 		}, "\n"), nil)
 	case txt == "open" || txt == "gates":

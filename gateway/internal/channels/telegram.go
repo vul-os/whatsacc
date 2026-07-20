@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Telegram is the channel value.
@@ -97,7 +97,7 @@ func TelegramGateKeyboard(gates []store.AvailableAP) InlineKeyboard {
 
 // TelegramMenu is the help/greeting text.
 func TelegramMenu(profileName string) string {
-	hello := "Welcome to whatsacc."
+	hello := "Welcome to lintel."
 	if profileName != "" {
 		hello = "Hi " + profileName + "."
 	}

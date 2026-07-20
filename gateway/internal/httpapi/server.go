@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
-	"github.com/vul-os/whatsacc/gateway/internal/hub"
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
-	"github.com/vul-os/whatsacc/gateway/internal/portal"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/hub"
+	"github.com/vul-os/lintel/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/portal"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Config is what the server needs beyond its collaborators.
@@ -36,6 +36,12 @@ type Config struct {
 	// Zero value = every channel refuses its webhook (fail-closed) and its
 	// sender is a config-unset no-op.
 	Channels channels.Config
+	// DMTAPTransport is the DMTAP dial-out channel's transport (see
+	// channels/dmtap.go). nil (the default — main.go never sets this today)
+	// means the DMTAP channel is disabled: fail-closed, never a silent no-op
+	// that could be mistaken for working. There is no env var for this yet
+	// because there is no real transport to configure (see dmtap.go's TODO).
+	DMTAPTransport channels.DMTAPTransport
 }
 
 // Server wires the store, signing keys, device hub and config into an
@@ -55,7 +61,13 @@ type Server struct {
 	waSend    channels.WhatsAppSender
 	slackSend channels.SlackSender
 	tgSend    channels.TelegramSender
-	socket    *channels.SocketMode // non-nil only when a Slack app token is set
+	socket    *channels.SocketMode // non-nil only when a Slack app token is set; also in dial below
+	dmtap     *channels.DMTAP      // non-nil only when cfg.DMTAPTransport is set; also in dial below
+
+	// dial holds every configured DialChannel (subscribe-shaped channels —
+	// see channels.DialChannel): Slack Socket Mode today, DMTAP alongside it.
+	// StartChannels launches whichever of these report Enabled().
+	dial []channels.DialChannel
 }
 
 // New builds a Server.
@@ -80,13 +92,30 @@ func New(cfg Config, st *store.Store, ks *keys.Keys, log *slog.Logger) *Server {
 	s.wa = channels.WhatsApp{AppSecret: ch.WhatsAppAppSecret, VerifyToken: ch.WhatsAppVerifyToken, PublicURL: ch.PublicURL}
 	s.slack = channels.Slack{SigningSecret: ch.SlackSigningSecret}
 	s.tg = channels.Telegram{WebhookSecret: ch.TelegramWebhookSecret}
-	s.waSend = &channels.HTTPWhatsAppSender{AccessToken: ch.WhatsAppAccessToken, PhoneNumberID: ch.WhatsAppPhoneNumberID, GraphVersion: ch.WhatsAppGraphVersion}
+	// WhatsApp engine: cloud (Meta Cloud API) is the default and the only
+	// implicit choice; the self-hosted bridge is opt-in only and, when
+	// selected, gets a non-negotiable startup warning naming the account-ban
+	// risk (see channels/send.go's "WhatsApp engine selection" section).
+	waEngine := channels.ResolveWhatsAppEngine(ch.WhatsAppEngine)
+	if waEngine == channels.WhatsAppEngineBridge {
+		log.Warn(channels.WhatsAppBanRiskWarning)
+	}
+	s.waSend = channels.NewWhatsAppSender(waEngine, ch)
 	s.slackSend = &channels.HTTPSlackSender{BotToken: ch.SlackBotToken}
 	s.tgSend = &channels.HTTPTelegramSender{BotToken: ch.TelegramBotToken}
 	if ch.SlackAppToken != "" {
 		// Socket Mode: the zero-URL path. Events + interactions arrive over the
 		// outbound WebSocket and are fed through the SAME handlers as the webhook.
 		s.socket = &channels.SocketMode{AppToken: ch.SlackAppToken, Logger: log, Handle: s.handleSlackSocketEnvelope}
+		s.dial = append(s.dial, s.socket)
+	}
+	if cfg.DMTAPTransport != nil {
+		// DMTAP: the second DialChannel, proving the seam generalizes beyond
+		// Slack. Only reachable when a caller injects a real Transport (see
+		// channels/dmtap.go — none exists in this codebase yet); main.go never
+		// does, so this stays disabled in the shipped binary today.
+		s.dmtap = &channels.DMTAP{Transport: cfg.DMTAPTransport, Logger: log, Handle: s.handleDMTAPIntent}
+		s.dial = append(s.dial, s.dmtap)
 	}
 	return s
 }
@@ -94,13 +123,18 @@ func New(cfg Config, st *store.Store, ks *keys.Keys, log *slog.Logger) *Server {
 // Hub exposes the device hub (tests + channel integrations).
 func (s *Server) Hub() *hub.Hub { return s.hub }
 
-// StartChannels launches any always-on channel workers (Slack Socket Mode)
-// bound to ctx. No-op unless a Slack app token is configured. Call once after
-// New; it returns immediately (workers run in the background).
+// StartChannels launches every configured dial-out channel worker
+// (channels.DialChannel — Slack Socket Mode, DMTAP) bound to ctx. Disabled
+// channels (Enabled() == false, e.g. no credentials configured) are skipped:
+// fail-closed, never "runs unauthenticated". Call once after New; it returns
+// immediately, the workers run in the background.
 func (s *Server) StartChannels(ctx context.Context) {
-	if s.socket != nil && s.socket.Enabled() {
-		s.log.Info("slack socket mode enabled (zero public URL)")
-		go s.socket.Run(ctx)
+	for _, d := range s.dial {
+		if d == nil || !d.Enabled() {
+			continue
+		}
+		s.log.Info("dial-out channel enabled", "channel", d.Kind())
+		go d.Run(ctx)
 	}
 }
 

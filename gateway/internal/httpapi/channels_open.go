@@ -11,8 +11,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // chVerdict is the reply-layer view of a channel open: the choke point's
@@ -36,15 +35,22 @@ func (s *Server) finishOpen(ctx context.Context, command string, res *store.LogA
 	return chVerdict{Allowed: true, Delivery: s.dispatchCommand(ctx, command, res)}
 }
 
-// phoneOpen resolves a phone's authority for an access point (WhatsApp): an
+// phoneOpen resolves a phone's authority for an access point (any phone-
+// verified channel — today WhatsApp, but the path is channel-agnostic): an
 // active visitor grant first (atomic consume, refunded on a limiter denial),
 // then verified-member access. hadAccess=false means neither — the caller
 // renders "you no longer have access". 'close' is the safe direction: it never
 // consumes a grant use and is not rate-limited by the choke point.
-func (s *Server) phoneOpen(ctx context.Context, phoneE164, accessPointID, command string) (hadAccess bool, v chVerdict, err error) {
+//
+// source is the calling channel's Kind (e.g. channels.KindWhatsApp) — it is
+// the audit_logs.source value, so it MUST be the real channel the request
+// came in on. Never hardcode a channel constant here: a wrong source
+// misattributes the open in the audit log, which is evidence for a system
+// that opens physical gates.
+func (s *Server) phoneOpen(ctx context.Context, phoneE164, accessPointID, command, source string) (hadAccess bool, v chVerdict, err error) {
 	if command == "open" {
 		// Visitor grant path: consume + verdict + refund-on-deny in one call.
-		res, grantID, err := s.store.VisitorOpenWithGrant(ctx, s.cfg.RateLimits, phoneE164, accessPointID, channels.KindWhatsApp)
+		res, grantID, err := s.store.VisitorOpenWithGrant(ctx, s.cfg.RateLimits, phoneE164, accessPointID, source)
 		if err != nil {
 			return false, chVerdict{}, err
 		}
@@ -76,7 +82,7 @@ func (s *Server) phoneOpen(ctx context.Context, phoneE164, accessPointID, comman
 		PhoneE164:     phoneE164,
 		AccessPointID: accessPointID,
 		Command:       command,
-		Source:        channels.KindWhatsApp,
+		Source:        source,
 	})
 	if errors.Is(err, store.ErrNotFound) {
 		return true, chVerdict{Reason: "access_point_not_found"}, nil

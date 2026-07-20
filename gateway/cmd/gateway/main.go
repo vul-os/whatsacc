@@ -1,13 +1,27 @@
-// Command gateway is the whatsacc server: one Go binary — channels, rules,
+// Command gateway is the lintel server: one Go binary — channels, rules,
 // portal, API, device hub, audit — backed by one SQLite file.
 //
 // Configuration is flags-over-env:
 //
-//	-data / WACC_DATA_DIR             data directory (SQLite db, signing keys)   default ./data
-//	-listen / WACC_LISTEN             listen address                             default :8080
-//	-public-url / WACC_PUBLIC_URL     external base URL (webhooks, links)        default ""
+//	-data / LINTEL_DATA_DIR             data directory (SQLite db, signing keys)   default ./data
+//	-listen / LINTEL_LISTEN             listen address                             default :8080
+//	-public-url / LINTEL_PUBLIC_URL     external base URL (webhooks, links)        default ""
 //	-admin-claim-token / ADMIN_CLAIM_TOKEN
-//	                                  one-shot instance-admin claim token; empty = claim disabled (fail-closed)
+//	                                    one-shot instance-admin claim token; empty = claim disabled (fail-closed)
+//
+// Chat-channel credentials (WHATSAPP_*/SLACK_*/TELEGRAM_*, no LINTEL_ prefix —
+// see channels.FromEnv) are read directly from the environment, as is the
+// WhatsApp engine selection:
+//
+//	LINTEL_WHATSAPP_ENGINE               "cloud" (default; also anything unset/
+//	                                      misspelled) or the opt-in "bridge" —
+//	                                      see channels.ResolveWhatsAppEngine.
+//	                                      Selecting "bridge" logs a startup
+//	                                      warning naming its account-ban risk.
+//	LINTEL_WHATSAPP_BRIDGE_URL           opt-in self-hosted bridge (target:
+//	LINTEL_WHATSAPP_BRIDGE_API_KEY       Evolution API) base URL / api key /
+//	LINTEL_WHATSAPP_BRIDGE_INSTANCE      instance name — only consulted when
+//	                                      LINTEL_WHATSAPP_ENGINE=bridge.
 package main
 
 import (
@@ -22,10 +36,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
-	"github.com/vul-os/whatsacc/gateway/internal/httpapi"
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/httpapi"
+	"github.com/vul-os/lintel/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Version is stamped via -ldflags "-X main.Version=..." at release time.
@@ -40,9 +54,9 @@ func envOr(key, def string) string {
 
 func main() {
 	var (
-		dataDir    = flag.String("data", envOr("WACC_DATA_DIR", "./data"), "data directory")
-		listen     = flag.String("listen", envOr("WACC_LISTEN", ":8080"), "listen address")
-		publicURL  = flag.String("public-url", envOr("WACC_PUBLIC_URL", ""), "external base URL")
+		dataDir    = flag.String("data", envOr("LINTEL_DATA_DIR", "./data"), "data directory")
+		listen     = flag.String("listen", envOr("LINTEL_LISTEN", ":8080"), "listen address")
+		publicURL  = flag.String("public-url", envOr("LINTEL_PUBLIC_URL", ""), "external base URL")
 		claimToken = flag.String("admin-claim-token", envOr("ADMIN_CLAIM_TOKEN", ""), "one-shot admin claim token (empty disables claiming)")
 	)
 	flag.Parse()
@@ -78,7 +92,7 @@ func run(dataDir, listen, publicURL, claimToken string, log *slog.Logger) error 
 
 	srv := httpapi.New(httpapi.Config{
 		Version:         Version,
-		Env:             envOr("WACC_ENV", "self-hosted"),
+		Env:             envOr("LINTEL_ENV", "self-hosted"),
 		PublicURL:       publicURL,
 		AdminClaimToken: claimToken,
 		JWTSecret:       secret,
@@ -95,7 +109,7 @@ func run(dataDir, listen, publicURL, claimToken string, log *slog.Logger) error 
 	defer cancel()
 	srv.StartChannels(ctx)
 
-	log.Info("whatsacc gateway", "version", Version, "listen", listen,
+	log.Info("lintel gateway", "version", Version, "listen", listen,
 		"data", dataDir, "gateway_key", ks.PublicKeyB64())
 
 	httpSrv := &http.Server{

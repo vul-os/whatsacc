@@ -1,10 +1,13 @@
 package channels
 
-// Slack Socket Mode — THE zero-URL story (ARCHITECTURE §4). When an app-level
-// token (xapp-…) is configured, the gateway DIALS OUT to Slack over a single
-// outbound WebSocket instead of receiving webhooks, so a gateway on a LAN with
-// NO public URL still runs Slack fully. This is what makes "a Pi on the estate
-// LAN is a complete installation" real.
+// Slack Socket Mode — THE zero-URL story (ARCHITECTURE §4), and the original
+// precedent for DialChannel (channels.go): when an app-level token (xapp-…)
+// is configured, the gateway DIALS OUT to Slack over a single outbound
+// WebSocket instead of receiving webhooks, so a gateway on a LAN with NO
+// public URL still runs Slack fully. This is what makes "a Pi on the estate
+// LAN is a complete installation" real. SocketMode implements DialChannel
+// (Kind/Enabled/Run) so it is a first-class channel alongside the webhook
+// ones, not a Slack-specific special case wired in by hand.
 //
 // Flow (per Slack's Socket Mode protocol): POST apps.connections.open with the
 // app token → a wss URL → dial it → receive `hello`, then `events_api` /
@@ -25,6 +28,8 @@ import (
 
 	"github.com/coder/websocket"
 )
+
+var _ DialChannel = (*SocketMode)(nil)
 
 // SocketConn is the minimal WebSocket surface Socket Mode needs (abstracted so
 // tests inject a fake).
@@ -61,7 +66,11 @@ type SocketMode struct {
 	ReconnectMin time.Duration // backoff floor (default 1s)
 }
 
+// Kind identifies this as the Slack dial-out channel (DialChannel).
+func (*SocketMode) Kind() string { return KindSlack }
+
 // Enabled reports whether Socket Mode is configured (an xapp- app token).
+// Fail-closed: the zero value (no token) is disabled.
 func (s *SocketMode) Enabled() bool { return s.AppToken != "" }
 
 func (s *SocketMode) log() *slog.Logger {

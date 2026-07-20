@@ -1,19 +1,34 @@
 // Package channels is the gateway's chat-channel seam: the per-provider parts
 // of "resolve sender → identity, message → intent, reply → send" that are
-// genuinely provider-specific — fail-closed webhook authentication, inbound
-// wire parsing, and reply rendering (WhatsApp interactive lists, Slack blocks,
-// Telegram inline keyboards). The conversational contract and the
-// authorization it gates are NOT here: every open funnels through the shared
-// open-path choke point (store.LogAccess → sign → hub dispatch) the HTTP open
-// route uses, driven by the httpapi channel handlers. A channel decides how to
-// ask and how to reply; it never decides whether the gate may open.
+// genuinely provider-specific — fail-closed webhook authentication (or, for a
+// dial-out provider, connection-native authentication), inbound wire parsing,
+// and reply rendering (WhatsApp interactive lists, Slack blocks, Telegram
+// inline keyboards). The conversational contract and the authorization it
+// gates are NOT here: every open funnels through the shared open-path choke
+// point (store.LogAccess → sign → hub dispatch) the HTTP open route uses,
+// driven by the httpapi channel handlers. A channel decides how to ask and how
+// to reply; it NEVER decides whether the gate may open — dial-out channels are
+// held to exactly the same rule (see DialChannel).
 //
-// Design (ARCHITECTURE §3a / §4): one small Channel interface authenticates
-// and names the identity space; Socket Mode (this package) lets a LAN-only
-// gateway with no public URL still run Slack fully by dialing out to Slack.
+// Design (ARCHITECTURE §3a / §4): two small interfaces cover the two shapes a
+// channel comes in.
+//
+//   - Channel is webhook-shaped (WhatsApp, Slack Events API, Telegram): the
+//     provider POSTs to us; Verify fail-closed-authenticates the request.
+//   - DialChannel is subscribe-shaped: the gateway dials OUT to (or otherwise
+//     maintains a live session with) the provider instead of receiving
+//     webhooks, so a LAN-only gateway with no public URL can still run it
+//     fully. Slack Socket Mode (socketmode.go) is the original precedent;
+//     DMTAP (dmtap.go) is the second implementation, generalizing the
+//     precedent into a proper seam instead of a Slack-specific special case.
+//
+// Both funnel into the SAME httpapi handler code path and the SAME choke
+// point — a dial-out channel differs from a webhook channel only in how it
+// receives bytes, never in what it is allowed to do with them.
 package channels
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -29,6 +44,7 @@ const (
 	KindWhatsApp = "whatsapp"
 	KindSlack    = "slack"
 	KindTelegram = "telegram"
+	KindDMTAP    = "dmtap" // scaffold only — see dmtap.go for exactly what is real
 )
 
 // SlackReplayWindowS is Slack's standard signed-request replay window: reject
@@ -46,13 +62,47 @@ type VerifyResult struct {
 func ok() VerifyResult             { return VerifyResult{OK: true} }
 func reject(r string) VerifyResult { return VerifyResult{OK: false, Reason: r} }
 
-// Channel is the per-provider seam. It authenticates an inbound webhook
-// (fail-closed) and names its identity space. Everything else a channel does
-// is exposed as concrete rendering/parsing helpers used by the httpapi
-// handlers, which own the shared conversational + open pipeline.
+// Channel is the per-provider seam for a WEBHOOK-shaped provider. It
+// authenticates an inbound webhook (fail-closed) and names its identity
+// space. Everything else a channel does is exposed as concrete
+// rendering/parsing helpers used by the httpapi handlers, which own the
+// shared conversational + open pipeline.
 type Channel interface {
 	Kind() string
 	Verify(headers http.Header, body []byte, now int64) VerifyResult
+}
+
+// DialChannel is the per-provider seam for a SUBSCRIBE-shaped provider: one
+// that has no webhook to receive because the gateway dials OUT to it (or
+// otherwise holds a live, provider-authenticated session) instead. This is
+// the generalized precedent set by Slack Socket Mode (socketmode.go) — a
+// LAN-only gateway with no public URL can still run the channel fully — made
+// into a proper seam so a subscribe-style provider (DMTAP: dmtap.go) is a
+// first-class channel rather than a Slack-specific special case.
+//
+// There is no separate Verify: the connection itself IS the authentication
+// (Slack's app-level token proves the workspace install; DMTAP's MLS group
+// membership proves the sender). What Verify's fail-closed contract becomes
+// here is Enabled — Run must never be invoked, and StartChannels must never
+// launch it, unless the provider is genuinely configured; an unset credential
+// means "this channel does not run", never "this channel runs unauthenticated".
+//
+// Same authorization contract as Channel: whatever Run receives from the
+// provider, it may only hand to its own Handle-style callback, which funnels
+// through the SAME store.LogAccess → sign → hub dispatch choke point every
+// webhook channel uses (via the httpapi handlers). A dial-out channel may
+// deliver an intent; it never decides whether the gate may open.
+type DialChannel interface {
+	Kind() string
+	// Enabled reports whether this channel is configured to dial out (e.g. an
+	// app/session token or identity key is set). Fail-closed: the zero value
+	// of a DialChannel implementation must report false.
+	Enabled() bool
+	// Run dials out (or opens/maintains the subscribed session) and serves it
+	// until ctx is cancelled, reconnecting with backoff on a recoverable
+	// error. Intended to be launched in its own goroutine; must not be called
+	// unless Enabled() is true.
+	Run(ctx context.Context)
 }
 
 // Config holds the channel credentials, sourced from env in main. All fields
@@ -66,6 +116,19 @@ type Config struct {
 	WhatsAppAccessToken   string
 	WhatsAppPhoneNumberID string
 	WhatsAppGraphVersion  string
+	// WhatsAppEngine is the raw LINTEL_WHATSAPP_ENGINE value — "cloud"
+	// (default; also anything unset/misspelled) or the opt-in "bridge".
+	// Resolve with ResolveWhatsAppEngine (send.go); build the sender with
+	// NewWhatsAppSender. See send.go's "WhatsApp engine selection" section
+	// for the ban-risk requirement this exists to enforce.
+	WhatsAppEngine string
+	// WhatsAppBridgeURL / WhatsAppBridgeAPIKey / WhatsAppBridgeInstance
+	// configure the opt-in self-hosted bridge engine (target: Evolution
+	// API). Only consulted when WhatsAppEngine resolves to
+	// WhatsAppEngineBridge; unset means BridgeWhatsAppSender fails closed.
+	WhatsAppBridgeURL      string
+	WhatsAppBridgeAPIKey   string
+	WhatsAppBridgeInstance string
 
 	// Slack (Events API webhook + Socket Mode)
 	SlackSigningSecret string
@@ -81,20 +144,30 @@ type Config struct {
 }
 
 // FromEnv builds a Config from a getenv func (os.Getenv in production, a map
-// in tests). Env var names match the Workers backend (the behavioral spec).
+// in tests). Provider CREDENTIAL env var names match the Workers backend (the
+// behavioral spec: WHATSAPP_*, SLACK_*, TELEGRAM_*, no LINTEL_ prefix — kept
+// for parity with a backend that predates and has no counterpart for them).
+// Config that is genuinely new to the Go gateway, with no backend precedent —
+// the WhatsApp engine selection and bridge config — uses the LINTEL_* prefix,
+// consistent with the gateway's own infra config (LINTEL_DATA_DIR,
+// LINTEL_LISTEN, …).
 func FromEnv(getenv func(string) string, publicURL string) Config {
 	return Config{
-		WhatsAppAppSecret:     getenv("WHATSAPP_APP_SECRET"),
-		WhatsAppVerifyToken:   getenv("WHATSAPP_VERIFY_TOKEN"),
-		WhatsAppAccessToken:   getenv("WHATSAPP_ACCESS_TOKEN"),
-		WhatsAppPhoneNumberID: getenv("WHATSAPP_PHONE_NUMBER_ID"),
-		WhatsAppGraphVersion:  getenv("WHATSAPP_GRAPH_VERSION"),
-		SlackSigningSecret:    getenv("SLACK_SIGNING_SECRET"),
-		SlackBotToken:         getenv("SLACK_BOT_TOKEN"),
-		SlackAppToken:         getenv("SLACK_APP_TOKEN"),
-		TelegramBotToken:      getenv("TELEGRAM_BOT_TOKEN"),
-		TelegramWebhookSecret: getenv("TELEGRAM_WEBHOOK_SECRET"),
-		PublicURL:             publicURL,
+		WhatsAppAppSecret:      getenv("WHATSAPP_APP_SECRET"),
+		WhatsAppVerifyToken:    getenv("WHATSAPP_VERIFY_TOKEN"),
+		WhatsAppAccessToken:    getenv("WHATSAPP_ACCESS_TOKEN"),
+		WhatsAppPhoneNumberID:  getenv("WHATSAPP_PHONE_NUMBER_ID"),
+		WhatsAppGraphVersion:   getenv("WHATSAPP_GRAPH_VERSION"),
+		WhatsAppEngine:         getenv("LINTEL_WHATSAPP_ENGINE"),
+		WhatsAppBridgeURL:      getenv("LINTEL_WHATSAPP_BRIDGE_URL"),
+		WhatsAppBridgeAPIKey:   getenv("LINTEL_WHATSAPP_BRIDGE_API_KEY"),
+		WhatsAppBridgeInstance: getenv("LINTEL_WHATSAPP_BRIDGE_INSTANCE"),
+		SlackSigningSecret:     getenv("SLACK_SIGNING_SECRET"),
+		SlackBotToken:          getenv("SLACK_BOT_TOKEN"),
+		SlackAppToken:          getenv("SLACK_APP_TOKEN"),
+		TelegramBotToken:       getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramWebhookSecret:  getenv("TELEGRAM_WEBHOOK_SECRET"),
+		PublicURL:              publicURL,
 	}
 }
 

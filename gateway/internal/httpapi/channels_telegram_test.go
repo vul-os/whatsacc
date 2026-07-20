@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/channels"
 )
 
 func tgMessage(userID, chatID int64, msgID int64, text string) []byte {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/channels"
 )
 
 // waTextMsg builds a signed-friendly WhatsApp text webhook body.

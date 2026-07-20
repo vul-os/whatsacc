@@ -17,7 +17,7 @@ func DenialMessage(reason string, retryAfterS int64, publicURL string) string {
 	case "account_suspended":
 		return "This account has been suspended by the gateway operator — the gate cannot be opened. Contact your operator for help."
 	case "user_disabled":
-		return "Your whatsacc user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help."
+		return "Your lintel user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help."
 	case "quota_exceeded":
 		return "Daily limit reached for this location — contact your admin. The web portal: " + trimURL(publicURL) + "/app"
 	default: // rate_limited

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 var opSources = map[string]bool{"web": true, "whatsapp": true, "api": true}
@@ -109,7 +109,7 @@ func (s *Server) dispatchCommand(ctx context.Context, command string, verdict *s
 		_ = s.store.UpdateAccessLogError(ctx, verdict.LogID, "undelivered")
 		return "undelivered"
 	}
-	outcome := s.hub.Dispatch(ctx, verdict.AP.DeviceID, env, s.cfg.AckTimeout)
+	outcome := s.hub.Dispatch(ctx, verdict.AP.DeviceID, env, s.cfg.AckTimeout, verdict.LogID)
 	switch outcome.Delivery {
 	case "acked":
 		if outcome.Result == "denied" || outcome.Result == "error" {

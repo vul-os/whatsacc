@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // WhatsApp is the channel value (holds only what Verify needs; the rest is

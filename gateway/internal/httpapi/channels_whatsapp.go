@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/channels"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/channels"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // waPending is one rendered reply awaiting send (to = recipient wa id, no '+').
@@ -194,19 +194,19 @@ func (s *Server) waNoAccessReply(ctx contextT, to, chatID, from string, location
 	}
 	if !linked {
 		return text(to, chatID, strings.Join([]string{
-			"Hello! This WhatsApp number isn't linked to a whatsacc account yet.",
+			"Hello! This WhatsApp number isn't linked to a lintel account yet.",
 			"Create your account here: " + channels.SignupLinkForPhone(s.channelPublicURL(), from),
 			"After signup, we'll ask if you want to connect this number.",
 		}, "\n\n"))
 	}
 	if len(locations) == 0 {
 		return text(to, chatID, strings.Join([]string{
-			"Welcome to whatsacc. Your number is connected.",
+			"Welcome to lintel. Your number is connected.",
 			"You don't have a location set up yet. Open the dashboard to add Home, HQ, or your first site.",
 			base + "/app",
 		}, "\n\n"))
 	}
-	first := "whatsacc"
+	first := "lintel"
 	second := fmt.Sprintf("I found %d locations, but none have active gates or doors ready yet.", len(locations))
 	if len(locations) == 1 {
 		first = locations[0].Name
@@ -257,7 +257,7 @@ func (s *Server) waHandleInteractive(ctx contextT, msg *channels.WAMessage, from
 // waAccessCommand runs one open/close through the shared choke point and
 // renders the honest result — backend pushAccessCommandResult.
 func (s *Server) waAccessCommand(ctx contextT, to, chatID, from, apID, gateName, command string) []waPending {
-	had, v, err := s.phoneOpen(ctx, from, apID, command)
+	had, v, err := s.phoneOpen(ctx, from, apID, command, channels.KindWhatsApp)
 	if err != nil {
 		s.log.Error("wa open", "err", err)
 		return nil

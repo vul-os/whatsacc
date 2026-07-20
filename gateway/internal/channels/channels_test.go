@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 func hmacHexT(secret, msg string) string {
@@ -120,7 +120,7 @@ func TestDenialMessagesExact(t *testing.T) {
 	if got := DenialMessage("account_suspended", 0, "https://x"); got != "This account has been suspended by the gateway operator — the gate cannot be opened. Contact your operator for help." {
 		t.Errorf("suspended: %q", got)
 	}
-	if got := DenialMessage("user_disabled", 0, "https://x"); got != "Your whatsacc user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help." {
+	if got := DenialMessage("user_disabled", 0, "https://x"); got != "Your lintel user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help." {
 		t.Errorf("disabled: %q", got)
 	}
 	if got := DenialMessage("quota_exceeded", 0, "https://gate.example/"); got != "Daily limit reached for this location — contact your admin. The web portal: https://gate.example/app" {
