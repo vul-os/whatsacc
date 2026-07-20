@@ -5,7 +5,7 @@
     "max_opens_per_location_per_day": 50
   },
   "usage": {
-    "day_start": "{{now-9h}}",
+    "day_start": "{{now-9h:iso}}",
     "location_opens_today": 47,
     "my_opens_today": 3,
     "members": [

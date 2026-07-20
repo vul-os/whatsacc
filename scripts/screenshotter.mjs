@@ -30,17 +30,34 @@ const MIN_BYTES = 30_000; // a real 2x/3x product shot is far bigger than this
 const APP_HAS_DARK_MODE = true; // real dark theme via :root[data-theme] (src/lib/theme.tsx)
 
 // ---------------------------------------------------------------------------
-// Fixtures: load JSON and substitute {{now±Nu}} tokens (u in s|m|h|d) with ISO
-// timestamps relative to run time, so "5 min ago" style UI always looks fresh.
+// Fixtures: load JSON and substitute {{now±Nu}} tokens (u in s|m|h|d) with
+// timestamps relative to run time, so "5 min ago" style UI always looks
+// fresh. api.ts's UnixSeconds type doc comment is the source of truth here:
+// almost every gateway timestamp is Unix *seconds* (a bare number), not an
+// ISO string — the two exceptions (LocationLimits.usage.day_start and
+// LocationSummary.today.day_start) are formatted server-side via Go's
+// time.RFC3339 and stay actual ISO strings. Getting this wrong renders as
+// "Invalid Date" in the portal (fromUnix() on a non-numeric value), not a
+// silent fallback, so the token form matters:
+//   "{{now-4m}}"        quoted, no suffix -> bare UnixSeconds number (quotes swallowed)
+//   "{{now-13d:date}}"  quoted           -> "YYYY-MM-DD" (e.g. AccountInsights.days[].day)
+//   "{{now-9h:iso}}"    quoted           -> full ISO string (the day_start exceptions)
 // ---------------------------------------------------------------------------
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 function loadFixture(name) {
   const raw = fs.readFileSync(path.join(FIXTURES, name), 'utf8');
-  const substituted = raw.replace(/\{\{now([+-]\d+)([smhd])(:date)?\}\}/g, (_, amount, unit, asDate) => {
-    const iso = new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString();
-    return asDate ? iso.slice(0, 10) : iso;
-  });
+  const substituted = raw
+    .replace(/"\{\{now([+-]\d+)([smhd])\}\}"/g, (_, amount, unit) => {
+      const ms = Date.now() + Number(amount) * UNIT_MS[unit];
+      return String(Math.round(ms / 1000));
+    })
+    .replace(/\{\{now([+-]\d+)([smhd]):date\}\}/g, (_, amount, unit) =>
+      new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString().slice(0, 10),
+    )
+    .replace(/\{\{now([+-]\d+)([smhd]):iso\}\}/g, (_, amount, unit) =>
+      new Date(Date.now() + Number(amount) * UNIT_MS[unit]).toISOString(),
+    );
   return substituted;
 }
 
@@ -79,12 +96,12 @@ function buildMockRoutes({ admin = false } = {}) {
           quotas: { max_opens_per_member_per_day: 30, max_opens_per_location_per_day: 50 },
         }),
     },
-    { method: 'GET', re: /^\/locations\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
+    { method: 'GET', re: /^\/accounts\/[^/]+\/locations$/, body: () => loadFixture('locations.json') },
     { method: 'GET', re: /^\/accounts\/[^/]+\/members$/, body: () => loadFixture('members.json') },
-    { method: 'GET', re: /^\/access\/access-points$/, body: () => loadFixture('access-points.json') },
-    { method: 'GET', re: /^\/access\/access-points\/[^/]+$/, body: () => loadFixture('access-points.json'), pick: 'first-access-point' },
-    { method: 'GET', re: /^\/access\/access-points\/[^/]+\/maintenance$/, body: () => loadFixture('maintenance.json') },
-    { method: 'GET', re: /^\/access\/grants(\?.*)?$/, body: () => loadFixture('grants.json') },
+    { method: 'GET', re: /^\/access-points$/, body: () => loadFixture('access-points.json') },
+    { method: 'GET', re: /^\/access-points\/[^/]+$/, body: () => loadFixture('access-points.json'), pick: 'first-access-point' },
+    { method: 'GET', re: /^\/access-points\/[^/]+\/maintenance$/, body: () => loadFixture('maintenance.json') },
+    { method: 'GET', re: /^\/grants(\?.*)?$/, body: () => loadFixture('grants.json') },
     { method: 'GET', re: /^\/reference\/countries$/, body: () => JSON.stringify({ countries: [
       { code: 'ZA', name: 'South Africa', flag: '\u{1F1FF}\u{1F1E6}' },
     ] }) },
@@ -101,11 +118,10 @@ function buildMockRoutes({ admin = false } = {}) {
   ];
 }
 
-// API pathname prefixes (mirrors backend/src/routes/*). The app is pointed at the
-// Vite origin via VITE_API_BASE_URL, so these prefixes distinguish API calls from
-// Vite asset requests on the same origin.
-const API_PREFIX_RE =
-  /^\/(admin|auth|accounts|access|analytics|devices|locations|phones|reference|whatsapp)(\/|$)/;
+// Every gateway route lives under /v1 (see src/lib/api.ts's API_VERSION_PREFIX).
+// The route regexes below are written against the un-prefixed path — the /v1
+// is stripped before matching, mirroring how apiFetch builds request URLs.
+const API_PREFIX_RE = /^\/v1\//;
 
 async function installApiMocks(context, opts = {}) {
   const routes = buildMockRoutes(opts);
@@ -114,9 +130,10 @@ async function installApiMocks(context, opts = {}) {
     async (route) => {
       const req = route.request();
       const url = new URL(req.url());
-      const pathWithQuery = url.pathname + url.search;
+      const pathname = url.pathname.replace(/^\/v1/, '');
+      const pathWithQuery = pathname + url.search;
       const match = routes.find(
-        (r) => r.method === req.method() && (r.re.test(url.pathname) || r.re.test(pathWithQuery)),
+        (r) => r.method === req.method() && (r.re.test(pathname) || r.re.test(pathWithQuery)),
       );
       if (!match) {
         console.warn(`  [mock] no fixture for ${req.method()} ${url.pathname} -> 404`);
@@ -136,7 +153,7 @@ async function installApiMocks(context, opts = {}) {
         // keep the quota caps for Silver Oaks so other locations read as
         // "no cap set" (keeps the dashboard chip to a single, real entry).
         const j = JSON.parse(body);
-        const id = url.pathname.split('/')[3];
+        const id = pathname.split('/')[3];
         j.location_id = id;
         if (id !== 'loc_silveroaks') {
           j.today.opens = 6;
@@ -208,8 +225,8 @@ const DETERMINISM_CSS = `
 
 const AUTH_SEED = `
   try {
-    localStorage.setItem('whatsacc.access_token', 'screenshotter-access-token');
-    localStorage.setItem('whatsacc.refresh_token', 'screenshotter-refresh-token');
+    localStorage.setItem('lintel.access_token', 'screenshotter-access-token');
+    localStorage.setItem('lintel.refresh_token', 'screenshotter-refresh-token');
   } catch {}
 `;
 
@@ -317,7 +334,7 @@ async function main() {
     browser = await chromium.launch();
 
     const desktopShots = [
-      { path: '/', file: 'landing-hero.png', settleMs: 1_400, expectText: 'whatsacc' },
+      { path: '/', file: 'landing-hero.png', settleMs: 1_400, expectText: 'lintel' },
       { path: '/docs', file: 'docs.png' },
       { path: '/security', file: 'security.png' },
       { path: '/app', file: 'portal-dashboard.png', expectText: 'Recent activity' },
@@ -386,7 +403,7 @@ async function main() {
           timezoneId: 'Africa/Johannesburg',
         });
         await context.addInitScript(AUTH_SEED);
-        await context.addInitScript(`window.localStorage.setItem('whatsacc.theme', '${scheme}');`);
+        await context.addInitScript(`window.localStorage.setItem('lintel.theme', '${scheme}');`);
         await installApiMocks(context, { admin: Boolean(admin) });
         const page = await context.newPage();
         page.on('pageerror', (err) => console.warn(`  [pageerror] ${err.message}`));
