@@ -2,7 +2,7 @@ import { LinkButton } from '@/components/ui/Button';
 import { HeroGateDayNight } from '@/components/illustrations/HeroGateDayNight';
 import { HeroGateDayNightMobile } from '@/components/illustrations/HeroGateDayNightMobile';
 
-// Gate-motor brands whose standard dry-contact inputs whatsacc is designed
+// Gate-motor brands whose standard dry-contact inputs lintel is designed
 // around — used as a quiet trust band below the fold. Stays restrained: small
 // caps, ink/45 colour, no logo files (just wordmarks) so the page feels
 // owned-and-considered rather than like a partnerships salad. These are
@@ -12,8 +12,8 @@ const integrations = ['Centurion', 'BFT', 'Came', 'Nice', 'Et Blue'];
 const capabilities = [
   'WhatsApp-native',
   'Ed25519-signed commands',
-  'Geofence-aware',
   'Audit log per open',
+  'Free & open source',
 ];
 
 export function Hero() {
@@ -84,7 +84,7 @@ export function Hero() {
           {/* dek — kept brief so we don't blow the fold */}
           <p className="mt-3 sm:mt-6 max-w-xl text-[15px] sm:text-[17px] leading-snug sm:leading-relaxed text-ink/70">
             Residents, staff and visitors open a gate, door or barrier with one WhatsApp
-            message. Phone-verified, geofence-aware, audited end-to-end.
+            message. Phone-verified, signed end-to-end, audited every time.
           </p>
 
           {/* capability chips — hidden on phones to keep the fold tight */}

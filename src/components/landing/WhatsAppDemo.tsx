@@ -1,39 +1,5 @@
 import { ArchMark } from '@/components/illustrations/ArchMark';
 
-function MapThumb() {
-  return (
-    <svg viewBox="0 0 220 130" className="w-full h-auto rounded-md" aria-hidden>
-      <defs>
-        <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#E8E2D5" />
-          <stop offset="1" stopColor="#D9D0BD" />
-        </linearGradient>
-      </defs>
-      <rect width="220" height="130" fill="url(#land)" />
-      <path d="M0 70 C 40 60, 80 80, 130 70 S 200 60, 220 72 L 220 130 L 0 130 Z" fill="#CFE5C8" />
-      <path d="M-10 28 Q 80 24 220 38 L 220 30 Q 110 18 -10 22 Z" fill="#B7D8F0" opacity="0.85" />
-      <g stroke="#B5AB95" strokeWidth="1.4" fill="none" opacity="0.85">
-        <path d="M0 96 L 220 84" />
-        <path d="M0 110 L 220 102" />
-        <path d="M44 130 L 60 0" />
-        <path d="M148 130 L 168 0" />
-      </g>
-      <g fill="#A89E84" opacity="0.55">
-        <rect x="14" y="80" width="20" height="14" rx="2" />
-        <rect x="78" y="100" width="26" height="16" rx="2" />
-        <rect x="120" y="78" width="22" height="14" rx="2" />
-        <rect x="180" y="98" width="20" height="14" rx="2" />
-      </g>
-      {/* pin */}
-      <g transform="translate(110 60)">
-        <ellipse cx="0" cy="20" rx="8" ry="2.5" fill="#000" opacity="0.18" />
-        <path d="M0 -22 C 9 -22 12 -14 8 -6 L 0 14 L -8 -6 C -12 -14 -9 -22 0 -22 Z" fill="#D6624D" />
-        <circle cx="0" cy="-15" r="3.4" fill="#F4EDE2" />
-      </g>
-    </svg>
-  );
-}
-
 function Tick({ read = true }: { read?: boolean }) {
   const c = read ? '#34B7F1' : '#8696A0';
   return (
@@ -120,18 +86,18 @@ export function WhatsAppDemo() {
               <em className="italic text-terracotta">Because it is.</em>
             </h2>
             <p className="mt-6 max-w-md text-ink/70 leading-relaxed">
-              Residents share their location, pick a gate, and we open it — every step happens
+              Residents send a word, pick a gate, and we open it — every step happens
               inside the same WhatsApp thread they already use. No new app to install. No fob to lose.
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-ink/75">
               <li className="flex gap-3">
                 <span className="mt-2 h-1 w-3 bg-terracotta shrink-0" />
-                <span>Phone number ↔ profile, with optional name + photo for the security team.</span>
+                <span>Phone number ↔ profile, with an optional name for the security team.</span>
               </li>
               <li className="flex gap-3">
                 <span className="mt-2 h-1 w-3 bg-terracotta shrink-0" />
-                <span>Geofence check rejects anyone outside the configured radius.</span>
+                <span>Permission and quota checks run before anything is sent to the controller.</span>
               </li>
               <li className="flex gap-3">
                 <span className="mt-2 h-1 w-3 bg-terracotta shrink-0" />
@@ -166,7 +132,7 @@ export function WhatsAppDemo() {
                     <ArchMark className="h-5 w-5 text-[#1A1F36]" />
                   </div>
                   <div className="leading-tight">
-                    <div className="text-[14px] font-medium">whatsacc · Stellar Heights</div>
+                    <div className="text-[14px] font-medium">lintel · Stellar Heights</div>
                     <div className="text-[11px] text-white/70">online</div>
                   </div>
                   <div className="ml-auto flex items-center gap-2 text-white/80">
@@ -194,45 +160,11 @@ export function WhatsAppDemo() {
                       TODAY
                     </div>
 
-                    {/* Incoming: greeting */}
+                    {/* Incoming: greeting + which gate? */}
                     <div className="relative max-w-[78%] self-start rounded-md rounded-tl-none bg-white px-2.5 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
                       <IncomingTail />
                       <p className="text-[13.5px] leading-snug text-ink">
-                        Hey Yusuf 👋 you have access to <b>3 gates</b> at <b>Stellar Heights</b>. Share your location to start.
-                      </p>
-                      <div className="mt-0.5 flex justify-end items-baseline gap-1 text-[10.5px] text-ink/45">
-                        <span>09:41</span>
-                      </div>
-                    </div>
-
-                    {/* Outgoing: location share */}
-                    <div className="relative max-w-[80%] self-end rounded-md rounded-tr-none bg-[#D9FDD3] p-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
-                      <OutgoingTail />
-                      <div className="overflow-hidden rounded-md">
-                        <MapThumb />
-                      </div>
-                      <div className="px-1 pt-1.5">
-                        <div className="flex items-start gap-1.5">
-                          <svg viewBox="0 0 16 16" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#075E54]" fill="currentColor" aria-hidden>
-                            <path d="M8 0a5 5 0 00-5 5c0 3.6 5 11 5 11s5-7.4 5-11a5 5 0 00-5-5zm0 7a2 2 0 110-4 2 2 0 010 4z" />
-                          </svg>
-                          <div className="leading-tight">
-                            <div className="text-[12.5px] font-medium text-ink">Live location</div>
-                            <div className="text-[11px] text-ink/55">Stellar Heights, Sunset Ave</div>
-                          </div>
-                        </div>
-                        <div className="mt-1 flex justify-end items-baseline gap-1 text-[10.5px] text-ink/45">
-                          <span>09:41</span>
-                          <Tick read />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Incoming: which gate? */}
-                    <div className="relative max-w-[78%] self-start rounded-md rounded-tl-none bg-white px-2.5 pt-1.5 pb-1 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
-                      <IncomingTail />
-                      <p className="text-[13.5px] leading-snug text-ink">
-                        Got it — you&rsquo;re <b>14&nbsp;m</b> from the perimeter. Which gate would you like to open?
+                        Hey Yusuf 👋 you have access to <b>3 gates</b> at <b>Stellar Heights</b>. Which one would you like to open?
                       </p>
                       <div className="mt-0.5 flex justify-end items-baseline gap-1 text-[10.5px] text-ink/45">
                         <span>09:41</span>

@@ -7,15 +7,15 @@ const items = [
   },
   {
     q: 'What happens if WhatsApp is down or my phone has no signal?',
-    a: 'Most controllers can fall back to a local PIN keypad or a physical override. whatsacc isn\'t the only way in — it\'s the fastest, most pleasant way in. The gateway also queues commands for up to 30 seconds across brief network blips.',
+    a: 'Most controllers can fall back to a local PIN keypad or a physical override. lintel isn\'t the only way in — it\'s the fastest, most pleasant way in. The gateway also queues commands for up to 30 seconds across brief network blips.',
   },
   {
     q: 'How does the geofence work?',
-    a: 'It\'s optional, per-location. When enabled, whatsacc asks WhatsApp for the sender\'s shared location at open time, or asks them to share live location. Open requests outside your radius are automatically denied and logged.',
+    a: 'It\'s designed, not built yet: per-location, WhatsApp shared location or a live-location ping at open time, requests outside your radius denied and logged. Track it in the docs — the FAQ won\'t get ahead of what\'s actually shipped.',
   },
   {
     q: 'Can I revoke access for someone in seconds?',
-    a: 'Yes. Open the member, hit revoke. It\'s effective on the next message. You can also schedule access (a contractor for one Saturday, a guest for the weekend) and it expires on its own.',
+    a: 'Yes. Open the member, hit revoke. It\'s effective on the next message. You can also grant temporary access to a phone number for a one-off time window — a contractor for one Saturday, a guest for the weekend — and it expires on its own; a repeating weekly schedule (cleaner, Tuesdays 08:00–12:00) is designed but not built yet.',
   },
   {
     q: 'What hardware does it work with?',
@@ -23,7 +23,7 @@ const items = [
   },
   {
     q: 'Is this secure enough for a complex with 200 residents?',
-    a: 'Phone-number identity, signed device commands, optional geofence, full audit log, time-of-day and per-member rules. Every open is treated as a request that has to earn its way through. See the security page for specifics.',
+    a: 'Phone-number identity, Ed25519-signed device commands with gateway-key pinning, an append-only audit log, and per-member/per-location quotas today; geofence and time-of-day rules are designed but not shipped. Every open is treated as a request that has to earn its way through. See the security page for specifics.',
   },
 ];
 

@@ -1,4 +1,13 @@
-const features = [
+import type { ReactNode } from 'react';
+
+const features: {
+  kicker: string;
+  title: string;
+  body: string;
+  span: string;
+  visual: ReactNode;
+  soon?: boolean;
+}[] = [
   {
     kicker: 'a',
     title: 'WhatsApp-native',
@@ -9,7 +18,8 @@ const features = [
   {
     kicker: 'b',
     title: 'Geofence safety',
-    body: 'Block opens from across town. Set a per-location radius and require live location confirmation when stakes are high.',
+    soon: true,
+    body: 'Designed, not shipped yet: block opens from across town, per-location radius, live location confirmation when stakes are high. Track it in the docs.',
     span: 'md:col-span-5',
     visual: <GeofenceVisual />,
   },
@@ -36,8 +46,8 @@ const features = [
   },
   {
     kicker: 'f',
-    title: 'Audit log + analytics',
-    body: 'Every event logged with sender, location and verdict. Export to CSV for HOA meetings or insurance claims.',
+    title: 'Audit log',
+    body: 'Every event logged with sender, location and verdict, append-only in your own SQLite file. Query it directly for HOA meetings or insurance claims.',
     span: 'md:col-span-8',
     visual: <AuditVisual />,
   },
@@ -72,11 +82,16 @@ export function Features() {
               className={`${f.span} group/f rounded-2xl bg-paper-cool border border-ink/10 overflow-hidden p-6 sm:p-8 md:min-h-[280px] flex flex-col gap-6 transition-colors hover:bg-paper-warm/70`}
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-3">
+                <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="font-display italic text-terracotta text-xl">{f.kicker}.</span>
                   <h3 className="font-display text-xl sm:text-[22px] lg:text-2xl leading-tight">
                     {f.title}
                   </h3>
+                  {f.soon && (
+                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-gold border border-gold rounded px-1.5 py-0.5">
+                      planned
+                    </span>
+                  )}
                 </div>
                 <p className="mt-3 text-ink/70 leading-relaxed max-w-md text-[15px]">{f.body}</p>
               </div>
@@ -211,7 +226,7 @@ function OpenSourceVisual() {
       <circle cx="38" cy="26" r="3" fill="#f4ede2" opacity="0.5" />
       <g fontFamily="JetBrains Mono" fontSize="10" fill="#f4ede2">
         <text x="14" y="48" opacity="0.85">
-          git clone whatsacc
+          git clone lintel
         </text>
         <text x="14" y="64" fill="#d6624d">
           LICENSE &middot; MIT
@@ -232,7 +247,7 @@ function AuditVisual() {
           13:58 &middot; open &middot; oakridge/ped
         </text>
         <text x="0" y="50" fill="#d6624d">
-          13:41 &middot; denied &middot; geofence
+          13:41 &middot; denied &middot; quota
         </text>
         <text x="0" y="68">
           13:30 &middot; paired &middot; ACC-04

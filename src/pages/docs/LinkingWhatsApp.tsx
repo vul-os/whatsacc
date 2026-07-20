@@ -6,7 +6,7 @@ export default function LinkingWhatsApp() {
       <DocLead
         kicker="01 · Start here"
         title="Linking your WhatsApp number"
-        intro="whatsacc speaks to residents through a WhatsApp number that belongs to you. This is the number people text 'open' to. Here's how to set one up — and how to choose between a personal number and a dedicated one."
+        intro="lintel speaks to residents through a WhatsApp number that belongs to you. This is the number people text 'open' to. Here's how to set one up — and how to choose between a personal number and a dedicated one."
       />
 
       <DocSection heading="Personal vs. dedicated number">
@@ -64,7 +64,7 @@ export default function LinkingWhatsApp() {
         <p>Other common reasons:</p>
         <ul className="list-disc pl-6 space-y-2">
           <li><strong>Wrong country code.</strong> Numbers must be in E.164 format with the leading <code>+</code>.</li>
-          <li><strong>Already linked elsewhere.</strong> A WhatsApp number can only be the primary on one whatsacc account at a time.</li>
+          <li><strong>Already linked elsewhere.</strong> A WhatsApp number can only be the primary on one lintel account at a time.</li>
           <li><strong>Slow network at the gate.</strong> If your controller is on flaky LTE, verification can complete but the first <em>open</em> times out — the controller will resync within a minute and subsequent opens are normal.</li>
         </ul>
       </DocSection>
@@ -73,7 +73,7 @@ export default function LinkingWhatsApp() {
         <p>
           You can confirm a number is linked + verified via the API at any time:
         </p>
-        <CodeBlock lang="bash">{`curl -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+        <CodeBlock lang="bash">{`curl -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   https://<your-gateway>/v1/phones/me`}</CodeBlock>
         <CodeBlock lang="json">{`{
   "phones": [

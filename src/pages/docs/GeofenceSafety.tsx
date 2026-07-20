@@ -6,27 +6,52 @@ export default function GeofenceSafety() {
       <DocLead
         kicker="02 · Concepts"
         title="Geofence safety"
-        intro="A geofence stops people from opening your gate when they're nowhere near it. It's optional — off by default for homes, on by default for complexes — and pairs with phone-number identity to form a defence-in-depth layer, not a magic shield."
+        intro="A geofence would stop people from opening your gate when they're nowhere near it — off by default for homes, on by default for complexes, pairing with phone-number identity to form a defence-in-depth layer, not a magic shield. It's designed and documented here in full; it is not built."
       />
 
-      <DocSection heading="How it works">
+      <div className="mb-10 sm:mb-12 rounded-2xl border border-gold/40 bg-gold/[0.06] px-5 py-4 sm:px-6 sm:py-5">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-ink/55 font-mono">
+          Status: designed, not implemented
+        </p>
+        <p className="mt-2 text-[15px] text-ink/80 leading-relaxed">
+          Nothing on this page runs today. There is no geofencing code in the Go gateway
+          or the reference backend — no location field on the open path, no radius
+          config, no <code>open.geofence_check</code> event. Everything below is the
+          intended design, kept here so operators know what's coming and implementers
+          know the target. Read it as a spec, not a live control, until this notice is
+          removed. Current, verified status lives in the{' '}
+          <a
+            href="https://github.com/vul-os/lintel#features"
+            className="underline underline-offset-4 decoration-terracotta"
+          >
+            README
+          </a>
+          .
+        </p>
+      </div>
+
+      <DocSection heading="How it would work">
         <p>
-          When geofence is enabled on a location, every open request must include a recent
-          location signal from the sender. whatsacc accepts two sources:
+          When geofence is enabled on a location, every open request would need to include
+          a recent location signal from the sender. The design accepts two sources:
         </p>
         <ul className="list-disc pl-6 space-y-2">
           <li>A WhatsApp <strong>shared location</strong> attached to the open message.</li>
-          <li>A <strong>live-location ping</strong> the user has shared with whatsacc within the last 5 minutes.</li>
+          <li>A <strong>live-location ping</strong> the user has shared with lintel within the last 5 minutes.</li>
         </ul>
         <p>
-          If the lat/lng is outside the configured radius, we return a polite decline message
-          and write the verdict to the audit log. The actual GPS distance is recorded so admins
-          can investigate.
+          If the lat/lng is outside the configured radius, the plan is to return a polite
+          decline message and write the verdict to the audit log, recording the actual GPS
+          distance so admins can investigate.
         </p>
       </DocSection>
 
-      <DocSection heading="Configuring it">
-        <CodeBlock lang="json" title="PATCH /v1/locations/loc_oak/policy">{`{
+      <DocSection heading="Configuring it (proposed)">
+        <p className="text-ink/55 text-[14px]">
+          This endpoint and payload do not exist yet — shown as the target shape for the
+          feature, not something you can call today.
+        </p>
+        <CodeBlock lang="json" title="PATCH /v1/locations/loc_oak/policy (proposed, not implemented)">{`{
   "geofence": {
     "enabled": true,
     "radius_m": 200,
@@ -56,39 +81,44 @@ export default function GeofenceSafety() {
         </p>
       </DocSection>
 
-      <DocSection heading="Decline messages users see">
-        <CodeBlock lang="plain" title="WhatsApp">{`whatsacc 14:02   Hi Yusuf — share your location and try again.
+      <DocSection heading="Decline messages users would see">
+        <p className="text-ink/55 text-[14px]">
+          Illustrative only — no such reply exists today since nothing triggers it.
+        </p>
+        <CodeBlock lang="plain" title="WhatsApp (mockup, not sent by lintel today)">{`lintel 14:02   Hi Yusuf — share your location and try again.
                  (we need it once per 5 min while geofence is on)
 
-whatsacc 14:09   Sorry, you're 1.8 km from Sunset Apartments.
+lintel 14:09   Sorry, you're 1.8 km from Sunset Apartments.
                  Geofence radius is 200 m. Try again when you're closer.`}</CodeBlock>
         <p>
-          Both lines are templated and translatable per location. Owners can override the copy
-          in <strong>Settings → Messaging</strong>.
+          The plan is for both lines to be templated and translatable per location, with
+          owners able to override the copy in <strong>Settings → Messaging</strong>.
         </p>
       </DocSection>
 
-      <DocSection heading="Edge cases we handle">
+      <DocSection heading="Edge cases the design would need to handle">
         <ul className="list-disc pl-6 space-y-2">
-          <li><strong>Spoofed location.</strong> Phones with deliberately spoofed location are flagged via WhatsApp&rsquo;s metadata, but we don&rsquo;t rely on that as the only check — combined with phone-number identity it&rsquo;s a meaningful layer, not a silver bullet.</li>
-          <li><strong>No location attached.</strong> The gate stays shut and we ask the sender to share their location. The original message stays in their thread so they can re-trigger.</li>
-          <li><strong>Stale signal.</strong> If the only signal we have is older than <code>max_signal_age_s</code>, treat as missing.</li>
-          <li><strong>Device offline.</strong> If the controller is offline when the geofence check passes, we queue the open for 30 s and retry on reconnect.</li>
-          <li><strong>Anchor not set.</strong> If the location has no map pin, geofence cannot be enabled — the policy update is rejected with <code>geofence_anchor_required</code>.</li>
+          <li><strong>Spoofed location.</strong> Phones with deliberately spoofed location can be flagged via WhatsApp&rsquo;s metadata, but the design doesn&rsquo;t rely on that as the only check — combined with phone-number identity it would be a meaningful layer, not a silver bullet.</li>
+          <li><strong>No location attached.</strong> The gate would stay shut and the sender would be asked to share their location, with the original message staying in their thread so they can re-trigger.</li>
+          <li><strong>Stale signal.</strong> A signal older than <code>max_signal_age_s</code> would be treated as missing.</li>
+          <li><strong>Device offline.</strong> If the controller is offline when the geofence check passes, the open would queue for 30 s and retry on reconnect.</li>
+          <li><strong>Anchor not set.</strong> If the location has no map pin, geofence couldn&rsquo;t be enabled — the policy update would be rejected with <code>geofence_anchor_required</code>.</li>
         </ul>
       </DocSection>
 
-      <DocSection heading="Auditing">
+      <DocSection heading="Auditing (proposed)">
         <p>
-          Every geofence verdict is logged whether the open succeeded or not. Use it to spot
-          residents who are constantly at the radius edge and might benefit from a wider window:
+          The plan is for every geofence verdict to be logged whether the open succeeded or
+          not, so admins can spot residents who are constantly at the radius edge and might
+          benefit from a wider window. Neither the query below nor the
+          <code> open.geofence_check</code> event kind exists yet:
         </p>
-        <CodeBlock lang="bash">{`curl -G https://<your-gateway>/v1/events \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+        <CodeBlock lang="bash" title="proposed, not implemented">{`curl -G https://<your-gateway>/v1/events \\
+  -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   --data-urlencode "location=loc_oak" \\
   --data-urlencode "kind=open.geofence_check" \\
   --data-urlencode "since=2026-05-01"`}</CodeBlock>
-        <CodeBlock lang="json">{`{
+        <CodeBlock lang="json" title="proposed shape">{`{
   "events": [
     {
       "id": "ev_01HZ4G…",

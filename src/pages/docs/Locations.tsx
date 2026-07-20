@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { DocLead, DocSection, CodeBlock } from './DocsLayout';
 
 export default function LocationsDoc() {
@@ -6,7 +7,7 @@ export default function LocationsDoc() {
       <DocLead
         kicker="02 · Concepts"
         title="Creating a Location"
-        intro="A Location is the physical place whatsacc protects. Everything else — access points, devices, members, geofences — hangs off it. Most accounts have one; estates have several with nested children."
+        intro="A Location is the physical place lintel protects. Everything else — access points, devices, members — hangs off it. Most accounts have one; estates have several with nested children."
       />
 
       <DocSection heading="The four kinds">
@@ -39,31 +40,46 @@ export default function LocationsDoc() {
         <ol className="list-decimal pl-6 space-y-3">
           <li>From the dashboard sidebar, click <strong>Locations</strong> then <em>New location</em>.</li>
           <li>Pick the kind, give it a name (residents see this in their WhatsApp replies), and a city.</li>
-          <li>Optional: drop a pin on the map. This anchors the geofence if you turn it on later.</li>
+          <li>Optional: drop a pin on the map. This is where a geofence anchor would attach if that
+          feature ships — <Link to="/docs/geofence-safety" className="underline underline-offset-4 decoration-terracotta">designed, not built yet</Link>.</li>
           <li>You&rsquo;re ready to add an access point.</li>
         </ol>
       </DocSection>
 
       <DocSection heading="Or via the API">
+        <p>
+          Fields are flat — <code>lat</code>/<code>long</code>, not a nested
+          <code> anchor</code> object — and the field is <code>type</code>, not
+          <code> kind</code>. <code>city</code> isn&rsquo;t its own field; put it inside
+          <code> address</code> if you use one.
+        </p>
         <CodeBlock lang="bash">{`curl -X POST https://<your-gateway>/v1/locations \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+  -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "kind": "complex",
+    "type": "complex",
     "name": "Sunset Apartments",
-    "city": "Cape Town",
     "country_code": "ZA",
-    "anchor": { "lat": -33.918, "lng": 18.423 }
+    "lat": -33.918,
+    "long": 18.423
   }'`}</CodeBlock>
+        <p>The create response is intentionally minimal:</p>
         <CodeBlock lang="json">{`{
   "id": "loc_oak",
-  "kind": "complex",
+  "account_id": "acc_oak"
+}`}</CodeBlock>
+        <p>Fetch the full record with a follow-up <code>GET /v1/locations/loc_oak</code>:</p>
+        <CodeBlock lang="json">{`{
+  "id": "loc_oak",
+  "parent_location_id": null,
+  "type": "complex",
   "name": "Sunset Apartments",
-  "city": "Cape Town",
-  "country_code": "ZA",
-  "anchor": { "lat": -33.918, "lng": 18.423 },
-  "access_points": [],
-  "created_at": "2026-05-14T10:21:04Z"
+  "slug": "sunset-apartments",
+  "status": "active",
+  "address": {},
+  "account_id": "acc_oak",
+  "lat": -33.918,
+  "long": 18.423
 }`}</CodeBlock>
       </DocSection>
 
@@ -80,19 +96,25 @@ GATE_PROD                — yes, we've seen this`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Schema (for the curious)">
-        <CodeBlock lang="ts" title="locations.types.ts">{`export type LocationKind = 'house' | 'complex' | 'building' | 'other';
+        <CodeBlock lang="ts" title="locations.types.ts">{`export type LocationType = 'house' | 'complex' | 'building' | 'other';
 
 export interface Location {
-  id: string;            // 'loc_oak'
-  kind: LocationKind;
+  id: string;                    // 'loc_oak'
+  parent_location_id: string | null;   // null for top-level
+  type: LocationType;
   name: string;
-  city: string;
-  country_code: string;  // ISO-3166-1 alpha-2
-  anchor: { lat: number; lng: number } | null;
-  parent_id: string | null;      // null for top-level
-  access_points: AccessPoint[];
-  created_at: string;            // ISO-8601
+  slug: string;
+  status: string;                // 'active' | ...
+  address: Record<string, unknown>;    // free-form; put city/street/etc. here
+  account_id: string;
+  lat: number | null;
+  long: number | null;
 }`}</CodeBlock>
+        <p className="text-ink/55 text-[14px]">
+          No <code>country_code</code> or <code>created_at</code> on the location itself —
+          country lives on the account, and access points come back from their own
+          endpoint, not embedded here.
+        </p>
       </DocSection>
     </>
   );

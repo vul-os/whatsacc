@@ -47,11 +47,11 @@ The five-minute channel, and the recommended first channel for self-hosters:
 
    ```yaml
    display_information:
-     name: whatsacc
+     name: lintel
      description: Text your gate open
    features:
      bot_user:
-       display_name: whatsacc
+       display_name: lintel
        always_online: true
      shortcuts:
        - name: Open a gate
@@ -126,7 +126,7 @@ Workers backend, where Telegram was an honest stub that only logged and acknowle
   verifying the `X-Telegram-Bot-Api-Secret-Token` header against your configured
   webhook secret (mismatches are rejected). A linked user texting `open` runs the
   **same rules-and-signing pipeline** as every other channel: identity resolution,
-  time windows, quotas, then the Ed25519-signed command to the controller. When several
+  quotas, then the Ed25519-signed command to the controller. When several
   gates are available the reply is an **inline-keyboard picker**, and tapping a button
   re-enters the same verdict path. Every chat and message is recorded and the shared
   per-sender flood throttle applies.
@@ -153,7 +153,7 @@ TELEGRAM_WEBHOOK_SECRET=…   # must match the secret_token you registered
 The Discord channel (bot token, identity by user id) is designed into the channel seam
 but **not shipped yet**. It is roadmap, not vaporware-in-fine-print: when it lands,
 setup will be a bot token and an invite link, mirroring Slack's minutes-not-days flow.
-Track progress on [GitHub](https://github.com/vul-os/whatsacc).
+Track progress on [GitHub](https://github.com/vul-os/lintel).
 
 ## Trigger words and pickers
 

@@ -1,12 +1,12 @@
-# whatsacc architecture
+# lintel architecture
 
 > **Texts that open gates.** A decentralized access-control system where a chat message —
 > WhatsApp, Slack, Telegram, Discord soon — opens a physical gate, door or barrier.
 
-whatsacc has no cloud. It is just the **system**: a gateway you run, controllers at
+lintel has no cloud. It is just the **system**: a gateway you run, controllers at
 your gates, an app in your pocket — every line MIT-licensed, nothing hosted by us.
-[whatsacc.com](https://whatsacc.com) is the project site (docs + downloads), not a
-service. There is **no billing system** — nothing in the binary charges anyone
+[vulos.org/products/lintel](https://vulos.org/products/lintel) is the project site
+(docs + downloads), not a service. There is **no billing system** — nothing in the binary charges anyone
 anything; operators who want to charge their residents solve that themselves, outside
 the system. Usage tracking (opens, audit, analytics) is a product feature and stays.
 
@@ -30,7 +30,7 @@ flowchart LR
 
     subgraph gw ["GATEWAY — one Go binary · SQLite"]
         CH["Channel seam"]
-        RE["Rules engine<br/>time windows · geofence · quotas"]
+        RE["Rules engine<br/>rate limits · quotas<br/>(geofence, time windows: planned)"]
         PORTAL["Management portal<br/>(embedded Svelte build)"]
         HUB["Device hub<br/>signed commands · Ed25519"]
         AUD[("Audit log<br/>SQLite")]
@@ -41,7 +41,7 @@ flowchart LR
         G["🚧 Gate / door / barrier"]
     end
 
-    APP["📱 whatsacc app<br/>Tauri · Svelte"]
+    APP["📱 lintel app<br/>Tauri · Svelte"]
 
     R -- "“open”" --> WA & TG & SL & DC
     WA & TG & SL & DC --> CH
@@ -76,7 +76,7 @@ NAT and on CGNAT'd 4G SIMs with zero inbound ports.
 ### Repo layout
 
 ```
-whatsacc/
+lintel/
 ├── backend/      # Cloudflare Workers · Hono · Postgres — behavioural reference the gateway ports from,
 │                 # still ahead on: phone-OTP verify, analytics, OAuth/email-verify/password-reset, meters
 ├── src/          # current portal + marketing — React 19 · Vite (wrapped by src-tauri/ for desktop)
@@ -122,7 +122,7 @@ sequenceDiagram
     R->>M: "open" (WhatsApp)
     M->>GW: webhook (signed)
     GW->>GW: resolve (channel, sender) → memberships
-    GW->>GW: rules: location · access point · time window · quota
+    GW->>GW: rules: location · access point · quota
     alt one access point
         GW->>C: signed open command (nonce · expiry)
         C->>C: verify gateway signature (pinned key)
@@ -173,7 +173,7 @@ Unlimited access through the gateway's web portal, always. Quota warnings in cha
 ## 4. Running a gateway — the WABA insight, reachability, and money
 
 Webhooks are easy; **the WhatsApp number is hard**. A WhatsApp channel needs a verified
-Meta Business + WABA + phone number. Every gateway operator brings their own — whatsacc
+Meta Business + WABA + phone number. Every gateway operator brings their own — lintel
 is never in the loop, and Meta bills the operator directly for their own conversations.
 
 **Reachability is kept deliberately simple.** The gateway binds a listener and serves
@@ -201,7 +201,7 @@ Full option-by-option breakdown, including the WhatsApp-is-webhook-only reasonin
 which channels need zero ingress today: [`site/docs/ingress.md`](site/docs/ingress.md).
 
 **Money is out of scope.** There is no billing code anywhere in the system. An operator
-who wants to charge their residents does it however they like — outside whatsacc.
+who wants to charge their residents does it however they like — outside lintel.
 
 ---
 
@@ -246,8 +246,13 @@ Per-location **settings toggles, off by default**:
 
 - **Nearly free** (the audit log already has the data): time & attendance reports,
   who's-on-site / evacuation list, open notifications.
-- **Half-built already**: visitor passes (one-time PIN/QR via chat or link — extends
-  `temp_access`), recurring access windows (cleaner, Tuesdays 08:00–12:00).
+- **Shipped**: temporary/visitor access grants — a phone number gets access to named
+  access points for a one-off dated window, with an optional use cap, revocable, and
+  refunded on a rate-limit/quota denial (`POST/GET /v1/grants`, portal page). This is
+  the "contractor for one Saturday" case.
+- **Designed, not started**: one-time PIN/QR passes that don't require knowing the
+  visitor's number in advance, and *recurring* access windows — a schedule that repeats
+  (cleaner, every Tuesday 08:00–12:00) rather than a single dated window.
 - **Needs controller I/O** (protocol supports now, ship later): gate-held-open alerts,
   visitor button → "someone at the gate, reply OPEN", lockdown mode.
 - **Non-goals for v1**: license-plate recognition, multi-party approval, occupancy caps.
@@ -260,7 +265,12 @@ Per-location **settings toggles, off by default**:
   what a "visitor" can be granted access as: today grants resolve to an E.164 number or
   a channel member id; a DMTAP identity resolves to a raw key or a `name@domain`, so a
   visitor pass could be issued to either without a phone number or a chat account of
-  any kind. Sketch only — no seam interface, no wire format, no schedule.
+  any kind. A `DialChannel` scaffold and a `DMTAPTransport` interface now exist
+  (`gateway/internal/channels/dmtap.go`), matching the shape every other channel
+  implements — but there is exactly one implementation of that interface,
+  `NotImplementedTransport`, which always fails closed, so the channel does not run in
+  the shipped binary. No working transport, no wire format for turning a DMTAP message
+  into a gate command, no schedule.
 
 
 

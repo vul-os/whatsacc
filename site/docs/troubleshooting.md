@@ -19,10 +19,12 @@ Your chat identity isn't a member anywhere on this gateway. An admin adds you un
 Slack by member id or invite link, for Telegram by chat id.
 
 **Replies arrive but the gate doesn't move.**
-Look at the reply — whatsacc always says why. `outside geofence (4.2 km)` means the
-geofence declined you; share your live location or get closer. `outside your access
-window` is a time-window rule. If it says *opened* and nothing moved, it's a wiring or
-controller issue — see below.
+Look at the reply — lintel always says why. A quota or rate-limit denial says so
+directly (see below); a phone that isn't a member and has no active temporary access
+grant gets told it doesn't have access. (Geofence and time-window declines don't exist
+yet — see [Geofence safety](security.md#geofence-safety) — so you won't see those
+replies today.) If it says *opened* and nothing moved, it's a wiring or controller
+issue — see below.
 
 **The bot says "Too many opens — try again in ~2 min."**
 You hit a built-in rate limit: the per-access-point cooldown (default 10 s between
@@ -99,8 +101,11 @@ must be on the same network. Also confirm the controller was paired to the gatew
 app is signed into.
 
 **"Grant expired."**
-Grants are short-lived on purpose. Open the app anywhere with connectivity and it
-refreshes silently; then the offline path works again.
+Offline emergency grants are short-lived by design, and the plan is for the app to
+refresh one silently whenever it opens with connectivity. That refresh flow isn't
+built yet, though — the gateway doesn't mint these grants and the app doesn't request
+them, so this message and the offline emergency path itself aren't reachable in the
+shipped app today. See [Emergency access](emergency-access.md) for current status.
 
 ## Instance admin
 
@@ -116,8 +121,9 @@ sign up first, then redeem. `GET /admin/claim` tells you where you stand:
 
 **I'm locked out of the only admin account.**
 The API refuses to disable or demote the *last* active instance admin precisely so
-this can't happen through whatsacc itself — but it can't protect you from a lost
-password or a lost 2FA device. Honestly: there is no in-band recovery. Regaining
+this can't happen through lintel itself — but it can't protect you from a lost
+password (there is no 2FA to lose — lintel doesn't have it). Honestly: there is no
+in-band recovery. Regaining
 the seat requires direct access to the gateway's database (set the admin flag on
 another active user yourself) — which is also why "who can touch the host" *is*
 your real admin list. Grant a second admin early and this note stays theoretical.
@@ -130,8 +136,8 @@ Downgrades aren't supported; restore your pre-upgrade backup of the data directo
 instead.
 
 **I restored a backup and every controller went red.**
-The backup didn't include the key material next to `whatsacc.db`. Restore the full
+The backup didn't include the key material next to `lintel.db`. Restore the full
 data directory, or re-pair each controller.
 
-Still stuck? Open a [GitHub issue](https://github.com/vul-os/whatsacc) — or mail
-hello@whatsacc.com.
+Still stuck? Open a [GitHub issue](https://github.com/vul-os/lintel) — or mail
+hello@vulos.org.

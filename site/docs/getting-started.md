@@ -1,6 +1,6 @@
 # Getting started
 
-whatsacc gets you from "I'd like to text my gate open" to actually doing it in about an
+lintel gets you from "I'd like to text my gate open" to actually doing it in about an
 evening, assuming the controller hardware is mounted. Everything runs on your own
 gateway — there is no hosted service and nothing to sign up for. This chapter is the
 short path; [Run a gateway](self-host.md) has the full install, reachability and backup
@@ -9,7 +9,7 @@ detail.
 ## What you'll need
 
 - A gate, door or barrier with a **dry-contact relay input** (most motors have one).
-- A whatsacc controller, or a supported Pi-class board running the controller agent.
+- A lintel controller, or a supported Pi-class board running the controller agent.
 - Somewhere for the gateway to live: a VPS, a Pi, any always-on box. Docker or a bare
   binary — your call.
 - A chat channel to bring: a Slack workspace is the five-minute start; WhatsApp needs
@@ -22,9 +22,9 @@ detail.
    gateway in `gateway/` implements this today — build it from source:
 
    ```sh
-   git clone https://github.com/vul-os/whatsacc
-   cd whatsacc/gateway && go build ./cmd/gateway
-   ./gateway -data /var/lib/whatsacc -listen :8080
+   git clone https://github.com/vul-os/lintel
+   cd lintel/gateway && go build ./cmd/gateway
+   ./gateway -data /var/lib/lintel -listen :8080
    ```
 
    > **Status.** The gateway runs the product core now (auth, accounts, locations,
@@ -32,7 +32,7 @@ detail.
    > rate limits, and the WhatsApp/Slack/Telegram channels). Still deferred: phone-OTP
    > verify, analytics, Google OAuth / email-verify / password-reset, meters, and the
    > real portal bundle. A Docker image builds from the `Dockerfile` in `gateway/`; the
-   > `ghcr.io/vul-os/whatsacc-gateway` image is CI-built but not auto-published yet.
+   > `ghcr.io/vul-os/lintel-gateway` image is CI-built but not auto-published yet.
 
    Details, reachability options and backups in [Run a gateway](self-host.md).
 2. **Claim the admin account.** Open the portal and sign up — the first account you
@@ -41,9 +41,11 @@ detail.
    before first boot, then redeem it exactly once against `POST /admin/claim`, as
    described in [Instance admin](admin.md).
 3. **Name your location** — house, complex, building or other. Give it a name residents
-   will recognise, and optionally drop a map pin: that pin anchors the geofence if you
-   enable it later. Then add an access point under **Access points → New** — main gate,
-   pedestrian gate, parking barrier; each gets its own controller.
+   will recognise, and optionally drop a map pin: this is where a geofence anchor would
+   attach if that feature ships (designed, not built — see
+   [Geofence safety](security.md#geofence-safety)). Then add an access point under
+   **Access points → New** — main gate, pedestrian gate, parking barrier; each gets its
+   own controller.
 4. **Pair a controller.** Portal → **Devices → Pair new** creates a claim token; the
    controller redeems it and pins the gateway's signing key. Full walkthrough in
    [Controllers](controllers.md).

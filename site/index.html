@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>whatsacc — texts that open gates</title>
-<meta name="description" content="whatsacc is a decentralized access network: one MIT-licensed gateway binary that turns a WhatsApp, Discord or Slack message into a signed command at your gate. Run it yourself — the whole system is the product.">
-<meta name="author" content="whatsacc">
-<meta name="application-name" content="whatsacc">
+<title>lintel — texts that open gates</title>
+<meta name="description" content="lintel is a decentralized access network: one MIT-licensed gateway binary that turns a WhatsApp or Slack message into a signed command at your gate (Discord next). Run it yourself — the whole system is the product.">
+<meta name="author" content="lintel">
+<meta name="application-name" content="lintel">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#141210">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="whatsacc">
-<meta property="og:title" content="whatsacc — texts that open gates">
+<meta property="og:site_name" content="lintel">
+<meta property="og:title" content="lintel — texts that open gates">
 <meta property="og:description" content="A decentralized access network. One MIT gateway binary, three chat channels, zero cloud lock-in.">
-<meta property="og:url" content="https://whatsacc.com/">
-<meta property="og:image" content="https://whatsacc.com/screenshots/landing-hero.png">
+<meta property="og:url" content="https://vulos.org/products/lintel/">
+<meta property="og:image" content="https://vulos.org/products/lintel/screenshots/landing-hero.png">
 <meta property="og:image:width" content="1440">
 <meta property="og:image:height" content="900">
 <meta name="twitter:card" content="summary_large_image">
@@ -24,7 +24,7 @@
 /* theme boot — runs before paint; key shared with docs/ */
 (function(){
   var t;
-  try { t = localStorage.getItem('whatsacc.theme'); } catch(e){}
+  try { t = localStorage.getItem('lintel.theme'); } catch(e){}
   if (t !== 'light' && t !== 'dark')
     t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', t);
@@ -414,21 +414,21 @@ p{margin:0}
 <header class="topbar">
   <div class="wrap">
     <div class="topbar-in">
-      <a class="brand" href="#top" aria-label="whatsacc home">
+      <a class="brand" href="#top" aria-label="lintel home">
         <span class="brand-mark" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 64 64" fill="none">
             <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
           </svg>
         </span>
-        <span class="brand-name">whatsacc</span>
+        <span class="brand-name">lintel</span>
       </a>
       <nav class="nav" aria-label="Primary">
         <a href="#how">How it works</a>
         <a href="#selfhost">Self-host</a>
         <a href="#free">Free</a>
         <a href="docs.html">Docs</a>
-        <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+        <a href="https://github.com/vul-os/lintel" rel="noopener">GitHub</a>
         <a class="nav-cta" href="docs.html#/self-host">Run a gateway</a>
       </nav>
       <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
@@ -451,7 +451,7 @@ p{margin:0}
       <a href="#selfhost">Self-host</a>
       <a href="#free">Free</a>
       <a href="docs.html">Docs</a>
-      <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+      <a href="https://github.com/vul-os/lintel" rel="noopener">GitHub</a>
       <a href="docs.html#/self-host">Run a gateway</a>
     </nav>
   </div>
@@ -488,8 +488,8 @@ p{margin:0}
           </span>
         </h1>
         <p class="hero-tag">
-          whatsacc is a <b>decentralized access network</b>. One MIT-licensed gateway binary
-          turns a WhatsApp, Slack or Discord message into a signed command at your gate.
+          lintel is a <b>decentralized access network</b>. One MIT-licensed gateway binary
+          turns a WhatsApp or Slack message into a signed command at your gate — Discord next.
         </p>
         <p class="hero-sub">
           You run it — your number, your rules, your SQLite file. There is no hosted
@@ -498,7 +498,7 @@ p{margin:0}
         <div class="cta-row">
           <a class="btn btn-ink" href="docs.html#/self-host">Run a gateway</a>
           <a class="btn btn-outline" href="docs.html">Read the docs</a>
-          <a class="btn btn-ghost" href="https://github.com/vul-os/whatsacc" rel="noopener">
+          <a class="btn btn-ghost" href="https://github.com/vul-os/lintel" rel="noopener">
             View on GitHub
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </a>
@@ -522,8 +522,8 @@ p{margin:0}
               </span>
             </div>
             <div class="shot">
-              <img class="shot-light" src="screenshots/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="whatsacc portal dashboard — locations, live activity and controllers" onerror="this.classList.add('missing')">
-              <img class="shot-dark" src="screenshots/dark/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="whatsacc portal dashboard, dark theme" onerror="this.classList.add('missing')">
+              <img class="shot-light" src="screenshots/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="lintel portal dashboard — locations, live activity and controllers" onerror="this.classList.add('missing')">
+              <img class="shot-dark" src="screenshots/dark/portal-dashboard.png" width="1440" height="900" loading="lazy" alt="lintel portal dashboard, dark theme" onerror="this.classList.add('missing')">
             </div>
           </figure>
           <script>
@@ -571,7 +571,7 @@ p{margin:0}
         </p>
         <ul class="tick-list">
           <li>Identity is <code style="font-family:var(--font-mono);font-size:.9em">(channel, sender)</code> — one person can be reachable on several channels.</li>
-          <li>Geofence, time windows and quotas are checked before anything moves.</li>
+          <li>Time windows and quotas are checked before anything moves (geofencing: designed, not shipped yet).</li>
           <li>Every open — and every denial — lands in the audit log within the same second.</li>
         </ul>
       </div>
@@ -583,7 +583,7 @@ p{margin:0}
               <span class="avatar" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 64 64" fill="none"><path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="42" r="3.6" fill="var(--terracotta)"/></svg>
               </span>
-              <div class="who"><b>whatsacc &middot; Stellar Heights</b><span><i></i>gateway online</span></div>
+              <div class="who"><b>lintel &middot; Stellar Heights</b><span><i></i>gateway online</span></div>
             </div>
             <div class="chat-body">
               <span class="day-chip">today</span>
@@ -689,14 +689,15 @@ p{margin:0}
       <li class="reveal">
         <div class="step-top"><span class="n">01</span><span class="dot"></span><span class="line"></span></div>
         <h3>A message arrives</h3>
-        <p>Someone texts <code>open</code> — on WhatsApp, Slack or Discord. The channel's
+        <p>Someone texts <code>open</code> — on WhatsApp or Slack (Discord next). The channel's
         webhook lands on your gateway and its signature is verified before anything else happens.</p>
       </li>
       <li class="reveal">
         <div class="step-top"><span class="n">02</span><span class="dot"></span><span class="line"></span></div>
         <h3>Your rules decide</h3>
-        <p>The gateway resolves the sender to a membership, then checks location, access point,
-        time window, geofence and quota. The verdict — either way — is appended to the audit log.</p>
+        <p>The gateway resolves the sender to a membership, then checks access point, time
+        window and quota (geofencing is designed, not shipped yet). The verdict — either way
+        — is appended to the audit log.</p>
       </li>
       <li class="reveal">
         <div class="step-top"><span class="n">03</span><span class="dot"></span></div>
@@ -748,10 +749,10 @@ p{margin:0}
       <div class="way reveal">
         <span class="w-tag"><i style="background:var(--gold)"></i>02 &middot; emergency</span>
         <h3>The app — <em>works offline</em></h3>
-        <p>The whatsacc app quietly holds a short-lived, gateway-signed grant of your rights.
+        <p>The lintel app quietly holds a short-lived, gateway-signed grant of your rights.
         When the internet is down, it finds the controller over LAN or Bluetooth and proves
         itself with a challenge-response. No cloud, no Meta, no signal required.</p>
-        <div class="w-foot">tauri &middot; desktop + iOS + Android &middot; also the admin console</div>
+        <div class="w-foot">tauri &middot; desktop today, iOS/Android planned &middot; also the admin console</div>
       </div>
 
       <div class="way reveal">
@@ -773,7 +774,7 @@ p{margin:0}
         <span class="eyebrow kicker">Run your own gateway</span>
         <h2 class="display-tight">No cloud center.<br><em>Anyone can run one.</em></h2>
         <p class="lede">
-          whatsacc is a network of independent gateways — Go, one binary, one SQLite file.
+          lintel is a network of independent gateways — Go, one binary, one SQLite file.
           There is no hosted service: every gateway is somebody's own, on a VPS, a Pi
           behind the couch, or a box in the gatehouse. All of it MIT; the only private
           thing about any gateway is its <code style="font-family:var(--font-mono);font-size:.9em">.env</code>.
@@ -814,18 +815,18 @@ p{margin:0}
         <div class="codeblock">
           <div class="cb-bar"><i aria-hidden="true"></i>your-vps ~ $</div>
           <pre><code><span class="c"># one binary, one SQLite file, portal embedded</span>
-docker run -d --name whatsacc \
-  -p 8080:8080 -v whatsacc:/data \
-  ghcr.io/vul-os/whatsacc-gateway
+docker run -d --name lintel \
+  -p 8080:8080 -v lintel:/data \
+  ghcr.io/vul-os/lintel-gateway
 
 <span class="c"># point a channel at it (slack: minutes)</span>
-whatsacc channel add slack --manifest slack.yml
+lintel channel add slack --manifest slack.yml
 
 <span class="c"># behind NAT? bring any tunnel you already trust</span>
 cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale funnel…</span>
 
 <span class="g">✓ gateway up</span> — portal at <span class="o">https://your-gate.example</span>
-<span class="g">✓ audit log</span>  /data/whatsacc.db</code></pre>
+<span class="g">✓ audit log</span>  /data/lintel.db</code></pre>
         </div>
         <p style="margin-top:18px;font-size:12.5px;line-height:1.7;color:rgba(250,250,248,.5);font-family:var(--font-mono)">
           gateway v0.x — image names settle at 1.0 &middot; see <a href="docs.html#/self-host" style="color:rgba(250,250,248,.75)">docs → run a gateway</a>
@@ -852,15 +853,15 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
     <div class="feat-grid">
       <div class="feat reveal">
         <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="11" r="7.5" stroke-dasharray="2.5 3"/><circle cx="12" cy="11" r="3.5"/><circle cx="12" cy="11" r="1" fill="currentColor"/></svg></span>
-        <h3>Geofence safety</h3>
-        <p>Block opens from across town. Per-location radius; live-location confirmation when
-        the stakes are high. Denials record the actual GPS distance.</p>
+        <h3>Geofence safety <span class="soon">planned</span></h3>
+        <p>Designed, documented, not shipped yet: block opens from across town, per-location
+        radius, live-location confirmation when the stakes are high. Track it in the docs.</p>
       </div>
       <div class="feat reveal">
         <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></span>
-        <h3>Time windows</h3>
-        <p>The cleaner, Tuesdays 08:00–12:00. Contractors for one Saturday. Access that
-        expires on its own instead of living in someone's head.</p>
+        <h3>Time windows <span class="soon">planned</span></h3>
+        <p>The cleaner, every Tuesday 08:00–12:00 — a schedule that repeats, set once
+        instead of living in someone's head.</p>
       </div>
       <div class="feat reveal">
         <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
@@ -930,7 +931,7 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
             <span class="addr"><span>portal / access points</span></span>
           </div>
           <div class="shot">
-            <img class="shot-light" src="screenshots/portal-locations.png" width="1440" height="900" loading="lazy" alt="Access points and controllers in the whatsacc portal" onerror="this.classList.add('missing')">
+            <img class="shot-light" src="screenshots/portal-locations.png" width="1440" height="900" loading="lazy" alt="Access points and controllers in the lintel portal" onerror="this.classList.add('missing')">
             <img class="shot-dark" src="screenshots/dark/portal-locations.png" width="1440" height="900" loading="lazy" alt="Access points view, dark theme" onerror="this.classList.add('missing')">
           </div>
         </div>
@@ -956,7 +957,7 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
             <span class="addr"><span>app / emergency access</span></span>
           </div>
           <div class="shot">
-            <img class="shot-light" src="screenshots/app-emergency.png" width="1440" height="900" loading="lazy" alt="The whatsacc app's offline emergency access screen" onerror="this.classList.add('missing')">
+            <img class="shot-light" src="screenshots/app-emergency.png" width="1440" height="900" loading="lazy" alt="The lintel app's offline emergency access screen" onerror="this.classList.add('missing')">
             <img class="shot-dark" src="screenshots/dark/app-emergency.png" width="1440" height="900" loading="lazy" alt="Emergency access screen, dark theme" onerror="this.classList.add('missing')">
           </div>
         </div>
@@ -975,7 +976,7 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
         <h2 class="display-tight">Free.<br><em>All of it.</em></h2>
       </div>
       <p class="lede">
-        whatsacc has no billing system. No tiers, no wallet, no card — no code path
+        lintel has no billing system. No tiers, no wallet, no card — no code path
         anywhere that collects money. The code is MIT; the whole system is the product.
       </p>
     </div>
@@ -997,14 +998,14 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
       <div class="feat reveal">
         <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span>
         <h3>The gateway</h3>
-        <p>Yours. A VPS, a Pi, a box in the gatehouse — every whatsacc gateway is
+        <p>Yours. A VPS, a Pi, a box in the gatehouse — every lintel gateway is
         somebody's own. There is no hosted service and nothing to sign up for.</p>
       </div>
       <div class="feat reveal">
         <span class="f-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 10.5v3M17.5 10.5v3"/></svg></span>
         <h3>The money</h3>
         <p>Out of scope. Want to charge your residents? Do it however you like, outside
-        the system — nothing in whatsacc meters, invoices or bills anyone.</p>
+        the system — nothing in lintel meters, invoices or bills anyone.</p>
       </div>
     </div>
 
@@ -1039,10 +1040,14 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
       </details>
       <details>
         <summary>What happens when the internet is down?<span class="plus">+</span></summary>
-        <p class="a">The app path keeps working. It holds a short-lived grant, signed earlier by the
-        gateway, and talks to the controller directly over your LAN or Bluetooth with a
-        challenge-response. No connectivity, no cloud, no Meta involved. Controllers also keep
-        their local button and fail-safe wiring — whatsacc is in parallel, never in the way.</p>
+        <p class="a">Designed to keep working: the app holds a short-lived grant, signed earlier by
+        the gateway, and talks to the controller directly over your LAN or Bluetooth with a
+        challenge-response — no connectivity, no cloud, no Meta involved. The controller-side
+        verification for this is built and tested today; gateway-side issuance of those grants is
+        still in progress (tracked in the repo), so treat this path as "designed," not "shipped,"
+        until that lands. Either way, controllers keep their own local button and any code-required
+        fail-safe egress hardware running independently — lintel sits in parallel with that
+        hardware, never in series with it, and is never a substitute for it.</p>
       </details>
       <details>
         <summary>Why is WhatsApp harder to set up than Slack?<span class="plus">+</span></summary>
@@ -1054,7 +1059,7 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
       </details>
       <details>
         <summary>Really free? What's the catch?<span class="plus">+</span></summary>
-        <p class="a">There isn't one. whatsacc has no billing system — nothing in the binary
+        <p class="a">There isn't one. lintel has no billing system — nothing in the binary
         collects money from anyone, and there is no paid edition to upsell you to. The code is MIT.
         If you run your own WhatsApp number, Meta bills you directly for your own conversations —
         that's between you and Meta, and Slack costs nothing at all. If you want to charge your
@@ -1070,8 +1075,9 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
         <summary>Is this secure enough for a complex with 200 residents?<span class="plus">+</span></summary>
         <p class="a">Commands are Ed25519-signed with a nonce and expiry, and each controller pins
         its gateway's public key at pairing — a hostile network or hijacked DNS can't forge an open.
-        Add channel-verified identity, optional geofence, per-member rules and an append-only audit
-        log. Every open earns its way through. Details in the security chapter of the docs.</p>
+        Add channel-verified identity, per-member rules and an append-only audit log (geofencing is
+        designed, not shipped yet). Every open earns its way through. Details in the security
+        chapter of the docs.</p>
       </details>
       <details>
         <summary>Do I need a public URL or a domain?<span class="plus">+</span></summary>
@@ -1093,14 +1099,14 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
     <div class="footer-in">
       <div class="footer-grid">
         <div>
-          <a class="brand" href="#top" aria-label="whatsacc home" style="text-decoration:none;color:inherit">
+          <a class="brand" href="#top" aria-label="lintel home" style="text-decoration:none;color:inherit">
             <span class="brand-mark" aria-hidden="true">
               <svg width="26" height="26" viewBox="0 0 64 64" fill="none">
                 <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                 <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
               </svg>
             </span>
-            <span class="brand-name">whatsacc</span>
+            <span class="brand-name">lintel</span>
           </a>
           <p class="about">A quieter way through the threshold. One MIT gateway binary,
           a network with no center — built in Durban, deployed wherever there's a gate
@@ -1128,15 +1134,15 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
         <div>
           <h4>Open source</h4>
           <ul>
-            <li><a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub — vul-os/whatsacc</a></li>
-            <li><a href="https://github.com/vul-os/whatsacc/blob/main/LICENSE" rel="noopener">MIT license</a></li>
+            <li><a href="https://github.com/vul-os/lintel" rel="noopener">GitHub — vul-os/lintel</a></li>
+            <li><a href="https://github.com/vul-os/lintel/blob/main/LICENSE" rel="noopener">MIT license</a></li>
             <li><a href="https://vulos.org" rel="noopener">The vulos suite</a></li>
-            <li><a href="mailto:hello@whatsacc.com">hello@whatsacc.com</a></li>
+            <li><a href="mailto:hello@vulos.org">hello@vulos.org</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-strip">
-        <span>&copy; 2026 whatsacc</span>
+        <span>&copy; 2026 lintel</span>
         <span aria-hidden="true">&mdash;</span>
         <span>texts that open gates</span>
         <span class="right">MIT &middot; v 0.2 &middot; durban</span>
@@ -1153,7 +1159,7 @@ cloudflared tunnel --url localhost:8080   <span class="c"># or frp, tailscale fu
   btn.addEventListener('click', function(){
     var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
-    try { localStorage.setItem('whatsacc.theme', next); } catch(e){}
+    try { localStorage.setItem('lintel.theme', next); } catch(e){}
   });
 
   /* mobile nav */

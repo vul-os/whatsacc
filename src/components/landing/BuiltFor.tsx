@@ -21,7 +21,7 @@ const audiences = [
   {
     tag: 'Security companies',
     blurb:
-      'Hand out controlled, time-bound access to guards, contractors and rotating staff.',
+      'Hand out controlled, instantly-revocable access to guards, contractors and rotating staff.',
     detail: 'Audit log every event · revoke in a tap',
   },
 ];

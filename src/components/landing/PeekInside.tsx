@@ -27,7 +27,7 @@ export function PeekInside() {
               <span className="h-2.5 w-2.5 rounded-full bg-gold" />
               <span className="h-2.5 w-2.5 rounded-full bg-moss" />
               <span className="ml-3 text-[11px] sm:text-xs text-ink/45 font-mono truncate">
-                app.whatsacc.io / oakridge
+                app.lintel.io / oakridge
               </span>
             </div>
 
@@ -57,7 +57,7 @@ export function PeekInside() {
                   <ChatLine
                     dir="out"
                     time="13:41"
-                    body="not opened — outside geofence (4.2km)"
+                    body="not opened — daily limit reached"
                     verdict="block"
                   />
                 </ul>

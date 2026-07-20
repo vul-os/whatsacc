@@ -35,11 +35,11 @@ export function Footer() {
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 pt-16 sm:pt-20 pb-10">
         <div className="grid grid-cols-12 gap-x-6 gap-y-10">
           <div className="col-span-12 lg:col-span-5">
-            <Link to="/" onClick={scrollToTop} className="inline-flex items-center gap-3" aria-label="whatsacc home">
+            <Link to="/" onClick={scrollToTop} className="inline-flex items-center gap-3" aria-label="lintel home">
               <span className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-xl bg-paper/5 border border-paper/10">
                 <ArchMark className="h-8 w-8 sm:h-9 sm:w-9 text-paper" />
               </span>
-              <span className="font-display italic text-4xl sm:text-5xl leading-none">whatsacc</span>
+              <span className="font-display italic text-4xl sm:text-5xl leading-none">lintel</span>
             </Link>
             <p className="mt-5 sm:mt-6 text-paper/65 max-w-sm leading-relaxed">
               A quieter way through the threshold. Built in Durban, deployed wherever
@@ -71,16 +71,16 @@ export function Footer() {
           <div className="col-span-12 sm:col-span-12 lg:col-span-3">
             <p className="text-[11px] uppercase tracking-[0.22em] text-paper/45 mb-4">Reach</p>
             <a
-              href="mailto:hello@whatsacc.io"
+              href="mailto:hello@vulos.org"
               className="text-sm text-paper/80 hover:text-paper break-all"
             >
-              hello@whatsacc.io
+              hello@vulos.org
             </a>
           </div>
         </div>
 
         <div className="mt-12 sm:mt-16 pt-6 border-t border-paper/15 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-paper/55">
-          <span>&copy; {new Date().getFullYear()} whatsacc</span>
+          <span>&copy; {new Date().getFullYear()} lintel</span>
           <span aria-hidden>&mdash;</span>
           <span>texts that open gates</span>
           <span className="ml-auto">v 0.1 &middot; durban</span>

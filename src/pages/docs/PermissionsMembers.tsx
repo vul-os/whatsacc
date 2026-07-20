@@ -6,93 +6,72 @@ export default function PermissionsMembers() {
       <DocLead
         kicker="02 · Concepts"
         title="Permissions & Members"
-        intro="Members are people whose phone numbers can text the gate. Roles control what they can do beyond opening it. Inheritance and explicit overrides let you express estate-scale policies without hand-curating every access point."
+        intro="Members are people invited onto an account by email; their phone number is what lets them text the gate. Roles control what they can do beyond opening it."
       />
 
       <DocSection heading="The four roles">
         <ul className="list-disc pl-6 space-y-2">
           <li><strong>Owner</strong> — the account holder. Danger-zone settings, can transfer ownership. Exactly one per account.</li>
-          <li><strong>Admin</strong> — can manage devices, members, and policies for assigned locations. Cannot delete the account.</li>
-          <li><strong>Member</strong> — can open gates they have access to. Can&rsquo;t change settings.</li>
-          <li><strong>Guest</strong> — like a member, but typically time-bound. Perfect for contractors and weekend visitors.</li>
+          <li><strong>Admin</strong> — can manage devices, members, and policies for the account.</li>
+          <li><strong>Member</strong> — can open gates on the account. Can&rsquo;t change settings.</li>
+          <li><strong>Viewer</strong> — read-only: sees locations, devices and activity but can&rsquo;t manage them.</li>
         </ul>
-      </DocSection>
-
-      <DocSection heading="Inheritance">
-        <p>
-          A role on a complex applies to all access points within it, unless overridden. You can,
-          for example, make someone an Admin of the whole estate and then explicitly deny them
-          opening rights to one specific access point.
+        <p className="text-ink/55 text-[14px]">
+          Roles are account-wide today — there&rsquo;s no separate role per location or
+          access point yet, and no built-in expiry on a membership. For one-off,
+          time-bound access that shouldn&rsquo;t become a standing membership (a
+          contractor, a weekend guest), use a temporary access grant instead — see the
+          app&rsquo;s Grants page.
         </p>
-        <CodeBlock lang="yaml" title="Effective policy example">{`# Estate-wide
-- subject: yusuf@example.com
-  role: admin
-  on: complex/sunset-apartments
-
-# But explicitly denied at one access point
-- subject: yusuf@example.com
-  effect: deny
-  action: open
-  on: access_point/loading-bay`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Inviting members">
         <ol className="list-decimal pl-6 space-y-3">
-          <li>Members → <em>Invite</em>. Paste a phone number or upload a CSV.</li>
-          <li>Pick a role and the location(s) to bind to.</li>
-          <li>Optional: set an expiry — useful for guests and contractors.</li>
-          <li>The invitee receives a one-line WhatsApp message confirming they&rsquo;re in.</li>
+          <li>Members → <em>Invite</em>. You&rsquo;ll need the invitee&rsquo;s email and their phone number.</li>
+          <li>Pick a role: owner, admin, member or viewer.</li>
+          <li>They get an accept link, valid for 7 days. Accepting binds their phone number to the account — that&rsquo;s what lets them text the gate.</li>
         </ol>
-        <p>CSV format is permissive — only <code>phone</code> is required:</p>
-        <CodeBlock lang="plain" title="members.csv">{`phone,name,role,expires_at
-+27821234567,Lebogang Pillay,member,
-+27839998877,Cleaner Mon-Fri,guest,2026-12-31T17:00:00+02:00
-+27834447766,Solar contractor,guest,2026-05-20T17:00:00+02:00`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Programmatic invites">
-        <CodeBlock lang="bash">{`curl -X POST https://<your-gateway>/v1/locations/loc_oak/invites \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+        <CodeBlock lang="bash">{`curl -X POST https://<your-gateway>/v1/accounts/acc_oak/invites \\
+  -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "phone": "+27821234567",
-    "role": "guest",
-    "expires_at": "2026-05-20T17:00:00Z"
+    "email": "lebogang@example.com",
+    "phone_e164": "+27821234567",
+    "role": "member"
   }'`}</CodeBlock>
         <CodeBlock lang="json">{`{
-  "invite_id": "inv_01HZ4D…",
-  "status": "sent",
-  "channel": "whatsapp",
-  "phone": "+27821234567",
-  "expires_at": "2026-05-20T17:00:00Z"
+  "id": "inv_01HZ4D…",
+  "email_sent": false,
+  "whatsapp_sent": false
 }`}</CodeBlock>
+        <p>
+          The accept token itself is never returned here — it&rsquo;s delivered straight
+          to the invitee, never to the inviter. <code>email_sent</code>/
+          <code>whatsapp_sent</code> report whether delivery is wired up on your
+          gateway; a half-configured install still creates the invite, it just can&rsquo;t
+          tell the invitee about it yet.
+        </p>
       </DocSection>
 
-      <DocSection heading="Revoking">
-        <p>
-          Open the member, hit <em>Revoke</em>. The next message they send to the gate is rejected
-          with a polite "your access has ended" reply. The audit log keeps the record forever —
-          revocation is not deletion. To purge a phone number entirely (e.g. GDPR-style request),
-          contact your instance admin — the data lives on your gateway's own database.
-        </p>
-        <CodeBlock lang="bash">{`curl -X DELETE https://<your-gateway>/v1/locations/loc_oak/members/+27821234567 \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx"`}</CodeBlock>
-      </DocSection>
-
-      <DocSection heading="Audit trail">
-        <p>
-          Every role change writes one row. Filter by subject phone or by admin to answer "who gave
-          this person access?" later:
-        </p>
-        <CodeBlock lang="json">{`{
-  "id": "ev_01HZ4G…",
-  "kind": "member.granted",
-  "actor": { "user_id": "u_owner", "ip": "102.220.208.91" },
-  "subject_phone": "+27821234567",
-  "role": "guest",
-  "expires_at": "2026-05-20T17:00:00Z",
-  "at": "2026-05-14T14:02:11Z"
-}`}</CodeBlock>
+      <DocSection heading="Revoking access">
+        <div className="rounded-2xl border border-gold/40 bg-gold/[0.06] px-5 py-4 sm:px-6 sm:py-5">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-ink/55 font-mono">
+            Status: not implemented
+          </p>
+          <p className="mt-2 text-[15px] text-ink/80 leading-relaxed">
+            There is currently no route to remove a member or revoke their access once
+            they&rsquo;ve accepted an invite — not in the gateway API, not in the
+            reference backend, not in the app. (Temporary access <em>grants</em> are
+            different and do revoke instantly — <code>POST /v1/grants/{'{id}'}/revoke</code> —
+            this gap is specifically about standing memberships.) Until member
+            offboarding ships, pulling a phone number&rsquo;s access means asking your
+            instance admin to edit the <code>account_members</code> row directly on the
+            gateway&rsquo;s own database.
+          </p>
+        </div>
       </DocSection>
     </>
   );

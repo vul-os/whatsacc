@@ -6,16 +6,16 @@ export default function ApiReference() {
       <DocLead
         kicker="03 · Reference"
         title="API reference"
-        intro="The HTTP API isn't required to use whatsacc — most users only ever touch the WhatsApp interface. But if you're integrating with property management software, building a kiosk, or wiring a Slack bot, this is for you. JSON in, JSON out, REST-shaped, no GraphQL."
+        intro="The HTTP API isn't required to use lintel — most users only ever touch the WhatsApp interface. But if you're integrating with property management software, building a kiosk, or wiring a Slack bot, this is for you. JSON in, JSON out, REST-shaped, no GraphQL."
       />
 
       <DocSection heading="Base URL">
         <p>
-          whatsacc is self-hosted, so the base URL is wherever <em>you</em> deployed the
+          lintel is self-hosted, so the base URL is wherever <em>you</em> deployed the
           gateway. Every example below uses a placeholder — substitute your own host.
         </p>
         <CodeBlock lang="plain">{`Your gateway   https://<your-gateway>/v1
-Local dev      http://localhost:8787/v1  (or wherever you run the backend)`}</CodeBlock>
+Local dev      http://localhost:8080/v1  (default -listen for ./gateway)`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="Authentication">
@@ -25,15 +25,15 @@ Local dev      http://localhost:8787/v1  (or wherever you run the backend)`}</Co
           <strong>Settings → API tokens</strong> screen in the dashboard is <em>planned</em> —
           until it lands, tokens are provisioned on the gateway itself.
         </p>
-        <CodeBlock lang="http" title="every request">{`Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx
+        <CodeBlock lang="http" title="every request">{`Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx
 Accept: application/json`}</CodeBlock>
         <p>
           Token prefixes:
         </p>
         <ul className="list-disc pl-6 space-y-1">
-          <li><code>wacc_live_</code> — production traffic, opens real gates.</li>
-          <li><code>wacc_test_</code> — sandbox, never opens a real gate.</li>
-          <li><code>wacc_dev_</code> — device-to-gateway session token, cycles automatically.</li>
+          <li><code>lintel_live_</code> — production traffic, opens real gates.</li>
+          <li><code>lintel_test_</code> — sandbox, never opens a real gate.</li>
+          <li><code>lintel_dev_</code> — device-to-gateway session token, cycles automatically.</li>
         </ul>
       </DocSection>
 
@@ -58,23 +58,21 @@ Accept: application/json`}</CodeBlock>
       <DocSection heading="Open an access point">
         <p>The bread-and-butter endpoint. Same code path as a WhatsApp <em>open</em>.</p>
         <CodeBlock lang="bash" title="curl">{`curl -X POST https://<your-gateway>/v1/access-points/ap_ABC123/open \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+  -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "actor": { "phone": "+27825550144" },
-    "location_signal": { "lat": -33.918, "lng": 18.423 }
+    "actor": { "phone": "+27825550144" }
   }'`}</CodeBlock>
         <CodeBlock lang="ts" title="TypeScript (fetch)">{`const r = await fetch(
   'https://<your-gateway>/v1/access-points/ap_ABC123/open',
   {
     method: 'POST',
     headers: {
-      Authorization: \`Bearer \${process.env.WACC_TOKEN}\`,
+      Authorization: \`Bearer \${process.env.LINTEL_TOKEN}\`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       actor: { phone: '+27825550144' },
-      location_signal: { lat: -33.918, lng: 18.423 },
     }),
   },
 );
@@ -83,10 +81,9 @@ const event = await r.json();`}</CodeBlock>
 
 r = requests.post(
     "https://<your-gateway>/v1/access-points/ap_ABC123/open",
-    headers={"Authorization": f"Bearer {os.environ['WACC_TOKEN']}"},
+    headers={"Authorization": f"Bearer {os.environ['LINTEL_TOKEN']}"},
     json={
         "actor": {"phone": "+27825550144"},
-        "location_signal": {"lat": -33.918, "lng": 18.423},
     },
     timeout=10,
 )
@@ -103,15 +100,14 @@ import (
 
 func openGate() (*http.Response, error) {
     body, _ := json.Marshal(map[string]any{
-        "actor":           map[string]string{"phone": "+27825550144"},
-        "location_signal": map[string]float64{"lat": -33.918, "lng": 18.423},
+        "actor": map[string]string{"phone": "+27825550144"},
     })
     req, _ := http.NewRequest(
         "POST",
         "https://<your-gateway>/v1/access-points/ap_ABC123/open",
         bytes.NewReader(body),
     )
-    req.Header.Set("Authorization", "Bearer "+os.Getenv("WACC_TOKEN"))
+    req.Header.Set("Authorization", "Bearer "+os.Getenv("LINTEL_TOKEN"))
     req.Header.Set("Content-Type", "application/json")
     return http.DefaultClient.Do(req)
 }`}</CodeBlock>
@@ -119,11 +115,7 @@ func openGate() (*http.Response, error) {
   "event_id": "ev_01HZ4B7Q2K7VJ",
   "status": "succeeded",
   "opened_at": "2026-05-14T14:02:11.842Z",
-  "latency_ms": 1834,
-  "policy_checks": {
-    "geofence": "ok",
-    "schedule": "ok"
-  }
+  "latency_ms": 1834
 }`}</CodeBlock>
       </DocSection>
 
@@ -133,7 +125,7 @@ func openGate() (*http.Response, error) {
           <code> kind</code>, <code>actor</code>, <code>since</code>, <code>until</code>.
         </p>
         <CodeBlock lang="bash">{`curl -G https://<your-gateway>/v1/events \\
-  -H "Authorization: Bearer wacc_live_xxxxxxxxxxxxxxxx" \\
+  -H "Authorization: Bearer lintel_live_xxxxxxxxxxxxxxxx" \\
   --data-urlencode "location=loc_oak" \\
   --data-urlencode "since=2026-05-01" \\
   --data-urlencode "kind=open.succeeded"`}</CodeBlock>
@@ -152,16 +144,18 @@ func openGate() (*http.Response, error) {
 }`}</CodeBlock>
       </DocSection>
 
-      <DocSection heading="Webhooks">
+      <DocSection heading="Webhooks (proposed, not implemented)">
         <p>
-          Subscribe to <code>open.succeeded</code>, <code>open.denied</code>,
-          <code> device.offline</code>, <code>device.online</code>, and <code>member.revoked</code>.
-          Payloads are signed with HMAC-SHA256 — verify with the shared secret shown when you
-          create the subscription.
+          There is no outbound webhook/subscription system in the gateway today — nothing
+          below can be configured or called yet. This is the intended design: subscribe to
+          <code> open.succeeded</code>, <code>open.denied</code>,
+          <code> device.offline</code>, <code>device.online</code>, and <code>member.revoked</code>,
+          with payloads signed HMAC-SHA256 and verified against a shared secret shown when
+          you create the subscription. Kept here as the target shape.
         </p>
         <CodeBlock lang="ts" title="Verify a webhook (Node / Hono)">{`import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export function verifyWaccWebhook(rawBody: string, signature: string, secret: string) {
+export function verifyLintelWebhook(rawBody: string, signature: string, secret: string) {
   const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
   const a = Buffer.from(signature, 'hex');
   const b = Buffer.from(expected, 'hex');
@@ -169,7 +163,7 @@ export function verifyWaccWebhook(rawBody: string, signature: string, secret: st
 }`}</CodeBlock>
         <CodeBlock lang="python" title="Verify a webhook (Python / Flask)">{`import hmac, hashlib
 
-def verify_wacc_webhook(raw_body: bytes, signature: str, secret: str) -> bool:
+def verify_lintel_webhook(raw_body: bytes, signature: str, secret: str) -> bool:
     expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)`}</CodeBlock>
         <CodeBlock lang="json" title="open.succeeded payload">{`{
@@ -188,18 +182,23 @@ def verify_wacc_webhook(raw_body: bytes, signature: str, secret: str) -> bool:
 
       <DocSection heading="Rate limits">
         <p>
-          1,000 requests / minute per token, soft. The gateway never denies an open because of rate limits —
-          those are routed through a separate fast path with its own budget. The HTTP API will
-          return <code>429</code> with a <code>Retry-After</code> header for everything else.
+          The open path itself is rate-limited — cooldowns, hourly caps, and any admin-set
+          daily quotas — enforced at one choke point shared by the portal, the API and every
+          chat channel, so no path can be picked to bypass it. A denied open returns{' '}
+          <code>429</code> with a <code>Retry-After</code> header; the reason lands in{' '}
+          <code>error</code>. See <a
+            href="https://github.com/vul-os/lintel/blob/main/site/docs/limits.md"
+            className="underline underline-offset-4 decoration-terracotta"
+          >Rate limits &amp; quotas</a> for the exact defaults. A separate, generic
+          per-token throttle across the rest of the HTTP API (with <code>X-RateLimit-*</code>{' '}
+          headers) is a reasonable future addition but doesn&rsquo;t exist yet — don&rsquo;t
+          program against those headers today.
         </p>
-        <CodeBlock lang="http" title="response when limited">{`HTTP/1.1 429 Too Many Requests
+        <CodeBlock lang="http" title="response when the open path is limited">{`HTTP/1.1 429 Too Many Requests
 Retry-After: 12
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1778753400
 Content-Type: application/json
 
-{ "error": "rate_limited", "detail": "Slow down — 1000/minute on this token." }`}</CodeBlock>
+{ "error": "rate_limited", "detail": "Slow down and try again shortly." }`}</CodeBlock>
       </DocSection>
 
       <DocSection heading="SDK (preview)">
@@ -207,7 +206,7 @@ Content-Type: application/json
           A first-party TypeScript SDK is planned. Until it lands in npm, the recommended path is
           a small wrapper around <code>fetch</code>:
         </p>
-        <CodeBlock lang="ts" title="lib/wacc.ts">{`export class Wacc {
+        <CodeBlock lang="ts" title="lib/lintel.ts">{`export class Lintel {
   constructor(
     private token: string,
     private base = 'https://<your-gateway>/v1',
@@ -229,14 +228,12 @@ Content-Type: application/json
 
 export interface OpenBody {
   actor: { phone: string };
-  location_signal?: { lat: number; lng: number };
 }
 export interface OpenEvent {
   event_id: string;
   status: 'succeeded' | 'denied' | 'queued';
   opened_at: string;
   latency_ms: number;
-  policy_checks: Record<string, 'ok' | 'denied' | 'skipped'>;
 }`}</CodeBlock>
       </DocSection>
     </>

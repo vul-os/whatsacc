@@ -17,7 +17,7 @@ const groups: { head: string; items: { to: string; label: string }[] }[] = [
       { to: '/docs/locations', label: 'Creating a Location' },
       { to: '/docs/pairing-device', label: 'Pairing a Device' },
       { to: '/docs/permissions-members', label: 'Permissions & Members' },
-      { to: '/docs/geofence-safety', label: 'Geofence safety' },
+      { to: '/docs/geofence-safety', label: 'Geofence safety (planned)' },
     ],
   },
   {

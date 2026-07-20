@@ -1,14 +1,14 @@
 # Architecture
 
-A condensed tour of how whatsacc fits together. The long-form version lives in the
+A condensed tour of how lintel fits together. The long-form version lives in the
 repository's `ARCHITECTURE.md`.
 
 ## No cloud center
 
-whatsacc has no central service that everything depends on — and no hosted service at
+lintel has no central service that everything depends on — and no hosted service at
 all. It is a network of independent **gateways**: anyone can run one, and every gateway
-is somebody's own. whatsacc.com is the project site (landing, docs, downloads), not a
-service. Every line of code is MIT-licensed and everything is free — there is no
+is somebody's own. vulos.org/products/lintel is the project site (landing, docs,
+downloads), not a service. Every line of code is MIT-licensed and everything is free — there is no
 billing system.
 
 "Decentralized" here means neither federation nor P2P. It means **many independent
@@ -24,7 +24,8 @@ resident ── "open" ──► WhatsApp / Slack / Telegram (Discord soon)
                               ▼
         ┌──────────── GATEWAY — one Go binary · SQLite ────────────┐
         │  channel seam → rules engine → device hub → audit log    │
-        │  (time windows · geofence · quotas)   (Ed25519 signing)  │
+        │  (rate limits · quotas)               (Ed25519 signing)  │
+        │  (geofence, time windows: designed, not built)           │
         │  embedded portal + app API                               │
         └───────────────────────┬──────────────────────────────────┘
               outbound wss ⇦ dial-out (no inbound ports at the gate)
@@ -46,7 +47,7 @@ directly to the controller over LAN/BLE with an offline-verifiable grant
 | **gateway** | The entire server: channels, rules, portal, API, device hub, audit | Any VPS / Pi / server with a public URL | Go · SQLite · embedded portal |
 | **controller** | The unit wired to the gate relay; verifies signatures, drives the motor | Pi-class board, Wi-Fi or GSM | Go agent |
 | **app** | Admin console + emergency access | Desktop, iOS, Android | React 19 · Tauri v2 today (gateway picker shipped); a Svelte 5 rewrite is a longer-term target, not started |
-| **web** | whatsacc.com — landing, docs, downloads | Any static host | Static |
+| **web** | vulos.org/products/lintel — landing, docs, downloads | Any static host | Static |
 | **proto** | The versioned wire contracts | — | Markdown + schemas |
 
 ### Two implementations, one target
@@ -80,9 +81,9 @@ why many gateways run Slack-first ([Chat channels](channels.md)).
 
 ## Money is out of scope
 
-There is no billing system anywhere in whatsacc — no tiers, no wallet, no checkout, and
+There is no billing system anywhere in lintel — no tiers, no wallet, no checkout, and
 no code path that could collect money. Operators who want to charge their residents do
-so outside the system, however they like; whatsacc neither meters nor invoices anyone.
+so outside the system, however they like; lintel neither meters nor invoices anyone.
 Your real costs sit with your own providers: your hardware, and Meta's per-conversation
 fees on your own number if you run a WhatsApp channel (Slack costs nothing).
 

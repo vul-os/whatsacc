@@ -9,7 +9,7 @@ const steps = [
   {
     n: '02',
     title: 'We verify, in seconds',
-    body: "whatsacc checks the sender's phone, their permissions for that location, the optional geofence, and any time-of-day rules.",
+    body: "lintel checks the sender's phone, their permissions for that location, and any admin-set quotas or cooldowns.",
   },
   {
     n: '03',
@@ -33,7 +33,7 @@ export function HowItWorks() {
             </h2>
             <p className="mt-5 max-w-sm text-ink/70 leading-relaxed">
               The whole experience hides behind one familiar place &mdash; a chat thread.
-              Everything else is whatsacc&rsquo;s job.
+              Everything else is lintel&rsquo;s job.
             </p>
           </div>
 

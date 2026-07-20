@@ -1,14 +1,14 @@
-# whatsacc documentation
+# lintel documentation
 
-**Texts that open gates.** whatsacc is a decentralized access-control system: a chat
+**Texts that open gates.** lintel is a decentralized access-control system: a chat
 message — WhatsApp, Slack or Telegram today, Discord soon — opens a physical gate, door
 or barrier.
 
-There is no cloud center — and no hosted service. whatsacc is a network of independent
-**gateways**; anyone can run one, and every gateway is somebody's own. whatsacc.com is
-the project site — this landing, these docs, the downloads — not a service: there is
-nothing to sign up for. Every line of code is MIT-licensed, and everything is free —
-there is no billing system anywhere in whatsacc. The only private thing about any
+There is no cloud center — and no hosted service. lintel is a network of independent
+**gateways**; anyone can run one, and every gateway is somebody's own.
+vulos.org/products/lintel is the project site — this landing, these docs, the
+downloads — not a service: there is nothing to sign up for. Every line of code is MIT-licensed, and everything is free —
+there is no billing system anywhere in lintel. The only private thing about any
 gateway is its `.env`.
 
 ## The pieces
@@ -17,21 +17,23 @@ gateway is its `.env`.
 | --- | --- |
 | **Gateway** | One Go binary with an embedded SQLite database. It receives chat webhooks, runs your access rules, serves the management portal and the app's API, keeps the audit log, and pushes signed commands to controllers. |
 | **Controller** | The small device wired to your gate's relay. It dials *out* to the gateway over a persistent connection, verifies command signatures against a pinned key, and pulses the motor. Wi-Fi or GSM. |
-| **App** | Desktop and mobile app (Tauri). It is the admin console — and the way to open your gate when the internet is down, using an offline-verifiable signed grant. |
+| **App** | Desktop and mobile app (Tauri). It is the admin console today; the offline emergency-open path (an offline-verifiable signed grant) is designed and the controller side is real, but gateway issuance and the app side aren't built yet — see [Emergency access](emergency-access.md). |
 | **Portal** | The web dashboard, embedded inside the gateway binary. No separate deployment. |
 
 ## The three ways in
 
 1. **Chat — the primary path.** Residents text `open` from the channel they already use.
    The gateway resolves who they are, runs the rules, signs a command, replies in-thread.
-2. **The app — emergency access.** Works with no internet at all: the app holds a
-   short-lived grant signed by the gateway and proves itself to the controller directly
-   over LAN or Bluetooth. See [Emergency access](emergency-access.md).
+2. **The app — emergency access (designed, not shipped end to end).** The plan: the app
+   would hold a short-lived grant signed by the gateway and prove itself to the
+   controller directly over LAN or Bluetooth with no internet at all. The controller
+   side is real and conformance-tested; the gateway doesn't issue grants yet and the
+   app doesn't hold them. See [Emergency access](emergency-access.md).
 3. **The web portal — the fallback.** Unlimited opens through the gateway's own dashboard.
 
 ## Running it
 
-There is one way to run whatsacc: yourself. That is the product — the whole system,
+There is one way to run lintel: yourself. That is the product — the whole system,
 nothing held back.
 
 - **Run a gateway** on a VPS, a Pi, or a box in the gatehouse — one binary, one SQLite
