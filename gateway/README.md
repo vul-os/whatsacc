@@ -34,8 +34,13 @@ bundle into `internal/portal/dist/`. See the porting map below.
   indistinguishable from not-found).
 - Auth core, real not stubbed: argon2id password hashing (PHC format),
   HS256 JWT (std-lib HMAC, header pinned — no alg confusion), rotating
-  refresh tokens with family reuse-detection.
-  `POST /v1/auth/{register,login,refresh,logout}`, `GET /v1/auth/me`.
+  refresh tokens with family reuse-detection, per-IP + per-account brute-force
+  throttles on the credential endpoints (fail-closed), and per-request live
+  revocation (a disabled user's still-valid token stops working on their very
+  next request, not at token expiry).
+  `POST /v1/auth/{register,login,refresh,logout,logout-all}`, `GET /v1/auth/me`.
+  See **Auth & session security** below for the throttle env vars and what
+  `logout-all` actually revokes.
 - One-shot instance-admin claim per the backend's semantics:
   `GET|POST /v1/admin/claim` — fail-closed when `ADMIN_CLAIM_TOKEN` is unset,
   constant-time token compare, atomic win, burned permanently via the
@@ -67,6 +72,13 @@ When `proto/vectors/` lands, point the tests at it and extend if needed.
 - `0005_channels.sql` — channel_identities (`(channel, external_id)` →
   profile), channel_chats + channel_messages (chat/message log, inbound dedupe
   via a partial unique index on `(channel, provider_message_id)`).
+- `0006_late_ack_reconcile.sql` — `reconciles_log_id` self-reference on
+  `access_logs` for late `cmd.ack` reconciliation: a verified ack that arrives
+  after the ack-wait deadline lands as a **new** row referencing the original,
+  never a mutation of it.
+- `0007_audit_hash_chain.sql` — tamper-evident hash chain + append-only DB
+  triggers for `access_logs` and `admin_audit_log` — see **Tamper-evident
+  audit log** below.
 
 Still deferred (ported with their routes): countries, oauth_identities,
 password/email token tables, device_commands (dispatch is in-memory via the
@@ -157,10 +169,127 @@ Config (flags override env):
 | `-listen` | `LINTEL_LISTEN` | `:8080` | listen address |
 | `-public-url` | `LINTEL_PUBLIC_URL` | — | external base URL (webhooks, links) |
 | `-admin-claim-token` | `ADMIN_CLAIM_TOKEN` | — | one-shot admin claim; empty = claiming disabled |
+| `-behind-proxy` | `LINTEL_BEHIND_PROXY` | `false` | permit binding a non-loopback `-listen` address — only set this when TLS is terminated upstream by a reverse proxy; see **Deployment & TLS** below |
 
 First-boot claim flow: register a user, then
 `POST /v1/admin/claim {"token": "<ADMIN_CLAIM_TOKEN>"}` with that user's
 bearer token. Exactly one caller can ever win; the mechanism burns forever.
+
+## Deployment & TLS
+
+This binary serves **plain HTTP only** — there is no built-in TLS/ACME code at all.
+Because of that, `-listen` **refuses to start** on anything but a loopback address
+(`127.0.0.1`, `::1`, `localhost`, or a hostname that resolves *exclusively* to
+loopback addresses) unless `-behind-proxy` (env `LINTEL_BEHIND_PROXY=1`) is set —
+binding a public interface here in plain HTTP would otherwise silently serve the
+admin portal, login and signing API in cleartext. `checkListenAddr` in
+`cmd/gateway/main.go` resolves the address the same way `net/http.Server` would:
+`:8080`, `0.0.0.0` and `[::]` all count as non-loopback wildcard binds, and a
+hostname is checked by resolving it and requiring *every* address it returns to be
+loopback.
+
+Two supported shapes:
+
+- **Reverse proxy on the same host** — bind the gateway to loopback
+  (`-listen 127.0.0.1:8080`) and put Caddy/nginx/Traefik in front, terminating TLS
+  there and forwarding plain HTTP to the loopback port. `-behind-proxy` is not
+  needed here — the gateway's own bind is still loopback-only. See
+  [Run a gateway → Reachability](../site/docs/self-host.md#reachability) for a
+  four-line Caddy config and the tunnel-based alternatives (cloudflared,
+  Tailscale Funnel, `vulos-relayd`, …).
+- **A container, or a proxy on a different host** — the gateway's *own* bind has
+  to be a wildcard (`:8080`) so Docker's `-p` mapping (or an external load
+  balancer) can reach it at all, since a container's loopback interface isn't
+  reachable from outside it. Pass `-behind-proxy` / `LINTEL_BEHIND_PROXY=1` to
+  declare, explicitly, that TLS is handled upstream of this process — the flag
+  does not add TLS, it only turns off the startup guard. `gateway/Dockerfile`
+  sets this env var for exactly this reason (`docker run -p` always needs the
+  in-container bind to be non-loopback). Put the actual TLS termination in front
+  of the published port — a reverse proxy, or restrict the host's `-p` mapping to
+  `127.0.0.1` and proxy from there.
+
+## Auth & session security
+
+- **Credential-endpoint brute-force throttles** (`internal/store/authratelimit.go`)
+  — separate from the four product `RATE_*` quotas above, and deliberately **not**
+  admin-overridable at runtime (env-only: a compromised admin console can't
+  quietly turn brute-force protection off the way `opens_per_hour` can be
+  zeroed). A per-IP **hard** limit counts every attempt (success or failure)
+  against `POST /v1/auth/{login,register,refresh}` and `POST /v1/admin/claim`;
+  a per-account **soft** limit on top of that only counts *failed* logins,
+  in a single fixed 5-minute window that never compounds — so a distributed
+  attacker guessing one victim's password is still capped, but flooding failed
+  logins against a victim's email costs them at most one bounded 5-minute
+  window of friction, never an indefinite lockout. A rate-limit-store error
+  here **fails closed** (`503`) — the opposite policy from the physical-access
+  limiter in `openpath.go` (which fails open because a locked gate is the
+  worse outcome; a brute-force gate silently disabling itself is not).
+
+  | Env | Default | Guards |
+  | --- | --- | --- |
+  | `RATE_LOGIN_IP_PER_5MIN` | 20 | `POST /v1/auth/login`, per source IP |
+  | `RATE_LOGIN_ACCOUNT_PER_5MIN` | 10 | `POST /v1/auth/login`, failed attempts per account (email) |
+  | `RATE_REGISTER_IP_PER_5MIN` | 10 | `POST /v1/auth/register`, per source IP |
+  | `RATE_REFRESH_IP_PER_5MIN` | 30 | `POST /v1/auth/refresh`, per source IP |
+  | `RATE_ADMIN_CLAIM_IP_PER_5MIN` | 10 | `POST /v1/admin/claim`, per source IP |
+
+- **Live revocation on every authenticated request.** `requireAuth` re-reads the
+  user's row (not just the JWT claims) on every request, so disabling a user cuts
+  them off on their very next request rather than waiting out the 15-minute
+  access-token TTL. (`requireAdmin`'s live platform-admin check already worked
+  this way; it now also applies to ordinary auth, not just admin routes.)
+- **`POST /v1/auth/logout-all`** — revokes every refresh-token family for the
+  calling user in one call (the "stolen phone" button): every other session's
+  refresh token stops working immediately. The caller's *own* current access
+  token still works until its normal TTL expires — access tokens aren't
+  individually revocable, only refresh-token families are, so the practical
+  effect is that no session can *renew* past its current access token.
+
+## Tamper-evident audit log
+
+`access_logs` and `admin_audit_log` are hash-chained
+(`internal/store/audithash.go`): every row gets `prev_hash`/`row_hash` —
+`SHA-256` over a JCS-canonical envelope of `{chain, prev_hash, fields}`, chained
+to the previous row in the same table. DB triggers reject any direct
+`UPDATE`/`DELETE` against either table except two narrow, schema-verified
+exceptions — a one-time hash backfill of a pre-chain row, and SQLite's own
+`ON DELETE SET NULL` cascade nulling a live FK when its target is deleted — see
+`migrations/0007_audit_hash_chain.sql` for the exact trigger conditions. The old
+live mutation this replaced, `store.UpdateAccessLogError`, is gone; a late
+`cmd.ack` now lands as an append-only follow-up row (`RecordDispatchOutcome`),
+the same pattern `0006`'s late-ack reconciliation established.
+
+**Coverage.** The hash covers every content column plus permanent `*_snapshot`
+copies of `account_id`/`location_id`/`access_point_id`/`user_id`
+(`admin_audit_log`: `actor_user_id_snapshot`). The *live* FK columns themselves
+are deliberately **not** hashed: this schema already nulls them via
+`ON DELETE SET NULL` when the referenced row is deleted (so history survives
+deletes), and hashing a column the schema is designed to mutate would make an
+ordinary location delete indistinguishable from tampering. The snapshot carries
+the same who/where information permanently instead — a coverage *relocation*,
+not a coverage loss.
+
+**Verify.** `GET /v1/admin/audit/verify` (admin-gated) walks both chains and
+reports the first row that fails to verify, if any. `gateway verify-audit -data
+DIR` does the same thing from the command line, **against a cold backup,
+without booting the server or its HTTP surface at all** — point it at a copy of
+a backup data directory and it prints pass/fail per table with a non-zero exit
+code on failure. Run it against a *copy*, never the original evidence file:
+opening the store applies any pending migration, a real (if small) mutation.
+
+**The honest ceiling.** A hash chain does **not** stop an attacker who edits the
+SQLite file directly *and* recomputes every downstream hash after their edit —
+that attacker can rewrite history undetectably, exactly as before this
+migration existed. What it does is turn *silent* tampering into *detectable*
+tampering for anyone who edits a row without also redoing that work, and it
+turns "was this tampered with?" from an unknowable question into a checkable
+one. It is a detection control, not a prevention control — and the test suite
+proves the limit directly: `TestHashChainTamperRecomputingDownstreamIsUndetected`
+shows a fully re-hashed tamper verifies clean. The two triggers are defense in
+depth against the *running application* (so a future code bug can't reintroduce
+a silent `UPDATE`/`DELETE`), not against an attacker with filesystem access to
+`lintel.db` — they can't stop someone who edits bytes directly or drops a
+trigger.
 
 ## Porting map (backend route → gateway package)
 
@@ -202,7 +331,7 @@ is tested against those vectors.
 gateway/
 ├── cmd/gateway/          # main: config, bootstrap, serve
 ├── internal/store/       # SQLite + embedded migrations + tenancy-scoped methods
-│   └── migrations/       # folded baseline + 0002..0004 (SQLite)
+│   └── migrations/       # folded baseline + 0002..0007 (SQLite)
 ├── internal/httpapi/     # net/http 1.22-pattern router; auth, accounts,
 │                         #   locations, access, open path, devices, admin
 ├── internal/hub/         # device registry, ws.challenge/auth, ack correlation

@@ -44,21 +44,24 @@ flowchart LR
     APP["📱 App (Tauri)<br/>admin + emergency"] --> GW
     GW -- "signed command<br/>(outbound wss)" --> C["Controller at the gate<br/>Wi-Fi / GSM 4G"]
     C --> G["🚧 Gate opens"]
-    APP -. "internet down?<br/>LAN/BLE offline grant (🔨 gateway issuance not built)" .-> C
+    APP -. "internet down?<br/>LAN/BLE offline grant (🔨 app doesn't hold/present one yet)" .-> C
 ```
 
 **The resilience story:** this is designed offline-first from day one, not a fallback
-bolted on after the fact — when the app has connectivity the gateway is meant to
-pre-issue it a short-lived signed grant, which it later proves straight to the
-controller over LAN or Bluetooth with no gateway and no Meta involved. **Where that
-stands today:** the wire contract ([grants.md](proto/grants.md)) is specified, and the
-**controller side is real and conformance-tested** — offline-grant verification, the
-LAN/mDNS transport, and the BLE framing/challenge-response all run against
-[`proto/vectors/`](proto/vectors/) (🟢, see
-[controller/README.md](controller/README.md#what-is-real-vs-stubbed)). What's **not
-built yet** is the gateway actually minting and serving those grants (🔨) — until it
-does, the offline path doesn't run end-to-end. Full design and status in
-[Emergency access](site/docs/emergency-access.md).
+bolted on after the fact — when the app has connectivity the gateway pre-issues it a
+short-lived signed grant, which it later proves straight to the controller over LAN or
+Bluetooth with no gateway and no Meta involved. **Where that stands today:** the wire
+contract ([grants.md](proto/grants.md)) is specified, and **both the controller side and
+the gateway's issuance side are real and conformance-tested** — offline-grant
+verification, the LAN/mDNS transport, and the BLE framing/challenge-response all run
+against [`proto/vectors/`](proto/vectors/) (🟢, see
+[controller/README.md](controller/README.md#what-is-real-vs-stubbed)), and the gateway
+now mints and signs real `typ:"grant"` objects at `POST /v1/offline-grants`
+([`gateway/internal/httpapi/offline_grants.go`](gateway/internal/httpapi/offline_grants.go)),
+verified byte-for-byte against the same [`proto/vectors/`](proto/vectors/) fixtures.
+What's **not built yet** is the app side (🔨) — nothing on the phone requests, stores or
+presents a grant, so the offline path still doesn't run end-to-end for a real resident.
+Full design and status in [Emergency access](site/docs/emergency-access.md).
 
 ## Part of VulOS
 
@@ -92,11 +95,12 @@ Three ways in, ranked by how people actually behave:
    point, active temporary-grant windows and quotas, then pushes an Ed25519-signed
    command to the controller. Multiple access points? You get a numbered picker in
    the thread.
-2. **The app** — the admin console, and (once gateway-side issuance ships — see the
-   resilience note above) emergency access that works **when the internet is down**:
-   a pre-issued signed grant, proved to the controller directly over LAN/BLE with a
-   nonce challenge. The controller half of that path is already real and
-   conformance-tested today.
+2. **The app** — the admin console, and emergency access designed to work **when the
+   internet is down**: a pre-issued signed grant, proved to the controller directly
+   over LAN/BLE with a nonce challenge. The controller half and the gateway's
+   issuance half are both real and conformance-tested today (see the resilience note
+   above) — what's still missing is the app itself requesting, storing and
+   presenting a grant, so this isn't something a resident can actually use yet.
 3. **Web portal** — unlimited fallback, always.
 
 Plus: per-location daily quotas (owner/admin exempt) and all four rate limits,
@@ -275,7 +279,7 @@ static site, host it anywhere; it also syncs into the
 | `backend/`    | Current API — Cloudflare Workers · Postgres RLS · WhatsApp + Slack | ✅ running, **spec for the Go port** |
 | `src/`        | Portal application — React 19 · Vite · light/dark, wrapped as a desktop app by `src-tauri/` (Tauri desktop shell, in progress) | ✅ running |
 | `scripts/`    | `screenshotter` — Playwright product shots with fixture data     | ✅ |
-| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes, WhatsApp/Slack/Telegram channels, admin console | 🟢 runs the product core; offline-grant issuance (proto/grants.md) and geofencing not yet built |
+| `gateway/`    | Go single-binary gateway — SQLite, auth core, admin claim, signed envelopes, offline-grant issuance, WhatsApp/Slack/Telegram channels, admin console | 🟢 runs the product core, including offline-grant issuance (proto/grants.md, `POST /v1/offline-grants`); geofencing not yet built |
 | `controller/` | Gate device agent — pairing, key pinning, signed-command verification, offline LAN/BLE grants | 🟢 reference impl real; GPIO relay + BLE radio need real hardware (`-tags gpio` / `-tags ble`) |
 | `e2e/`        | Cross-module suite — real gateway + controller binaries over the wire, money path proven | 🟢 |
 | `src-tauri/`  | Tauri v2 desktop shell wrapping `src/` — gateway picker (any gateway, not build-time-fixed) | 🟢 |

@@ -37,6 +37,20 @@ alternative — see [Ingress & reachability](ingress.md) for the honest options 
 bind, any tunnel including a self-hosted `vulos-relayd`, or the paid Vulos Relay
 convenience).
 
+### Opt-in: a self-hosted bridge instead of the Cloud API
+
+`LINTEL_WHATSAPP_ENGINE=bridge` swaps the sender above for a self-hosted, **unofficial**
+WhatsApp Web bridge (Evolution API, fronting Baileys) — for operators who can't or
+won't do Meta's business-verification process. It is off by default and opt-in only;
+the trade is a real account-ban risk (Meta bans unofficial clients, commonly within
+weeks, not years, and tightened enforcement further on 2026-01-15), so the gateway logs
+a startup warning naming it every time `bridge` is selected.
+
+**That warning's required fallback is the web portal and/or a second chat channel
+(Slack Socket Mode or Telegram below) — not the offline LAN/BLE grant path**, which
+is designed but not gateway-issued yet (see [Emergency access](emergency-access.md)).
+Full setup and the honest risk/fallback breakdown: [Linking WhatsApp](linking-whatsapp.md).
+
 ## Slack
 
 The five-minute channel, and the recommended first channel for self-hosters:

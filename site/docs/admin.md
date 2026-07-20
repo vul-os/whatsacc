@@ -77,7 +77,7 @@ stops on their next request, even if their token has hours left on it.
 | Accounts | `GET /admin/accounts`, `GET /admin/accounts/:id`, `PATCH /admin/accounts/:id` | List and search accounts (name, paged); drill into one — members and roles, locations, the last 25 access-log entries; suspend or unsuspend |
 | Users | `GET /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/platform-admin` | List and search users (email, paged) with their account memberships and last access; disable or re-enable; grant or revoke instance admin |
 | Limits | `GET /admin/limits`, `PATCH /admin/limits` | Read and override the four abuse rate limits at runtime, no restart |
-| Audit | `GET /admin/audit`, `GET /admin/audit/actions` | The cross-account access log, filterable by kind; the admin action trail |
+| Audit | `GET /admin/audit`, `GET /admin/audit/actions`, `GET /admin/audit/verify` | The cross-account access log, filterable by kind; the admin action trail; verify both tables' tamper-evident hash chains |
 
 Cross-account reads use the same row-level scoping machinery as everything else —
 the admin context is a first-class input to the *same* policies every tenant query
@@ -151,21 +151,36 @@ audit-logged with the patch you sent and the resulting override set.
 
 ## The audit trail
 
-Two views, both admin-only:
+Three views, all admin-only:
 
 - **`GET /admin/audit`** — the cross-account access log: every open, close and
   denial on the instance, joined with account, location, access point and user.
   Filter with `?kind=` — `denied`, `success`, `open`, `close`, `rate_limited`,
   `quota_exceeded`, `account_suspended`.
 - **`GET /admin/audit/actions`** — the admin action trail: every claim attempt
-  (won or lost), suspension, user disable, admin grant or revoke, and limits
-  change — *and every denied request to `/admin/*` by a non-admin*, with the path
-  they probed. Operators are watched too; that's the point.
+  (won or lost), suspension, user disable, admin grant or revoke, limits change,
+  device create, pair redeem, invite create/accept, location create/update/
+  delete, access-point create, and visitor-grant create/revoke — *and every
+  denied request to `/admin/*` by a non-admin*, with the path they probed.
+  Operators are watched too; that's the point.
+- **`GET /admin/audit/verify`** — walks both tables' hash chains (see below) and
+  reports the first row that fails to verify, if any; `200` when both chains
+  check out, `409` when either doesn't.
 
-The action trail is append-only: nothing in the request-serving path can write to
-it directly — rows go through one internal writer — and only instance admins can
-read it. Mutations and their audit rows commit in the same transaction, so a
-recorded action really happened and a real action is really recorded.
+Both audited tables are append-only at the database layer, not just by
+convention: DB triggers reject any direct `UPDATE`/`DELETE` against either one
+except a one-time hash-chain backfill and SQLite's own cascade nulling a foreign
+key when its target is deleted. Every row is also part of a **tamper-evident hash
+chain** — each row's hash covers its own content and the previous row's hash, so
+editing history without redoing that work downstream breaks the chain. `GET
+/admin/audit/verify` checks this live; the `gateway verify-audit` CLI subcommand
+checks it against a cold backup, without booting the server at all. **This is a
+detection control, not a prevention control**: an attacker who edits the SQLite
+file directly and recomputes every hash after their edit leaves a chain that
+still verifies clean — see [Security → Tamper-evident audit log](security.md)
+for the full design and that honest limit. Mutations and their audit rows commit
+in the same transaction, so a recorded action really happened and a real action
+is really recorded.
 
 ## Where this fits
 

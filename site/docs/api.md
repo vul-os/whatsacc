@@ -19,6 +19,14 @@ sent as:
 Authorization: Bearer <session_token>
 ```
 
+`POST /v1/auth/login`, `/register`, `/refresh` and `POST /v1/admin/claim` are all
+throttled against brute-force guessing (per-IP hard limit on every attempt; login
+adds a per-account soft limit on failed attempts only) — a `429` with `Retry-After`
+means you've hit one of those, not a bug in your client. `POST /v1/auth/logout-all`
+revokes every refresh-token family for the calling user in one call (every other
+session stops being able to renew; the token you called it with keeps working until
+its own TTL runs out).
+
 **Planned**: long-lived, location-scoped, read/read-write **API tokens** issued from
 the portal under **Settings → API tokens** (tracked in the repo todo), shaped like
 `Authorization: Bearer lintel_live_<token>`. Until that ships, integrating means logging
@@ -64,6 +72,12 @@ only through the admin console/API (`GET /v1/admin/audit`, `GET
 /v1/admin/audit/actions` — instance-admin only, see [Instance admin](admin.md)), not
 via a per-account, per-token events feed. A scoped `GET /v1/events` for regular API
 tokens is planned alongside the API-token system below, not shipped.
+
+Both audited tables are hash-chained and append-only at the database layer;
+`GET /v1/admin/audit/verify` (also instance-admin only) checks the chain and
+reports the first tampered row, if any — see
+[Security → Tamper-evident audit log](security.md) for the design and its honest
+limits.
 
 ## Webhooks
 

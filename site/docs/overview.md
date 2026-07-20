@@ -8,8 +8,11 @@ There is no cloud center — and no hosted service. lintel is a network of indep
 **gateways**; anyone can run one, and every gateway is somebody's own.
 vulos.org/products/lintel is the project site — this landing, these docs, the
 downloads — not a service: there is nothing to sign up for. Every line of code is MIT-licensed, and everything is free —
-there is no billing system anywhere in lintel. The only private thing about any
-gateway is its `.env`.
+there is no billing system anywhere in lintel. The private things worth protecting on
+any gateway are its data directory — which holds the SQLite database plus the
+unencrypted Ed25519 signing key and JWT secret the gateway generates on first boot —
+and its `.env` (channel credentials, and `ADMIN_CLAIM_TOKEN` before it's claimed). See
+[Security](security.md) for what's actually in each.
 
 ## The pieces
 
@@ -17,7 +20,7 @@ gateway is its `.env`.
 | --- | --- |
 | **Gateway** | One Go binary with an embedded SQLite database. It receives chat webhooks, runs your access rules, serves the management portal and the app's API, keeps the audit log, and pushes signed commands to controllers. |
 | **Controller** | The small device wired to your gate's relay. It dials *out* to the gateway over a persistent connection, verifies command signatures against a pinned key, and pulses the motor. Wi-Fi or GSM. |
-| **App** | Desktop and mobile app (Tauri). It is the admin console today; the offline emergency-open path (an offline-verifiable signed grant) is designed and the controller side is real, but gateway issuance and the app side aren't built yet — see [Emergency access](emergency-access.md). |
+| **App** | Desktop and mobile app (Tauri). It is the admin console today; the offline emergency-open path (an offline-verifiable signed grant) is designed, and both the controller side and the gateway's issuance side are real and conformance-tested — but the app side (requesting, storing and presenting a grant) isn't built yet, so the path doesn't run end-to-end for a resident — see [Emergency access](emergency-access.md). |
 | **Portal** | The web dashboard, embedded inside the gateway binary. No separate deployment. |
 
 ## The three ways in
@@ -27,8 +30,9 @@ gateway is its `.env`.
 2. **The app — emergency access (designed, not shipped end to end).** The plan: the app
    would hold a short-lived grant signed by the gateway and prove itself to the
    controller directly over LAN or Bluetooth with no internet at all. The controller
-   side is real and conformance-tested; the gateway doesn't issue grants yet and the
-   app doesn't hold them. See [Emergency access](emergency-access.md).
+   side and the gateway's issuance side are both real and conformance-tested; the app
+   doesn't request, store or present a grant yet, so nothing on a resident's phone can
+   use this path today. See [Emergency access](emergency-access.md).
 3. **The web portal — the fallback.** Unlimited opens through the gateway's own dashboard.
 
 ## Running it
@@ -42,9 +46,11 @@ nothing held back.
 - **Bring your own channel credentials.** Slack takes minutes; WhatsApp needs your own
   verified Meta business number (a WABA), and Meta bills you directly for your own
   conversations. See [Chat channels](channels.md).
-- **Reachability is your choice**: a public IP with the gateway's built-in ACME, any
-  tunnel you already trust running beside the binary (including a self-hosted,
-  no-account-needed `vulos-relayd`, or the paid Vulos Relay convenience) — or, with
+- **Reachability is your choice**: a public IP behind your own reverse proxy or a
+  TLS-terminating tunnel (the gateway itself speaks plain HTTP only — see
+  [Ingress & reachability](ingress.md)), any tunnel you already trust running beside
+  the binary (including a self-hosted, no-account-needed `vulos-relayd`, or the paid
+  Vulos Relay convenience) — or, with
   **Slack Socket Mode (shipped)**, no public URL at all: the gateway dials out to Slack
   over a WebSocket instead of receiving webhooks. Controllers already dial out too.
   Telegram and WhatsApp still need a reachable URL today (Telegram webhook, WhatsApp's

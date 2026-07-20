@@ -103,9 +103,10 @@ app is signed into.
 **"Grant expired."**
 Offline emergency grants are short-lived by design, and the plan is for the app to
 refresh one silently whenever it opens with connectivity. That refresh flow isn't
-built yet, though — the gateway doesn't mint these grants and the app doesn't request
-them, so this message and the offline emergency path itself aren't reachable in the
-shipped app today. See [Emergency access](emergency-access.md) for current status.
+built yet, though — the gateway can mint a grant on request (`POST
+/v1/offline-grants`), but the app doesn't request, store or present one, so this
+message and the offline emergency path itself aren't reachable in the shipped app
+today. See [Emergency access](emergency-access.md) for current status.
 
 ## Instance admin
 

@@ -146,6 +146,12 @@ the app's own keypair. Near the gate, the app finds the controller directly (mDN
 same LAN, or BLE) and proves itself with a challenge-response. No internet, no gateway,
 no Meta involved.
 
+**Status:** the wire contract, the controller-side verification, and the gateway's
+issuance endpoint (`POST /v1/offline-grants`) are all real and conformance-tested
+against `proto/vectors/`. The app side — requesting, storing and presenting a grant —
+is not built yet, so this path does not run end-to-end for a real resident today; see
+[Emergency access](site/docs/emergency-access.md) for the full status.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -177,15 +183,24 @@ Meta Business + WABA + phone number. Every gateway operator brings their own —
 is never in the loop, and Meta bills the operator directly for their own conversations.
 
 **Reachability is kept deliberately simple.** The gateway binds a listener and serves
-HTTPS, full stop — no tunnel protocol, no relay dependency, no driver framework. WhatsApp
-is the reason a public endpoint is ever needed at all: the Meta Cloud API is
-**webhook-only** (Meta calls out to you; there is no long-poll alternative), so a
-WhatsApp channel always needs a public HTTPS URL Meta can reach.
+**plain HTTP, full stop** — no TLS/ACME code, no tunnel protocol, no relay dependency,
+no driver framework. TLS is entirely the operator's job: put a reverse proxy or a
+TLS-terminating tunnel in front of the gateway for anything reachable beyond
+`localhost` — see [`site/docs/ingress.md`](site/docs/ingress.md) for a working Caddy
+example. WhatsApp is the reason a public endpoint is ever needed at all: the Meta
+Cloud API is **webhook-only** (Meta calls out to you; there is no long-poll
+alternative), so a WhatsApp channel always needs a public HTTPS URL Meta can reach.
 
-1. **Direct** (default) — a VPS or any public IP; the binary does ACME itself.
-2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel, or a
+1. **Direct** — a VPS or any public IP, behind your own reverse proxy (Caddy, nginx,
+   Traefik) or a TLS-terminating tunnel that holds the certificate. The gateway binary
+   itself has zero TLS/ACME code.
+2. **Any tunnel you already trust** — cloudflared, Tailscale Funnel, ngrok, or a
    self-hosted `vulos-relayd` (open-source, no Vulos account needed) — run beside the
-   binary, forwarding to its port. Documented, not implemented. The paid, hosted
+   binary, forwarding to its port; these terminate TLS at their own edge or local agent
+   and hand the gateway plain HTTP, so no extra proxy is needed. A tunnel run in raw
+   TCP/SNI-passthrough mode (e.g. `frp` TCP passthrough) doesn't work against the
+   gateway directly, since it has nothing to terminate that TLS with — put a reverse
+   proxy behind a passthrough tunnel if you want that shape. The paid, hosted
    **Vulos Relay** is the same tunnel model as a convenience, never a requirement — one
    feature-scoped ingress option among several, not a dependency.
 3. **Zero-infrastructure mode** — real today for Slack. **Slack Socket Mode ships**:
@@ -223,7 +238,7 @@ own tenants, numbers, devices and audit log — with zero coordination between t
 | Emergency grants | Short-TTL signed capability bound to app keypair; nonce challenge-response  |
 | Channel ingress  | Per-channel verification (Meta HMAC, Slack signed-request scheme + replay window, Telegram secret-token header) |
 | Tenancy          | App-layer org scoping in SQLite (replaces Postgres RLS)                     |
-| Transport        | TLS terminated by the gateway itself — any tunnel in front only ever sees ciphertext when run in passthrough mode |
+| Transport        | Plain HTTP — the gateway ships no TLS/ACME code; TLS comes from a reverse proxy or TLS-terminating tunnel the operator puts in front (see §4) |
 | Audit            | Append-only event log: every open, denial, pairing, config change           |
 | Abuse limits     | Non-monetary rate limits (open cooldown, hourly caps, chat flood throttle) + optional admin-set per-location quotas; denials audited, chat replies honest |
 | Instance admin   | Gateway operator role (one-time claim bootstrap): manage accounts/users, suspend, tune rate-limit defaults, cross-tenant audit view |

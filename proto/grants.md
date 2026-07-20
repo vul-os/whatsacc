@@ -157,12 +157,24 @@ which this additive pass does not add.
 
 The controller side of this contract (verification, the 11-step order,
 stale-clock, windows, cnonce handling) is real and conformance-tested. The
-**gateway side — minting and refreshing a member's `grant` object — has no
-implementation in this codebase yet**; nothing in `gateway/` issues a
-`typ: "grant"` object. The "refreshes on every online launch, so revocation
-converges within the TTL" reasoning above describes the intended contract;
-it is not yet an observable guarantee, because the issuing half of it does
-not exist yet. **v0: undefined / unbuilt.**
+**gateway side — minting a member's `grant` object — is also real and
+conformance-tested**: `POST /v1/offline-grants`
+(`gateway/internal/httpapi/offline_grants.go`) authorizes the request through
+the same gates the live `/open` path uses, all-or-nothing across the
+requested access points, then signs the grant with
+`gateway/internal/keys.SignGrant` — verified byte-for-byte against this
+file's `grant-redeem-valid` vector. TTL is fixed at the 7-day default above
+and is not caller-extendable.
+
+What is **not yet implemented anywhere in this codebase is the app side**:
+nothing requests, stores or presents a grant on a resident's device, so the
+full end-to-end path — app holds a grant, proves it to a controller with no
+gateway involved — does not run today, even though both the gateway and
+controller halves are ready for it. The "refreshes on every online launch,
+so revocation converges within the TTL" reasoning above describes the
+intended contract; it is not yet an observable guarantee end to end,
+because there is no app-side refresh loop to observe it with. **v0: gateway
++ controller real and conformance-tested; app client unbuilt.**
 
 ## Transports
 

@@ -40,6 +40,44 @@ WABA and bills you directly — those costs are between you and Meta, never rout
 through lintel. Slack takes minutes — see [Chat channels](channels.md) — and many
 gateways run Slack-first, WhatsApp later or never.
 
+## The alternative: a self-hosted bridge (opt-in, higher risk)
+
+If the WABA process above is a dealbreaker, the gateway can instead talk to a
+self-hosted, **unofficial** WhatsApp Web bridge (target: Evolution API, which fronts
+Baileys) rather than Meta's Cloud API:
+
+```sh
+LINTEL_WHATSAPP_ENGINE=bridge
+LINTEL_WHATSAPP_BRIDGE_URL=https://bridge.example.internal:8080
+LINTEL_WHATSAPP_BRIDGE_API_KEY=…
+LINTEL_WHATSAPP_BRIDGE_INSTANCE=…
+```
+
+This is opt-in only — leave `LINTEL_WHATSAPP_ENGINE` unset, misspell it, or use
+anything but the exact string `bridge`, and the gateway falls back to the official
+`cloud` engine. The reason it isn't the default: Meta actively detects and bans
+automated/unofficial clients, and tightened its terms further on 2026-01-15 —
+reported number survival on unofficial APIs is commonly **weeks, not years**.
+Selecting `bridge` logs a startup warning naming this risk every time the gateway
+starts.
+
+**A banned number goes silent on WhatsApp, with no notice to residents.** The gateway
+does not have a working offline fallback for that moment: the LAN/BLE emergency-grant
+path described in [Emergency access](emergency-access.md) has real, conformance-tested
+verification on both the controller side and the gateway's issuance side, but the app
+doesn't hold or present a grant yet, so it is not what saves you here — don't rely on
+it. What actually works today, right now:
+
+- **The web portal** — unlimited opens through the gateway's own dashboard, no chat
+  channel involved at all.
+- **A second shipped chat channel** — Slack Socket Mode or Telegram (see
+  [Chat channels](channels.md)) — so a WhatsApp ban doesn't mean *no way to text the
+  gate*, just one fewer way.
+
+Set one of those up and confirm it works **before** you turn `bridge` on. If neither is
+acceptable, stick with the official Cloud API above, slow business-verification
+process and all.
+
 ## Which number should residents see?
 
 We recommend a **dedicated number** for the property rather

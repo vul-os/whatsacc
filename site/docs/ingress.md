@@ -1,9 +1,19 @@
 # Ingress & reachability
 
-The gateway binds a listener and speaks HTTPS, full stop. It has no tunnel client
-built in, no relay protocol wired into the binary, and no dependency on any vendor to
-run. What you need beyond that depends entirely on which channel you attach — this
-chapter is the honest, option-by-option breakdown.
+The gateway binds a listener and speaks **plain HTTP, full stop** — it has no TLS or
+ACME code of its own, no tunnel client built in, no relay protocol wired into the
+binary, and no dependency on any vendor to run. What you need beyond that depends
+entirely on which channel you attach — this chapter is the honest, option-by-option
+breakdown.
+
+> **TLS is entirely the operator's responsibility.** The gateway binary cannot
+> terminate TLS by itself — grep the source and there's no `autocert`, no
+> `ListenAndServeTLS`, nothing. Every option below that reaches the public internet
+> assumes something *else* — a reverse proxy you run, or a tunnel that terminates TLS
+> at its own edge — sits in front of the gateway's plain-HTTP listener. Bind `-listen`
+> to a public address with nothing in front of it and you're serving the admin portal,
+> the login endpoint and the signing API over cleartext HTTP — credentials, JWTs and
+> refresh tokens included. Option (a) below shows a working reverse-proxy setup.
 
 ## The one thing driving all of this: Meta's Cloud API is webhook-only
 
@@ -47,17 +57,37 @@ unconditionally, and remote (off-LAN) portal/app access needs one if you want it
 
 Three honest options, in the order most self-hosters reach for them:
 
-### (a) Public bind + TLS — no tunnel, no third party
+### (a) Public bind + your own reverse proxy — no tunnel, no third party
 
 The simplest option if you already have a VPS, a static IP, or a router you can
-port-forward on: point a DNS name at the box and let the gateway terminate TLS itself
-(built-in ACME/Let's Encrypt), or put your own reverse proxy (nginx, Caddy, Traefik) in
-front of it. Nothing else in the loop — you own the whole path from Meta to your
-gateway.
+port-forward on: point a DNS name at the box and run a reverse proxy (Caddy, nginx,
+Traefik) in front of the gateway. The proxy holds the certificate, speaks HTTPS to the
+world, and forwards plain HTTP to the gateway — which you bind to `127.0.0.1` (or
+another private interface), never to a public one directly, since the binary has no
+TLS of its own to protect it if you do.
+
+Caddy is the least ceremony — automatic Let's Encrypt certificates and renewal from a
+four-line config:
+
+```
+# /etc/caddy/Caddyfile
+your-gate.example {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+```sh
+./gateway -listen 127.0.0.1:8080 -public-url https://your-gate.example &
+caddy run   # or: systemctl enable --now caddy
+```
+
+nginx or Traefik do the same job if you already run one of those. Nothing else in the
+loop besides the proxy — you own the whole path from Meta to your gateway.
 
 - Costs: your VPS/hosting bill only.
-- Trade-off: you're responsible for the box being reachable — firewall rules, port
-  forwarding on CGNAT-free connections, keeping the reverse proxy patched.
+- Trade-off: you're responsible for the box being reachable and the proxy staying
+  patched — firewall rules, port forwarding on CGNAT-free connections, certificate
+  renewal (automatic with Caddy, cron/certbot with nginx).
 
 ### (b) Any tunnel you already trust — including self-hosted `vulos-relayd`
 
@@ -66,18 +96,26 @@ router), a tunnel forwards a public HTTPS endpoint to your local gateway port. N
 about lintel is coupled to a specific tunnel — pick whichever you're already
 comfortable operating:
 
-- **cloudflared**, **frp**, **Tailscale Funnel**, **ngrok**, or your own — run it
-  beside the gateway binary, point it at the local port, done.
+- **cloudflared** (standard mode), **Tailscale Funnel**, **ngrok**, or your own — run
+  it beside the gateway binary, point it at the local port
+  (e.g. `http://localhost:8080`), done. These terminate TLS at their own edge or local
+  agent and forward plain HTTP the rest of the way over loopback — that matches the
+  gateway exactly as it is, no separate reverse proxy needed.
 - **`vulos-relayd`** — the open-source reverse-tunnel daemon behind Vulos Relay
   (WSS + yamux, SSRF-guarded). It's MIT-licensed and **self-hostable with no Vulos
-  account and no billing relationship** — you run the daemon yourself, on your own
-  relay box, the same way you'd run any other tunnel here. It's listed alongside the
-  others because it happens to exist and is a solid option, not because lintel
-  depends on it.
+  account and no billing relationship** — you run the client agent yourself, beside the
+  gateway, the same way you'd run any other tunnel here. It terminates the WSS tunnel
+  locally and forwards plain HTTP to the gateway over loopback — the same pattern as
+  the others. It's listed alongside them because it happens to exist and is a solid
+  option, not because lintel depends on it.
 
-All of these terminate TLS at your gateway when run in passthrough mode — the tunnel
-operator (including a self-hosted `vulos-relayd` box you run yourself) never sees
-plaintext.
+One thing this doesn't cover: a tunnel run in **raw TCP / SNI-passthrough** mode (e.g.
+`frp` configured for TCP passthrough rather than its HTTP proxy mode) forwards the
+still-encrypted bytes all the way to the gateway instead of terminating them — and the
+gateway has no TLS code to receive that with, so it just fails. If you specifically
+want that shape (the tunnel provider never even has TLS-terminating access), run your
+own reverse proxy — see option (a) — behind the passthrough to do the termination
+locally; don't point a raw passthrough tunnel straight at the gateway's listener.
 
 - Costs: whatever the tunnel provider charges (often free for personal use), plus your
   own compute.

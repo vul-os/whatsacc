@@ -89,14 +89,20 @@ fees on your own number if you run a WhatsApp channel (Slack costs nothing).
 
 ## Reachability
 
-The gateway core is transport-agnostic — it binds a listener, full stop. Three ways to
-be reachable, in increasing order of self-sufficiency:
+The gateway core is transport-agnostic — it binds a listener and speaks **plain HTTP**,
+full stop; it has no TLS or ACME code of its own. Three ways to be reachable, in
+increasing order of self-sufficiency:
 
-1. **Direct** — a public IP or VPS; the gateway terminates its own TLS with built-in
-   ACME.
-2. **Any tunnel you already trust** — cloudflared, frp, Tailscale Funnel — run beside
-   the binary; tunnels compose at the HTTP layer, so independence from any one provider
-   is structural, not a promise.
+1. **Direct** — a public IP or VPS, behind your own reverse proxy (Caddy, nginx,
+   Traefik) that holds the certificate and terminates TLS in front of the gateway. See
+   [Ingress & reachability](ingress.md) for a working Caddy example.
+2. **Any tunnel you already trust** — cloudflared, Tailscale Funnel, ngrok — run beside
+   the binary; these terminate TLS at their own edge or local agent and forward plain
+   HTTP to the gateway, so they work as-is. A tunnel run in raw TCP/SNI-passthrough
+   mode (e.g. `frp` TCP passthrough) doesn't, since the gateway has no TLS of its own
+   to terminate what it passes through — put a reverse proxy behind that instead.
+   Tunnels compose at the HTTP layer, so independence from any one provider is
+   structural, not a promise.
 3. **No public URL at all** — real today, not aspirational. Controllers dial out, and
    Slack **Socket Mode ships**: with an `xapp-…` app-level token the gateway dials out
    to Slack over an outbound WebSocket, so a LAN-only gateway with no reachable address

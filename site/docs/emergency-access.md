@@ -48,21 +48,39 @@ MTUs 23/185/512; the **BLE radio (GATT peripheral) still needs hardware validati
 its BlueZ glue compiles behind `-tags ble` on Linux but has not been exercised on real
 hardware yet.
 
-**What is not built: the gateway never mints a grant.** The wire format
-(`proto/grants.md`) is real and versioned, and the controller-side verification above
-conforms to it. But nothing in `gateway/` constructs or signs a `typ:"grant"` object —
-there is no issuance endpoint, no background job, no code path in the gateway that
-produces one. The cross-module e2e test that exercises the LAN redemption path
-(`e2e/harness_test.go` / `TestOfflineGrant_Redeem`) reads the gateway's own private
-signing key off its data directory and signs the grant **itself**, standing in for
-issuance code that does not exist — its own comments say so ("the 'app' (this harness)
-presents a gateway-signed grant... with the gateway absent from the transaction"). That
-proves the verification and redemption side end to end; it does not prove the full path,
-because nothing plays the gateway's part outside the test harness. The app (Tauri) side
-that would request and store a grant is also not built. So two pieces are missing, not
-one: gateway-side issuance, and the app UI that would hold and present the result.
-Nothing here is faked — the verification logic that decides to open is real and correct
-— but the path does not run end-to-end today.
+**Gateway-side issuance is now real.** `POST /v1/offline-grants`
+([`gateway/internal/httpapi/offline_grants.go`](https://github.com/vul-os/lintel/blob/main/gateway/internal/httpapi/offline_grants.go))
+authenticates the caller, re-checks the exact same membership / account-suspended /
+user-disabled gates the live `/open` path enforces (all-or-nothing — a caller not
+currently entitled to every requested access point gets nothing, never a grant
+silently narrowed to a subset they didn't notice), and signs a `typ:"grant"` object
+with [`keys.SignGrant`](https://github.com/vul-os/lintel/blob/main/gateway/internal/keys/grant.go)
+— the identical JCS/Ed25519 discipline `Envelope` uses, verified byte-for-byte against
+[`proto/vectors/grants.json`](https://github.com/vul-os/lintel/blob/main/proto/vectors/grants.json)'s
+`grant-redeem-valid` fixture. TTL is fixed at the proto default (7 days) and is not
+caller-extendable, and every issuance is written to the admin audit trail. The
+cross-module e2e test that exercises the LAN redemption path
+(`e2e/harness_test.go` / `TestOfflineGrant_Redeem`) now calls this real endpoint
+instead of self-signing a grant with the gateway's key, as it used to — the
+gateway → controller half of the path is proven end to end against real issuance.
+
+One deliberate gap: issuance does **not** check a controller's lockdown state — the
+gateway has no visibility into that, by design (lockdown is controller-local; see
+"that locality is the feature this whole path exists for" in `proto/grants.md`) — so a
+grant can be minted while a controller happens to be in lockdown. That isn't an
+oversight: lockdown is still enforced, unmodified, at redemption time (step 2 of the
+controller's 11-step verification, already conformance-tested), which is the freshest
+possible signal anyway — a lockdown state cached at mint time could go stale seconds
+later regardless.
+
+**What is still not built: the app.** Nothing on the phone requests, stores or
+presents a grant — the Tauri app (`src/` + `src-tauri/`) ships an admin console today
+and no emergency-access UI. So the path is now three pieces of four: the wire
+contract, the controller-side verification, and gateway-side issuance are all real and
+conformance-tested; the fourth — an app that holds a grant and proves it to a
+controller over LAN/BLE — does not exist yet. A resident cannot use offline emergency
+access today, because nothing on their phone can present a grant, even though the
+gateway is now willing to hand one out.
 
 ## Revocation and expiry
 

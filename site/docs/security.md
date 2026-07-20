@@ -10,11 +10,12 @@ there is only one binary.
 | --- | --- |
 | Command integrity | Ed25519-signed commands with nonce + expiry; the controller pins the gateway's key at pairing |
 | Pairing | Claim-token flow: admin creates a claim, the device redeems it once, keys are exchanged |
-| Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response — **controller-side verification is real and conformance-tested; gateway-side issuance isn't built yet, see below** |
+| Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response — **controller-side verification and gateway-side issuance are both real and conformance-tested; the app doesn't request/present a grant yet, see below** |
 | Channel ingress | Per-channel verification (Meta HMAC, Slack signed-request scheme + replay window, Telegram secret-token header) — fail closed |
 | Tenancy | Tenant-isolated at the database layer — app-layer org scoping on every SQLite query in the Go gateway; the current Postgres reference enforces forced row-level security |
-| Transport | TLS terminated by the gateway itself; tunnels stay content-blind via SNI passthrough where supported |
-| Audit | Append-only event log: every open, denial, pairing and config change |
+| Transport | Plain HTTP — the binary has no TLS/ACME code at all. TLS is the operator's job: a reverse proxy or a TLS-terminating tunnel in front of the gateway. `-listen` refuses to bind a non-loopback address on its own — see [Ingress & reachability](ingress.md) |
+| Audit | Hash-chained, tamper-*evident* event log: every open, denial, pairing and config change, with append-only DB triggers and a verify command that works against a cold backup — see **Tamper-evident audit log** below for exactly what that does and doesn't guarantee |
+| Login | Per-IP and per-account brute-force throttles on login/register/refresh/admin-claim, fail-closed; live per-request session revocation; a "log out everywhere" endpoint — see **Login & session security** below |
 | Abuse limits | Cooldowns, hourly caps and optional per-location quotas at one choke point — see [Rate limits & quotas](limits.md) |
 
 ## Signed commands and key pinning
@@ -70,9 +71,11 @@ Edge cases handled explicitly:
 The offline grant path is designed to add no new soft spot: the controller checks a
 grant **signed by the pinned gateway key**, then a fresh nonce signed by the app key
 the grant names. Neither the LAN nor Bluetooth is trusted. Revocation converges within
-the grant TTL. **Status:** that verification logic is real, and conformance-tested on
-the controller side today; what's not built yet is the gateway actually minting and
-serving the grants it verifies, so the path doesn't run end-to-end yet — see
+the grant TTL. **Status:** that verification logic is real and conformance-tested on
+the controller side, and the gateway now really mints and signs the grants it
+verifies (`POST /v1/offline-grants`) — also conformance-tested against the same
+vectors. What's not built yet is the app: nothing on the phone requests, stores or
+presents a grant, so the path still doesn't run end-to-end for a resident — see
 [Emergency access](emergency-access.md) for the full trade-off and current status.
 
 ## Abuse limits
@@ -86,6 +89,79 @@ can neither inspect nor exhaust each other's counters. If the counter store itse
 audit log (availability wins for a physical gate; visibility is preserved). The
 full design, defaults and tuning live in [Rate limits & quotas](limits.md).
 
+## Tamper-evident audit log
+
+The two audit tables — `access_logs` (every open, close and denial) and
+`admin_audit_log` (every admin action, and every denied attempt to reach one) —
+are hash-chained: each row carries a `SHA-256` hash over its own content plus the
+previous row's hash, so the rows form one unbroken chain per table. Database
+triggers reject any direct `UPDATE` or `DELETE` against either table, with two
+narrow, schema-verified exceptions (a one-time hash backfill when a gateway
+upgrades onto this scheme, and SQLite's own cascade nulling a foreign key when
+the location/account/device it points at is deleted — never the audit content
+itself). `GET /v1/admin/audit/verify` (admin-only) and the `gateway verify-audit`
+CLI subcommand both walk the chain and report the first row that doesn't check
+out, if any — and the CLI form works **against a cold backup, without booting
+the server at all**, which is the point: you can ask "was this tampered with?"
+of a copy sitting on a shelf.
+
+What's covered is deliberately not the live foreign-key columns
+(`account_id`/`location_id`/`access_point_id`/`user_id`) themselves — this schema
+already nulls those via `ON DELETE SET NULL` so a row's history survives an
+ordinary location or account deletion, and hashing a column the schema is
+*designed* to mutate would make a routine delete indistinguishable from
+tampering. Instead, each row also carries a permanent snapshot of those same ids
+taken at insert time, and the snapshot is what the hash covers — the who/where
+of a row stays fully tamper-evident; only the *live*, intentionally-mutable
+pointer is excluded.
+
+**Be precise about what this buys you, because it's easy to oversell a hash
+chain.** It does not stop an attacker who edits the SQLite file directly *and*
+recomputes every hash downstream of their edit — that attacker rewrites history
+undetectably, exactly as they could before this existed. What it does is turn
+*silent* tampering into *detectable* tampering for anyone who touches a row
+without also redoing that (non-trivial: they'd need to notice the chain exists,
+understand the canonicalization, and re-derive potentially thousands of
+downstream hashes) — and it turns "was this log tampered with?" from an
+unknowable question into a checkable one. That is a detection control, not a
+prevention control, and the test suite proves the boundary directly: a
+purpose-built test tampers one row, recomputes every hash after it exactly the
+way a careful attacker would, and confirms verification reports clean. The DB
+triggers are defense in depth against the *running application* — a future code
+bug reintroducing a silent `UPDATE` gets a loud SQLite error instead of a quiet
+mutation — not against someone with filesystem access to `lintel.db`, who can
+edit bytes directly or drop a trigger outright. Same ceiling as the append-only
+note under **What we deliberately don't claim**, below — this doesn't change
+who wins if an attacker owns the host, only how loudly everyone else can tell.
+
+## Login & session security
+
+- **Brute-force throttles, fail-closed.** `POST /v1/auth/{login,register,refresh}`
+  and `POST /v1/admin/claim` each sit behind a per-IP throttle that counts every
+  attempt, success or failure — the hard limit that actually stops a
+  single-source guessing script, and it spends the *attacker's* IP budget, never
+  a victim's. Login additionally has a per-account soft limit that only counts
+  *failed* attempts, in one fixed window that never compounds, so a distributed
+  attacker spread across many IPs still can't cheaply guess one known victim's
+  password, and — just as importantly — an attacker can't abuse that same
+  per-account limit to lock a victim out on purpose: the worst a deliberate flood
+  costs them is one bounded window of friction, never an indefinite lock. If the
+  counter store itself errors, these throttles **fail closed** (the login
+  attempt is refused) — the opposite of the physical-access limiter's
+  documented availability-first policy, because a login endpoint being briefly
+  unavailable is a better outcome here than a brute-force gate that silently
+  disables itself.
+- **Live revocation on every request, not just admin ones.** Every authenticated
+  request re-reads the calling user's row before proceeding — a disabled user's
+  still-signature-valid access token stops working on their very next request,
+  not after its full (15-minute) lifetime expires. This was previously true only
+  for admin routes; it now applies to ordinary sessions too.
+- **Log out everywhere.** `POST /v1/auth/logout-all` revokes every refresh-token
+  family belonging to the calling user in one call — the "stolen phone" button.
+  Every other session stops being able to renew immediately; access tokens
+  themselves aren't individually revocable, so the practical guarantee is "no
+  session outlives its current access token," not "every token dies instantly."
+
 ## The instance admin
 
 The operator seat ([Instance admin](admin.md)) is powerful, so its trust model is
@@ -97,8 +173,10 @@ deliberately narrow:
 - **Constant-time token check.** The claim comparison leaks neither length nor
   first-differing-byte through timing.
 - **Per-request revocation.** Admin status is re-read from the live user record on
-  every request — never trusted from a token — so a revoked admin (or a disabled
-  user) is cut off on their very next request, not at token expiry.
+  every request — never trusted from a token — so a revoked admin is cut off on
+  their very next request, not at token expiry. (This is the admin-specific
+  check; see **Login & session security** above for the same live-revocation
+  discipline now applied to every authenticated session, admin or not.)
 - **Everything is audited.** Every admin action — claims, suspensions, disables,
   grants, limit changes — and every *denied* attempt to reach an admin route lands
   in an append-only trail that only admins can read and nothing in the request
@@ -111,10 +189,23 @@ deliberately narrow:
 
 - lintel is not end-to-end encrypted messaging — chat channels are WhatsApp's and
   Slack's infrastructure, and the gateway must read messages to act on them.
-- Your gateway is as secure as the machine it runs on. Back up your data
-  directory; protect your `.env`.
-- The audit log is append-only at the application layer; if an attacker owns the host,
-  they own the SQLite file too.
+- Your gateway is as secure as the machine it runs on. Back up your data directory —
+  but know what's actually in it: alongside `lintel.db` it holds `gateway_ed25519.seed`
+  (the Ed25519 key that signs every open/close command this gateway ever sends — steal
+  it and you can forge signed opens for every access point it manages, indefinitely)
+  and `jwt_secret` (the HMAC key behind every session). Both are raw, unencrypted key
+  material at mode `0600`. A plain `tar czf backup.tgz ./data` captures the database
+  and both keys in one unencrypted archive, so protect that archive like the keys
+  themselves — encrypt it at rest, and don't leave a copy somewhere less trusted than
+  the gateway itself. The `.env` file (channel tokens, `ADMIN_CLAIM_TOKEN` before
+  it's claimed) is worth protecting too, but it is not where the gateway's own
+  cryptographic identity lives.
+- The audit log's append-only-ness is enforced by database triggers, not just
+  application discipline, and tampering with it is now *detectable* via its hash
+  chain (see **Tamper-evident audit log** above) — but if an attacker owns the
+  host, they own the SQLite file too, and a sufficiently careful edit (rewrite a
+  row, then recompute every hash after it) still passes verification. Detection,
+  not prevention, against that adversary.
 
 ## Physical safety
 
