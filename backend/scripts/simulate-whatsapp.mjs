@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-const BASE = 'https://whatsacc-backend-dev.whatsaccsupport.workers.dev';
+const BASE = 'https://lintel-backend-dev.lintelsupport.workers.dev';
 const WA_APP_SECRET = (process.env.WHATSAPP_APP_SECRET ?? '').trim();
 
 if (!WA_APP_SECRET) {

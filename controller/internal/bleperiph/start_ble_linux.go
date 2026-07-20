@@ -25,8 +25,8 @@ import (
 
 	"tinygo.org/x/bluetooth"
 
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/framing"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/framing"
 )
 
 // txConn adapts the tx characteristic to blesession.Conn.

@@ -1,9 +1,9 @@
 // Package jcs renders Go values as RFC 8785 (JCS) canonical JSON, for the
-// subset of values the whatsacc wire contracts use.
+// subset of values the lintel wire contracts use.
 //
 // DUPLICATION NOTE: this file is a copy/adaptation of
 // gateway/internal/keys/jcs.go. The controller is its own Go module
-// (github.com/vul-os/whatsacc/controller) so it can be vendored onto devices
+// (github.com/vul-os/lintel/controller) so it can be vendored onto devices
 // without dragging in the gateway; the ~170 lines of JCS are deliberately
 // duplicated rather than imported. If a canonicalization bug is found, fix
 // it in BOTH places and re-run each module's conformance-vector tests

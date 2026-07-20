@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/framing"
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/framing"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 type memConn struct {

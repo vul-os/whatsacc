@@ -34,12 +34,12 @@ export function createApp() {
         if (/^http:\/\/localhost(:\d+)?$/.test(o)) return origin;
         if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(o)) return origin;
         // Firebase Hosting — deployed sites + preview channels
-        if (o === 'https://whats-acc.web.app') return origin;
-        if (o === 'https://whats-acc-dev.web.app') return origin;
-        if (/^https:\/\/whats-acc(-dev)?--[a-z0-9-]+\.web\.app$/.test(o)) return origin;
+        if (o === 'https://lintel.web.app') return origin;
+        if (o === 'https://lintel-dev.web.app') return origin;
+        if (/^https:\/\/lintel(-dev)?--[a-z0-9-]+\.web\.app$/.test(o)) return origin;
         // Custom domains
-        if (o === 'https://whatsacc.com') return origin;
-        if (o === 'https://www.whatsacc.com') return origin;
+        if (o === 'https://lintel.com') return origin;
+        if (o === 'https://www.lintel.com') return origin;
         return null;
       },
       credentials: true,
@@ -49,7 +49,7 @@ export function createApp() {
     }),
   );
 
-  app.get('/', (c) => c.text('whatsacc'));
+  app.get('/', (c) => c.text('lintel'));
 
   app.get('/health', async (c) => {
     try {

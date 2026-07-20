@@ -3,7 +3,7 @@ import { getEnv } from './env.ts';
 import type { AuthClaims } from './db.ts';
 import { Unauthorized } from './errors.ts';
 
-const ISSUER = 'whatsacc';
+const ISSUER = 'lintel';
 
 function secretKey(): Uint8Array {
   const env = getEnv();

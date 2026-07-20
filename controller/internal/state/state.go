@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 const stateFile = "state.json"

@@ -1,6 +1,6 @@
 # Linking WhatsApp
 
-WhatsApp is whatsacc's primary channel — and the one with genuinely hard setup, because
+WhatsApp is lintel's primary channel — and the one with genuinely hard setup, because
 Meta gates it behind business verification. This chapter is what it takes to bring your
 own number to your gateway. (If you want to be texting your gate *today*, start with
 Slack — minutes, not days — and add WhatsApp when the WABA clears.)
@@ -37,7 +37,7 @@ the high-friction channel — budget an afternoon and some patience:
 
 One honest note for those who push through: Meta charges per-conversation fees on your
 WABA and bills you directly — those costs are between you and Meta, never routed
-through whatsacc. Slack takes minutes — see [Chat channels](channels.md) — and many
+through lintel. Slack takes minutes — see [Chat channels](channels.md) — and many
 gateways run Slack-first, WhatsApp later or never.
 
 ## Which number should residents see?

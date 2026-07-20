@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/command"
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
-	"github.com/vul-os/whatsacc/controller/internal/noncestore"
-	"github.com/vul-os/whatsacc/controller/internal/relay"
-	"github.com/vul-os/whatsacc/controller/internal/state"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/command"
+	"github.com/vul-os/lintel/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/noncestore"
+	"github.com/vul-os/lintel/controller/internal/relay"
+	"github.com/vul-os/lintel/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 func testKeys(t *testing.T) (dir string, gwPriv ed25519.PrivateKey, gwPub ed25519.PublicKey, gwPubB64 string, ctrlPriv ed25519.PrivateKey) {

@@ -1,4 +1,4 @@
-# whatsacc — working todo
+# lintel — working todo
 
 ## direction (see ARCHITECTURE.md)
 - Go single-binary gateway (SQLite, embedded portal, channel seam) — port from backend/
@@ -7,7 +7,8 @@
 - Discord channel (WhatsApp + Slack shipped)
 
 ## carried over (still relevant)
-- [x] buy domain on namecheap, whatsacc.com
+- [x] buy domain on namecheap, lintel.com (retired by rename decision — project
+      site now lives at vulos.org/products/lintel, no separate domain)
 - [x] resend setup, connect dns settings
 - [x] static site/ (firebase removed by decision — host anywhere / Vulos console sync)
 - [x] google oauth set up
@@ -26,5 +27,5 @@
 
 ## removed by decision (do not resurrect)
 - billing / paystack / wallet / subscriptions / invoices / VAT / referrals / payouts /
-  pricing tiers / FX display — whatsacc has NO billing system. Operators solve money
+  pricing tiers / FX display — lintel has NO billing system. Operators solve money
   outside the system; see ARCHITECTURE.md §4 "Money is out of scope".

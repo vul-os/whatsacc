@@ -50,7 +50,7 @@ export function ArchMark({
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={className}>
-      <em className="font-display not-italic [font-style:italic] tracking-tight">whatsacc</em>
+      <em className="font-display not-italic [font-style:italic] tracking-tight">lintel</em>
     </span>
   );
 }

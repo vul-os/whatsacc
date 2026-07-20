@@ -12,9 +12,9 @@ The **WhatsApp Cloud API only speaks webhooks** — Meta's servers make an outbo
 `POST` to *your* gateway every time someone messages your number. There is no
 long-poll or socket alternative Meta offers; if you want WhatsApp, Meta must be able to
 reach a public HTTPS URL you control. That single fact is the entire reason a
-self-hosted whatsacc install might need a public endpoint at all.
+self-hosted lintel install might need a public endpoint at all.
 
-Nothing else in whatsacc requires this. Controllers dial **out** to the gateway
+Nothing else in lintel requires this. Controllers dial **out** to the gateway
 (WebSocket), so gate hardware never needs to be reachable. And two chat channels are
 designed to need no inbound connection whatsoever — see below.
 
@@ -30,7 +30,7 @@ These need nothing public at all — not a port, not a tunnel, not a domain:
 - **Telegram long-polling** — Telegram's Bot API supports `getUpdates` polling as an
   alternative to registering a webhook, entirely outbound, no public URL needed. It's
   the natural zero-ingress path for Telegram and is on the roadmap for this channel;
-  *today* whatsacc's Telegram integration (opens fully wired through the shared pipeline)
+  *today* lintel's Telegram integration (opens fully wired through the shared pipeline)
   receives updates via webhook (see [Chat channels](channels.md)), so it still needs a
   reachable URL for now.
 
@@ -63,7 +63,7 @@ gateway.
 
 If your box has no public IP (home connection, CGNAT, a Pi behind a residential
 router), a tunnel forwards a public HTTPS endpoint to your local gateway port. Nothing
-about whatsacc is coupled to a specific tunnel — pick whichever you're already
+about lintel is coupled to a specific tunnel — pick whichever you're already
 comfortable operating:
 
 - **cloudflared**, **frp**, **Tailscale Funnel**, **ngrok**, or your own — run it
@@ -72,7 +72,7 @@ comfortable operating:
   (WSS + yamux, SSRF-guarded). It's MIT-licensed and **self-hostable with no Vulos
   account and no billing relationship** — you run the daemon yourself, on your own
   relay box, the same way you'd run any other tunnel here. It's listed alongside the
-  others because it happens to exist and is a solid option, not because whatsacc
+  others because it happens to exist and is a solid option, not because lintel
   depends on it.
 
 All of these terminate TLS at your gateway when run in passthrough mode — the tunnel
@@ -94,7 +94,7 @@ any other tunnel, and Vulos operates the reachability fabric for you.
 
 - Costs: a Vulos Relay subscription.
 - Trade-off: none technically — it's the same tunnel model as (b), just operated for
-  you. It's an *option*, never a requirement: whatsacc has no code path that assumes
+  you. It's an *option*, never a requirement: lintel has no code path that assumes
   Relay exists, and every self-host guide in this repo works without it.
 
 ## Where this leaves each channel
@@ -111,7 +111,7 @@ any other tunnel, and Vulos operates the reachability fabric for you.
 
 ## The suite rule this follows
 
-whatsacc has no hard runtime dependency on any Vulos product, ever — it is a
+lintel has no hard runtime dependency on any Vulos product, ever — it is a
 standalone, MIT-licensed system that runs to completion with nothing but a box and,
 optionally, your own channel credentials. Vulos Relay shows up here strictly as one
 *feature-scoped* ingress option for a single channel (WhatsApp), competing on equal

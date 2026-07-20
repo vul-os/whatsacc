@@ -119,7 +119,7 @@ function accountsRouter() {
     // Cross-row read: the users/profiles RLS policies only expose the
     // caller's own rows, so a direct JOIN would filter every co-member out.
     // app.account_member_list is the house-pattern SECURITY DEFINER helper
-    // (owned by whatsacc_internal, self-gated on app.is_account_member) that
+    // (owned by lintel_internal, self-gated on app.is_account_member) that
     // returns the full member list for accounts the caller belongs to and
     // zero rows for everyone else.
     const rows = await withUserDb(c, async (tx) => {
@@ -153,7 +153,7 @@ function accountsRouter() {
       const accountRows = await tx<{ name: string }[]>`
         select name from accounts where id = ${id}
       `;
-      return { invite_id: invite!.id, account_name: accountRows[0]?.name ?? 'whatsacc account' };
+      return { invite_id: invite!.id, account_name: accountRows[0]?.name ?? 'lintel account' };
     });
 
     const env = getEnv();
@@ -165,7 +165,7 @@ function accountsRouter() {
       const waTo = phone_e164.startsWith('+') ? phone_e164.slice(1) : phone_e164;
       const waResult = await sendWhatsAppText(
         waTo,
-        `Hi! You've been invited to join ${result.account_name} on whatsacc. Accept your invitation here: ${acceptUrl}`,
+        `Hi! You've been invited to join ${result.account_name} on lintel. Accept your invitation here: ${acceptUrl}`,
       );
       whatsappSent = waResult.ok;
       if (!waResult.ok) {
@@ -176,8 +176,8 @@ function accountsRouter() {
     }
 
     const inviteMail = renderEmail({
-      preheader: `You've been invited to join ${result.account_name} on whatsacc.`,
-      heading: `Join ${escapeHtml(result.account_name)} on whatsacc`,
+      preheader: `You've been invited to join ${result.account_name} on lintel.`,
+      heading: `Join ${escapeHtml(result.account_name)} on lintel`,
       bodyParagraphs: [
         `You've been invited to join <strong style="color:#1a1f36;">${escapeHtml(result.account_name)}</strong> as <strong style="color:#1a1f36;">${escapeHtml(role)}</strong>.`,
         'Accept the invite to set up your account and start opening gates with a text.',
@@ -192,7 +192,7 @@ function accountsRouter() {
     try {
       await sendEmail({
         to: email,
-        subject: `You've been invited to ${result.account_name} on whatsacc`,
+        subject: `You've been invited to ${result.account_name} on lintel`,
         html: inviteMail.html,
         text: inviteMail.text,
       });

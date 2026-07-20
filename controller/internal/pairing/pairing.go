@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/state"
 )
 
 // Redeem is the pair.redeem request body.

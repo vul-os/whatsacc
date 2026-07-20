@@ -1,4 +1,4 @@
-// proto/vectors/lib.mjs — shared helpers for the whatsacc conformance vectors.
+// proto/vectors/lib.mjs — shared helpers for the lintel conformance vectors.
 // Node builtins only (node:crypto). No external dependencies.
 //
 // ############################################################################
@@ -106,7 +106,7 @@ export function verifyObject(obj, pub32) {
 }
 
 // --- Fixed test keys ---------------------------------------------------------
-// Each seed is sha256("whatsacc-test-vector:<name>") — hardcoded so the vectors
+// Each seed is sha256("lintel-test-vector:<name>") — hardcoded so the vectors
 // never depend on the hash being recomputed. TEST KEYS ONLY (see banner above).
 
 export const SEEDS = {

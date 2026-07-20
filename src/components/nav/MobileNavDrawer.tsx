@@ -42,7 +42,7 @@ export function MobileNavDrawer({
             <span className="grid h-8 w-8 place-items-center rounded-md bg-ink text-paper">
               <ArchMark className="h-5 w-5" />
             </span>
-            <span className="font-display italic text-lg">whatsacc</span>
+            <span className="font-display italic text-lg">lintel</span>
           </Link>
           <button
             type="button"

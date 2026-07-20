@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/release.sh — cut a whatsacc release.
+# scripts/release.sh — cut a lintel release.
 #
 # Usage: scripts/release.sh vX.Y.Z [--dry-run]
 #
@@ -89,7 +89,7 @@ if [ "$DRY_RUN" = "--dry-run" ]; then
 fi
 
 step "tagging $VERSION"
-git tag -a "$VERSION" -m "whatsacc $VERSION"
+git tag -a "$VERSION" -m "lintel $VERSION"
 
 step "pushing tag (triggers release.yml + docker.yml)"
 git push origin "refs/tags/$VERSION"

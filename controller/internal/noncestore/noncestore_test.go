@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/noncestore"
+	"github.com/vul-os/lintel/controller/internal/noncestore"
 )
 
 func TestPersistenceAcrossReopen(t *testing.T) {

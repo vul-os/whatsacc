@@ -11,7 +11,7 @@ linked alongside.
 The first screen after sign-in: live activity across your locations, controller
 health, and the day's opens.
 
-![whatsacc portal dashboard](screenshots/portal-dashboard.png)
+![lintel portal dashboard](screenshots/portal-dashboard.png)
 
 [Dark variant](screenshots/dark/portal-dashboard.png)
 

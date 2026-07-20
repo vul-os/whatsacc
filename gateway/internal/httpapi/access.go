@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Access points (and, from stage 3, the open path + temporary grants),

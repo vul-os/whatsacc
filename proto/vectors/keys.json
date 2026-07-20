@@ -1,5 +1,5 @@
 {
-  "$comment": "*** TEST KEYS ONLY — PUBLIC, DETERMINISTIC, NEVER USE IN PRODUCTION *** Seeds are sha256(\"whatsacc-test-vector:<name>\"). private_seed_hex is the raw 32-byte Ed25519 seed (RFC 8032); public_key_hex/b64u is the raw 32-byte public key.",
+  "$comment": "*** TEST KEYS ONLY — PUBLIC, DETERMINISTIC, NEVER USE IN PRODUCTION *** Seeds are sha256(\"lintel-test-vector:<name>\"). private_seed_hex is the raw 32-byte Ed25519 seed (RFC 8032); public_key_hex/b64u is the raw 32-byte public key.",
   "keys": {
     "gateway": {
       "private_seed_hex": "70aa01ee88373ba4d1088fe27ba9d4e7b5ad63b71210e7acb2ec4590d0ff79fd",

@@ -1,6 +1,6 @@
-# whatsacc gateway
+# lintel gateway
 
-The whole whatsacc server as **one Go binary**: channels, rules, portal, API,
+The whole lintel server as **one Go binary**: channels, rules, portal, API,
 device hub, audit — backed by **one SQLite file**. See `../ARCHITECTURE.md`
 for the full picture; the Cloudflare Workers backend in `../backend/` is the
 behavioral spec this is being ported from.
@@ -153,9 +153,9 @@ Config (flags override env):
 
 | Flag | Env | Default | |
 | --- | --- | --- | --- |
-| `-data` | `WACC_DATA_DIR` | `./data` | SQLite db + keys live here |
-| `-listen` | `WACC_LISTEN` | `:8080` | listen address |
-| `-public-url` | `WACC_PUBLIC_URL` | — | external base URL (webhooks, links) |
+| `-data` | `LINTEL_DATA_DIR` | `./data` | SQLite db + keys live here |
+| `-listen` | `LINTEL_LISTEN` | `:8080` | listen address |
+| `-public-url` | `LINTEL_PUBLIC_URL` | — | external base URL (webhooks, links) |
 | `-admin-claim-token` | `ADMIN_CLAIM_TOKEN` | — | one-shot admin claim; empty = claiming disabled |
 
 First-boot claim flow: register a user, then

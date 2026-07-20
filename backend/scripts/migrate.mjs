@@ -1,4 +1,4 @@
-// Whatsacc database migration runner (Node version, post-Deno port).
+// Lintel database migration runner (Node version, post-Deno port).
 //
 // Usage (run from the backend/ directory):
 //   npm run migrate                 Apply pending migrations against ../.env

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Auth endpoints — the skeleton subset of backend/src/routes/auth.ts. Real
@@ -133,7 +133,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 // dummyHash keeps login timing flat when the email doesn't exist.
 var dummyHash = func() string {
-	h, err := HashPassword("whatsacc-dummy")
+	h, err := HashPassword("lintel-dummy")
 	if err != nil {
 		panic(err)
 	}

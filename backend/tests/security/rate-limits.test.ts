@@ -250,7 +250,7 @@ dbTest('sec: rate_limit functions reject forged scopes from the request role', a
   const a = await registerUser(app);
   const asUser = { user_id: a.user_id, account_id: a.account_id, is_platform_admin: false };
 
-  // The SECURITY DEFINER functions execute as whatsacc_internal (BYPASSRLS),
+  // The SECURITY DEFINER functions execute as lintel_internal (BYPASSRLS),
   // so a forged scope would let the request role plant/read counters in an
   // arbitrary namespace. The allowlist inside the functions must raise.
   // Each probe runs in its own transaction (the raise aborts it).

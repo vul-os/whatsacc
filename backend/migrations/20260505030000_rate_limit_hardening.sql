@@ -4,12 +4,12 @@
 -- applied elsewhere, so history is never edited.
 --
 --   1. PRIVILEGES: app.rate_limit_bump/get/last were EXECUTE-granted to
---      PUBLIC. They are SECURITY DEFINER owned by whatsacc_internal
+--      PUBLIC. They are SECURITY DEFINER owned by lintel_internal
 --      (BYPASSRLS), so ANY database role could forge or read arbitrary
 --      counters. REVOKE from PUBLIC and grant only the roles that actually
---      run them: whatsacc_app — the request-path role (withRLS does
---      SET LOCAL ROLE whatsacc_app before any application query, for both
---      authenticated and anon/webhook contexts) — plus whatsacc_internal
+--      run them: lintel_app — the request-path role (withRLS does
+--      SET LOCAL ROLE lintel_app before any application query, for both
+--      authenticated and anon/webhook contexts) — plus lintel_internal
 --      for internal callers.
 --   2. SCOPE ALLOWLIST: the functions are recreated to accept only the
 --      scopes the application actually uses (src/lib/rate-limit.ts):
@@ -249,11 +249,11 @@ $$;
 -- Ownership + privileges (REVOKE PUBLIC, grant actual runtime roles)
 -- ============================================================================
 
-ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)           OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_last(text, text)                       OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_claim_cooldown(text, int)              OWNER TO whatsacc_internal;
+ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)           OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_last(text, text)                       OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_claim_cooldown(text, int)              OWNER TO lintel_internal;
 
 REVOKE EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           FROM PUBLIC;
@@ -261,8 +261,8 @@ REVOKE EXECUTE ON FUNCTION app.rate_limit_last(text, text)                      
 REVOKE EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.rate_limit_claim_cooldown(text, int)              FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_last(text, text)                       TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_claim_cooldown(text, int)              TO whatsacc_app, whatsacc_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_last(text, text)                       TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_claim_cooldown(text, int)              TO lintel_app, lintel_internal;

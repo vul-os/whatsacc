@@ -1,4 +1,4 @@
-module github.com/vul-os/whatsacc/gateway
+module github.com/vul-os/lintel/gateway
 
 go 1.25.6
 

@@ -1,4 +1,4 @@
-// Package wire holds the whatsacc v0 wire types the controller speaks and
+// Package wire holds the lintel v0 wire types the controller speaks and
 // the shared signing rule: remove `sig`, JCS-serialize (RFC 8785), sign the
 // UTF-8 bytes with Ed25519; sig and all binary values are base64url without
 // padding. Optional members are omitted entirely when absent (never null)
@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/jcs"
 )
 
 // Version is the contract major version this implementation speaks.

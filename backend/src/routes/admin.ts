@@ -1,6 +1,6 @@
 // Instance-admin (gateway operator) routes.
 //
-// whatsacc is a self-hosted gateway; each deployment has an operator. These
+// lintel is a self-hosted gateway; each deployment has an operator. These
 // routes let that operator bootstrap themselves (one-time claim), observe the
 // instance (overview / accounts / users / audit), moderate it (suspend
 // accounts, disable users, grant/revoke platform admin) and tune the
@@ -176,7 +176,7 @@ function likePattern(q: string): string {
  * advisory-xact-lock pattern as app.claim_platform_admin.
  */
 async function lockAdminMutation(tx: TxSql): Promise<void> {
-  await tx`select pg_advisory_xact_lock(hashtextextended('whatsacc:admin_mutation', 0))`;
+  await tx`select pg_advisory_xact_lock(hashtextextended('lintel:admin_mutation', 0))`;
 }
 
 type RateLimitExternal = Record<RateLimitOverrideField, number>;

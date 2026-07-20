@@ -1,7 +1,7 @@
 // Package lanserver is the LAN transport for offline grant redemption
 // (proto/grants.md §LAN): plain HTTP on a LAN TCP port — POST /grant/open →
 // grant.challenge, POST /grant/proof → grant.result — advertised via mDNS
-// _whatsacc._tcp (TXT device=<device_id>, proto=0). Plain HTTP is
+// _lintel._tcp (TXT device=<device_id>, proto=0). Plain HTTP is
 // acceptable: every message is Ed25519-signed and single-use; the transport
 // adds no trust. Verification lives entirely in the shared grants.Exchange
 // (the same core the BLE session drives).
@@ -16,9 +16,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/mdns"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/mdns"
 )
 
 // MaxBody bounds request bodies (a grant.open with a full grant is < 8 KiB,
@@ -109,14 +109,14 @@ func (s *Server) Serve(ctx context.Context, addr string) error {
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
-	log.Info("lan grant listener", "addr", ln.Addr().String(), "mdns", adv.Instance+"._whatsacc._tcp.local")
+	log.Info("lan grant listener", "addr", ln.Addr().String(), "mdns", adv.Instance+"._lintel._tcp.local")
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
 }
 
-// instanceName mirrors the BLE local name: wacc-<first 8 hex of device_id>.
+// instanceName mirrors the BLE local name: lintel-<first 8 hex of device_id>.
 func instanceName(deviceID string) string {
 	hex := make([]byte, 0, 8)
 	for i := 0; i < len(deviceID) && len(hex) < 8; i++ {
@@ -125,5 +125,5 @@ func instanceName(deviceID string) string {
 			hex = append(hex, c)
 		}
 	}
-	return "wacc-" + string(hex)
+	return "lintel-" + string(hex)
 }

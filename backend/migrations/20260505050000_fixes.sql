@@ -10,7 +10,7 @@
 --   2. GET /accounts/:id/members INNER JOINs users, but the users_self RLS
 --      policy only exposes the caller's own row, so an account owner could
 --      only ever list themselves. Fix via the house pattern for cross-row
---      reads: a SECURITY DEFINER helper owned by whatsacc_internal
+--      reads: a SECURITY DEFINER helper owned by lintel_internal
 --      (BYPASSRLS), self-gated on app.is_account_member(), returning the
 --      member list (email + display_name included). users/profiles RLS
 --      stays untouched.
@@ -40,7 +40,7 @@ ALTER TABLE slack_messages
     CHECK (kind IN ('text', 'file', 'system', 'interactive'));
 
 -- ============================================================================
--- 2. Member listing helper (SECURITY DEFINER, whatsacc_internal-owned)
+-- 2. Member listing helper (SECURITY DEFINER, lintel_internal-owned)
 -- ============================================================================
 -- Fail-closed: non-members of the target account get zero rows. The
 -- app.is_account_member() gate keeps the baseline semantics (active member,
@@ -68,10 +68,10 @@ AS $$
     ORDER BY am.created_at ASC, am.user_id ASC;
 $$;
 
-ALTER FUNCTION app.account_member_list(uuid) OWNER TO whatsacc_internal;
--- Post-hardening grant style: runtime callers all execute as whatsacc_app
--- (withRLS does SET LOCAL ROLE whatsacc_app), so no PUBLIC grant.
-GRANT EXECUTE ON FUNCTION app.account_member_list(uuid) TO whatsacc_app, whatsacc_internal;
+ALTER FUNCTION app.account_member_list(uuid) OWNER TO lintel_internal;
+-- Post-hardening grant style: runtime callers all execute as lintel_app
+-- (withRLS does SET LOCAL ROLE lintel_app), so no PUBLIC grant.
+GRANT EXECUTE ON FUNCTION app.account_member_list(uuid) TO lintel_app, lintel_internal;
 
 -- ============================================================================
 -- 3. Phone verification codes (OTP)
@@ -104,8 +104,8 @@ CREATE POLICY phone_verification_codes_internal ON phone_verification_codes
     USING (app.current_user_id() IS NULL OR app.is_platform_admin())
     WITH CHECK (app.current_user_id() IS NULL OR app.is_platform_admin());
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON phone_verification_codes TO whatsacc_internal;
-GRANT SELECT, INSERT, UPDATE, DELETE ON phone_verification_codes TO whatsacc_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON phone_verification_codes TO lintel_internal;
+GRANT SELECT, INSERT, UPDATE, DELETE ON phone_verification_codes TO lintel_app;
 
 -- Start (or restart) a verification challenge for a phone the caller owns.
 -- Returns true when a code row was (re)created; false when the phone does
@@ -210,10 +210,10 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION app.phone_verification_start(uuid, text, timestamptz)  OWNER TO whatsacc_internal;
-ALTER FUNCTION app.phone_verification_consume(uuid, text, int)        OWNER TO whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.phone_verification_start(uuid, text, timestamptz) TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.phone_verification_consume(uuid, text, int)       TO whatsacc_app, whatsacc_internal;
+ALTER FUNCTION app.phone_verification_start(uuid, text, timestamptz)  OWNER TO lintel_internal;
+ALTER FUNCTION app.phone_verification_consume(uuid, text, int)        OWNER TO lintel_internal;
+GRANT EXECUTE ON FUNCTION app.phone_verification_start(uuid, text, timestamptz) TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.phone_verification_consume(uuid, text, int)       TO lintel_app, lintel_internal;
 
 -- ============================================================================
 -- 4. Telegram inbound redelivery dedupe

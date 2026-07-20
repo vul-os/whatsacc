@@ -13,11 +13,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/command"
-	"github.com/vul-os/whatsacc/controller/internal/events"
-	"github.com/vul-os/whatsacc/controller/internal/state"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/command"
+	"github.com/vul-os/lintel/controller/internal/events"
+	"github.com/vul-os/lintel/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 // Runner keeps the controller connected to its gateway: outbound WSS with

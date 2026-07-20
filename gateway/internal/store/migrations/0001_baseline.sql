@@ -1,5 +1,5 @@
 -- 0001_baseline.sql
--- SQLite baseline for the whatsacc gateway, translated from the ESSENTIAL core
+-- SQLite baseline for the lintel gateway, translated from the ESSENTIAL core
 -- of backend/migrations/20260505000000_baseline.sql (Postgres) plus the
 -- instance_settings table from 20260505020000_admin.sql.
 --

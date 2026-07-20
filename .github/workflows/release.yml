@@ -56,11 +56,11 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          name="whatsacc-gateway_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          name="lintel-gateway_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
           mkdir -p dist
           go build -trimpath \
             -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME}" \
-            -o "dist/${name}/whatsacc-gateway" ./cmd/gateway
+            -o "dist/${name}/lintel-gateway" ./cmd/gateway
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
       - uses: actions/upload-artifact@v4
         with:
@@ -92,7 +92,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          name="whatsacc-controller_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          name="lintel-controller_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
           mkdir -p "dist/${name}"
           if [ -d cmd ]; then
             for d in cmd/*/; do
@@ -103,7 +103,7 @@ jobs:
           else
             go build -trimpath \
               -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME}" \
-              -o "dist/${name}/whatsacc-controller" .
+              -o "dist/${name}/lintel-controller" .
           fi
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
       - uses: actions/upload-artifact@v4
@@ -135,12 +135,12 @@ jobs:
           mkdir -p dist-desktop
           found=0
           while IFS= read -r -d '' dmg; do
-            cp "$dmg" "dist-desktop/whatsacc_${GITHUB_REF_NAME}_macos_$(uname -m).dmg"
+            cp "$dmg" "dist-desktop/lintel_${GITHUB_REF_NAME}_macos_$(uname -m).dmg"
             found=1
           done < <(find src-tauri/target -type f -name '*.dmg' -path '*/bundle/*' -print0)
           while IFS= read -r -d '' app; do
             ditto -c -k --keepParent "$app" \
-              "dist-desktop/whatsacc_${GITHUB_REF_NAME}_macos_$(uname -m).app.zip"
+              "dist-desktop/lintel_${GITHUB_REF_NAME}_macos_$(uname -m).app.zip"
             found=1
           done < <(find src-tauri/target -type d -name '*.app' -path '*/bundle/*' -print0)
           if [ "$found" -eq 0 ]; then
@@ -175,7 +175,7 @@ jobs:
           files: dist/*
           generate_release_notes: true
           body: |
-            Container image: `ghcr.io/${{ github.repository_owner }}/whatsacc-gateway:${{ github.ref_name }}` (linux/amd64 + linux/arm64, published by the Docker workflow).
+            Container image: `ghcr.io/${{ github.repository_owner }}/lintel-gateway:${{ github.ref_name }}` (linux/amd64 + linux/arm64, published by the Docker workflow).
 
             The macOS desktop app is **unsigned** (no Apple signing identity is configured): on first launch, right-click the app and choose Open.
 

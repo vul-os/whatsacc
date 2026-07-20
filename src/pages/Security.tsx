@@ -48,7 +48,7 @@ export default function Security() {
           A gate is the smallest <em className="italic text-terracotta">serious</em> piece of infrastructure in your day.
         </h1>
         <p className="mt-6 sm:mt-8 max-w-xl text-ink/70 text-base sm:text-lg leading-relaxed">
-          Here&rsquo;s how whatsacc earns the right to open one.
+          Here&rsquo;s how lintel earns the right to open one.
         </p>
       </section>
 
@@ -86,10 +86,10 @@ export default function Security() {
           </div>
           <div className="relative lg:justify-self-end">
             <a
-              href="mailto:security@whatsacc.io"
+              href="mailto:security@vulos.org"
               className="inline-flex h-12 px-6 items-center rounded-full bg-paper text-ink font-medium hover:bg-terracotta hover:text-paper transition-colors"
             >
-              security@whatsacc.io
+              security@vulos.org
             </a>
           </div>
         </div>

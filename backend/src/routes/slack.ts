@@ -94,7 +94,7 @@ type SlackPayload = {
 };
 
 function slackMenu(profileName?: string): string {
-  const hello = profileName ? `Hi ${profileName}.` : 'Welcome to whatsacc.';
+  const hello = profileName ? `Hi ${profileName}.` : 'Welcome to lintel.';
   return [
     hello,
     '',
@@ -225,7 +225,7 @@ function slackRouter() {
                 to: channelId,
                 chatId: chat.id,
                 body: [
-                  "I don't know which whatsacc profile this Slack user belongs to yet.",
+                  "I don't know which lintel profile this Slack user belongs to yet.",
                   `Add Slack user ID ${event.user} in the web dashboard, then send "menu".`,
                 ].join('\n'),
               });

@@ -1,5 +1,5 @@
 // Package mdns is a minimal, best-effort mDNS (RFC 6762) responder that
-// advertises the controller's LAN grant listener as _whatsacc._tcp.local
+// advertises the controller's LAN grant listener as _lintel._tcp.local
 // with TXT ["device=<device_id>", "proto=0"] (proto/grants.md §LAN). It is
 // std-lib only: a hand-rolled DNS encoder/decoder covering exactly the
 // PTR/SRV/TXT/A records this service needs. Advertising failures are logged
@@ -19,13 +19,13 @@ import (
 
 const (
 	mdnsAddr    = "224.0.0.251:5353"
-	serviceName = "_whatsacc._tcp.local."
+	serviceName = "_lintel._tcp.local."
 	ttlSeconds  = 120
 )
 
-// Advertiser answers PTR queries for _whatsacc._tcp and announces on start.
+// Advertiser answers PTR queries for _lintel._tcp and announces on start.
 type Advertiser struct {
-	Instance string // instance label, e.g. "wacc-de71ce00"
+	Instance string // instance label, e.g. "lintel-de71ce00"
 	Port     uint16 // LAN listener TCP port
 	TXT      []string
 	Log      *slog.Logger
@@ -169,8 +169,8 @@ func (a *Advertiser) buildResponse(id uint16) []byte {
 	if ip == nil {
 		return nil
 	}
-	instance := a.Instance + "." + serviceName // wacc-x._whatsacc._tcp.local.
-	host := a.Instance + ".local."             // wacc-x.local.
+	instance := a.Instance + "." + serviceName // lintel-x._lintel._tcp.local.
+	host := a.Instance + ".local."             // lintel-x.local.
 	var b []byte
 	b = binary.BigEndian.AppendUint16(b, id)
 	b = binary.BigEndian.AppendUint16(b, 0x8400) // QR=1, AA=1
@@ -179,7 +179,7 @@ func (a *Advertiser) buildResponse(id uint16) []byte {
 	b = binary.BigEndian.AppendUint16(b, 0)      // NS
 	b = binary.BigEndian.AppendUint16(b, 0)      // AR
 
-	// PTR _whatsacc._tcp.local → instance
+	// PTR _lintel._tcp.local → instance
 	b = appendName(b, serviceName)
 	b = appendRRHeader(b, 12, uint32(ttlSeconds), false)
 	b = appendUint16Len(b, appendName(nil, instance))

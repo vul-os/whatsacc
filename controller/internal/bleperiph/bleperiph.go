@@ -1,7 +1,7 @@
 // Package bleperiph is the BLE GATT peripheral for offline grant redemption
 // (proto/grants.md §BLE GATT): service 9f0a0001-8f7c-4b62-9d5e-7acc00000001
-// ("whatsacc-grant") with rx (write), tx (notify) and info (read)
-// characteristics, advertised as "wacc-<first 8 hex of device_id>".
+// ("lintel-grant") with rx (write), tx (notify) and info (read)
+// characteristics, advertised as "lintel-<first 8 hex of device_id>".
 //
 // Layering (all verification and framing logic lives BELOW this package and
 // is fully tested without a radio):
@@ -22,8 +22,8 @@ package bleperiph
 import (
 	"errors"
 
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/grants"
 )
 
 // Service and characteristic UUIDs (proto/grants.md §BLE GATT).
@@ -52,7 +52,7 @@ type Config struct {
 	MTU        int // 0 = DefaultMTU
 }
 
-// LocalName returns the advertised name "wacc-<first 8 hex of device_id>".
+// LocalName returns the advertised name "lintel-<first 8 hex of device_id>".
 func LocalName(deviceID string) string {
 	hex := make([]byte, 0, 8)
 	for i := 0; i < len(deviceID) && len(hex) < 8; i++ {
@@ -61,5 +61,5 @@ func LocalName(deviceID string) string {
 			hex = append(hex, c)
 		}
 	}
-	return "wacc-" + string(hex)
+	return "lintel-" + string(hex)
 }

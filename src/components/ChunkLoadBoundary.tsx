@@ -18,7 +18,7 @@ function looksLikeChunkLoadError(err: unknown): boolean {
   );
 }
 
-const RELOAD_FLAG = 'whatsacc.chunkReloadAttempted';
+const RELOAD_FLAG = 'lintel.chunkReloadAttempted';
 
 // Mounted as `errorElement` for every lazy-loaded route. When the user has
 // a stale `index.html` cached (chunk hashes from an older deploy) the new

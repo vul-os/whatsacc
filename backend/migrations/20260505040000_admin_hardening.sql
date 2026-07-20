@@ -8,7 +8,7 @@
 --      set_config/SET LOCAL — custom GUCs have no ACL). It now DERIVES the
 --      answer from the users table, keyed by app.current_user_id():
 --      admin ⇔ the current user's row has is_platform_admin AND is not
---      disabled. SECURITY DEFINER owned by whatsacc_internal (BYPASSRLS) so
+--      disabled. SECURITY DEFINER owned by lintel_internal (BYPASSRLS) so
 --      the users read cannot recurse into the users RLS policy.
 --
 --      Semantics preserved exactly:
@@ -31,9 +31,9 @@
 --   2. PUBLIC EXECUTE revoked from the admin SECURITY DEFINER functions
 --      (instance_setting_get/set, admin_audit_write, platform_admin_exists,
 --      claim_platform_admin — the *_get was flagged in the rate-limit review
---      too). Runtime callers all execute as whatsacc_app (withRLS does
---      SET LOCAL ROLE whatsacc_app for user, admin and anon contexts alike),
---      so grants go to whatsacc_app + whatsacc_internal only.
+--      too). Runtime callers all execute as lintel_app (withRLS does
+--      SET LOCAL ROLE lintel_app for user, admin and anon contexts alike),
+--      so grants go to lintel_app + lintel_internal only.
 
 -- ============================================================================
 -- 1. Table-derived is_platform_admin()
@@ -54,10 +54,10 @@ AS $$
     );
 $$;
 
-ALTER FUNCTION app.is_platform_admin() OWNER TO whatsacc_internal;
+ALTER FUNCTION app.is_platform_admin() OWNER TO lintel_internal;
 
 REVOKE EXECUTE ON FUNCTION app.is_platform_admin() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app.is_platform_admin() TO whatsacc_app, whatsacc_internal;
+GRANT EXECUTE ON FUNCTION app.is_platform_admin() TO lintel_app, lintel_internal;
 
 -- ============================================================================
 -- 2. Privilege tightening on the admin SECURITY DEFINER seam
@@ -69,8 +69,8 @@ REVOKE EXECUTE ON FUNCTION app.platform_admin_exists()                          
 REVOKE EXECUTE ON FUNCTION app.claim_platform_admin(uuid)                                FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.admin_audit_write(uuid, text, text, text, boolean, jsonb) FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION app.instance_setting_get(text)                                TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.instance_setting_set(text, jsonb, uuid)                   TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.platform_admin_exists()                                   TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.claim_platform_admin(uuid)                                TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.admin_audit_write(uuid, text, text, text, boolean, jsonb) TO whatsacc_app, whatsacc_internal;
+GRANT EXECUTE ON FUNCTION app.instance_setting_get(text)                                TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.instance_setting_set(text, jsonb, uuid)                   TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.platform_admin_exists()                                   TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.claim_platform_admin(uuid)                                TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.admin_audit_write(uuid, text, text, text, boolean, jsonb) TO lintel_app, lintel_internal;

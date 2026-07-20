@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/framing"
+	"github.com/vul-os/lintel/controller/internal/framing"
 )
 
 // synthetic ATT MTUs required by the BLE addendum; usable payload = MTU − 3.

@@ -1,4 +1,4 @@
-# whatsacc backend — wrangler local-dev secrets
+# lintel backend — wrangler local-dev secrets
 #
 # Copy to .dev.vars:   cp .dev.vars.example .dev.vars    (from backend/)
 #
@@ -12,7 +12,7 @@
 # hit the same database.
 
 # Required — worker refuses requests without these two
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/whatsacc?sslmode=disable
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/lintel?sslmode=disable
 JWT_SECRET=dev-only-change-me
 
 # Google OAuth sign-in (optional)

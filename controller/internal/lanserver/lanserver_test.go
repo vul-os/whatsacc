@@ -9,11 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
-	"github.com/vul-os/whatsacc/controller/internal/lanserver"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/lanserver"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 // TestLANFlowEndToEnd drives the real HTTP endpoints with a FRESH random

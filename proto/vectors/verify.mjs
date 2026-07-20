@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// proto/vectors/verify.mjs — self-check for the whatsacc conformance vectors.
+// proto/vectors/verify.mjs — self-check for the lintel conformance vectors.
 //
 // For every vector it:
 //   1. re-canonicalizes the wire object (minus sig) and byte-compares against

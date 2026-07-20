@@ -1,5 +1,5 @@
 // Command controller-sim is an interactive/scriptable simulator for the
-// whatsacc reference controller. It runs the REAL agent assembly with the
+// lintel reference controller. It runs the REAL agent assembly with the
 // mock relay (state transitions printed), or replays the conformance
 // fixtures without any gateway:
 //
@@ -27,16 +27,16 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/vul-os/whatsacc/controller/internal/agent"
-	"github.com/vul-os/whatsacc/controller/internal/blesession"
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/framing"
-	"github.com/vul-os/whatsacc/controller/internal/grants"
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
-	"github.com/vul-os/whatsacc/controller/internal/lanserver"
-	"github.com/vul-os/whatsacc/controller/internal/relay"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/agent"
+	"github.com/vul-os/lintel/controller/internal/blesession"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/framing"
+	"github.com/vul-os/lintel/controller/internal/grants"
+	"github.com/vul-os/lintel/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/lanserver"
+	"github.com/vul-os/lintel/controller/internal/relay"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 func main() {

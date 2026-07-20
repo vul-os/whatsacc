@@ -23,7 +23,7 @@ export async function sendEmail(msg: EmailMessage): Promise<void> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: msg.from ?? 'whatsacc <noreply@whatsacc.com>',
+      from: msg.from ?? 'lintel <noreply@lintel.com>',
       to: [msg.to],
       subject: msg.subject,
       html: msg.html,
@@ -75,7 +75,7 @@ const FONT_SANS =
 // ArchMark component. Renders crisply in Apple Mail, Gmail web, iOS, and
 // most modern clients; Outlook desktop omits SVG so the wordmark beside it
 // keeps the brand visible.
-const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="whatsacc">
+const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="lintel">
   <rect width="64" height="64" rx="14" fill="${INK}"/>
   <path d="M16 50 V32 a16 16 0 0 1 32 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" fill="none" stroke="${PAPER}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="32" cy="42" r="2.6" fill="${TERRACOTTA}"/>
@@ -90,7 +90,7 @@ function header(): string {
             <tr>
               <td valign="middle" style="padding:0 12px 0 0;line-height:0;">${LOGO_SVG}</td>
               <td valign="middle" style="font-family:${FONT_DISPLAY};font-size:22px;font-weight:600;color:${INK};letter-spacing:-0.01em;">
-                <a href="https://whatsacc.com" style="text-decoration:none;color:${INK};">whatsacc</a>
+                <a href="https://vulos.org/products/lintel" style="text-decoration:none;color:${INK};">lintel</a>
               </td>
             </tr>
           </table>
@@ -182,7 +182,7 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
                             <span style="display:inline-block;width:5px;height:5px;background-color:${TERRACOTTA};border-radius:50%;line-height:0;font-size:0;">&nbsp;</span>
                           </td>
                           <td style="font-family:${FONT_SANS};font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(26,31,54,0.55);">
-                            Whatsacc &middot; account
+                            Lintel &middot; account
                           </td>
                         </tr>
                       </table>
@@ -201,11 +201,12 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="padding:24px 4px 0;">
-                      <p style="margin:0 0 4px;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK};font-weight:600;letter-spacing:0.02em;">whatsacc</p>
+                      <p style="margin:0 0 4px;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK};font-weight:600;letter-spacing:0.02em;">lintel</p>
                       <p style="margin:0 0 10px;font-family:${FONT_DISPLAY};font-size:13px;line-height:1.5;color:${INK_FAINT};font-style:italic;">Texts that open gates.</p>
                       <p style="margin:0;font-family:${FONT_SANS};font-size:11px;line-height:1.6;color:${INK_FAINT};">
-                        This is a transactional message about your whatsacc account. Manage settings at
-                        <a href="https://whatsacc.com" style="color:${INK_FAINT};text-decoration:underline;">whatsacc.com</a>.
+                        This is a transactional message about your lintel account, sent by the
+                        gateway you or your operator runs. Learn more at
+                        <a href="https://vulos.org/products/lintel" style="color:${INK_FAINT};text-decoration:underline;">vulos.org/products/lintel</a>.
                       </p>
                     </td>
                     <td valign="top" align="right" style="padding:24px 4px 0;font-family:${FONT_SANS};font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(26,31,54,0.4);white-space:nowrap;">
@@ -223,7 +224,7 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
 </html>`;
 
   const textParts = [
-    'whatsacc',
+    'lintel',
     '',
     input.heading,
     '',
@@ -231,7 +232,7 @@ export function renderEmail(input: TemplateInput): { html: string; text: string 
     ...(input.cta ? ['', input.cta.label + ': ' + input.cta.url] : []),
     ...(input.footnote ? ['', stripTags(input.footnote)] : []),
     '',
-    '— whatsacc · Texts that open gates.',
+    '— lintel · Texts that open gates.',
   ];
 
   return { html, text: textParts.join('\n') };

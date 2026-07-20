@@ -25,7 +25,7 @@ func TestPortalBuildSPAFallback(t *testing.T) {
 		return rec
 	}
 
-	if rec := get("/"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "whatsacc") {
+	if rec := get("/"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "lintel") {
 		t.Errorf("root: %d %s", rec.Code, rec.Body)
 	}
 	// unknown client route → index.html (200), so deep links work

@@ -21,7 +21,7 @@
         "claim_token": "dGVzdC1jbGFpbS10b2tlbi0xMjNBQkNERUZHSElKS0w",
         "controller_pubkey": "XW2imvoHDzaZNj9Id5yUYgnDRo6yiHkdrb4CW09fORw",
         "hw": {
-          "model": "wacc-c1",
+          "model": "lintel-c1",
           "fw": "0.1.0",
           "ifaces": [
             "wifi",
@@ -29,7 +29,7 @@
           ]
         }
       },
-      "canonical": "{\"claim_token\":\"dGVzdC1jbGFpbS10b2tlbi0xMjNBQkNERUZHSElKS0w\",\"controller_pubkey\":\"XW2imvoHDzaZNj9Id5yUYgnDRo6yiHkdrb4CW09fORw\",\"hw\":{\"fw\":\"0.1.0\",\"ifaces\":[\"wifi\",\"gsm\"],\"model\":\"wacc-c1\"},\"typ\":\"pair.redeem\",\"v\":0}"
+      "canonical": "{\"claim_token\":\"dGVzdC1jbGFpbS10b2tlbi0xMjNBQkNERUZHSElKS0w\",\"controller_pubkey\":\"XW2imvoHDzaZNj9Id5yUYgnDRo6yiHkdrb4CW09fORw\",\"hw\":{\"fw\":\"0.1.0\",\"ifaces\":[\"wifi\",\"gsm\"],\"model\":\"lintel-c1\"},\"typ\":\"pair.redeem\",\"v\":0}"
     },
     {
       "name": "pair-grant-response",

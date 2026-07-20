@@ -1,5 +1,5 @@
 -- 20260505000000_baseline.sql
--- Clean baseline schema for whatsacc: auth, tenancy, access control,
+-- Clean baseline schema for lintel: auth, tenancy, access control,
 -- WhatsApp / Telegram / Slack messaging, maintenance tracking, temporary
 -- access grants, and row-level security.
 --
@@ -1408,7 +1408,7 @@ CREATE POLICY temporary_access_grant_access_points_write
 -- Force row-level security
 -- ============================================================================
 -- ENABLE ROW LEVEL SECURITY only enforces RLS on non-owner roles. The app
--- connects with the role that owns the schema (whatsacc_app), so without
+-- connects with the role that owns the schema (lintel_app), so without
 -- this every policy would be silently bypassed. FORCE applies the policies
 -- to the owner too. Superusers still bypass — production must use a non-
 -- superuser role for the application connection.
@@ -1444,33 +1444,33 @@ $$;
 -- tables (meters, grant consumption) where there is no direct write policy
 -- on purpose.
 --
--- The whatsacc_internal role is created out-of-band by the DB bootstrap
+-- The lintel_internal role is created out-of-band by the DB bootstrap
 -- step (it requires CREATEROLE privilege, which the app role doesn't have).
 -- See README for the bootstrap commands.
 
--- whatsacc_internal needs CREATE on the app schema to take ownership of
+-- lintel_internal needs CREATE on the app schema to take ownership of
 -- functions defined there (Postgres requires the grantor and target role
 -- both have CREATE on the function's schema). Idempotent.
-GRANT CREATE ON SCHEMA app TO whatsacc_internal;
+GRANT CREATE ON SCHEMA app TO lintel_internal;
 
 -- Trigger functions and SECURITY DEFINER helpers need to read+write
 -- application tables under their own role. Idempotent.
-GRANT USAGE ON SCHEMA public TO whatsacc_internal;
-GRANT USAGE ON SCHEMA app TO whatsacc_internal;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO whatsacc_internal;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO whatsacc_internal;
+GRANT USAGE ON SCHEMA public TO lintel_internal;
+GRANT USAGE ON SCHEMA app TO lintel_internal;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO lintel_internal;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO lintel_internal;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO whatsacc_internal;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lintel_internal;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT USAGE, SELECT ON SEQUENCES TO whatsacc_internal;
+    GRANT USAGE, SELECT ON SEQUENCES TO lintel_internal;
 
--- Hand ownership of the privileged helpers to whatsacc_internal.
-ALTER FUNCTION app.is_account_member(uuid)             OWNER TO whatsacc_internal;
-ALTER FUNCTION app.is_account_admin(uuid)              OWNER TO whatsacc_internal;
-ALTER FUNCTION app.access_points_init_meters()         OWNER TO whatsacc_internal;
-ALTER FUNCTION app.access_logs_advance_meter()         OWNER TO whatsacc_internal;
-ALTER FUNCTION app.maintenance_events_after_insert()   OWNER TO whatsacc_internal;
-ALTER FUNCTION app.try_consume_grant(text, uuid, timestamptz) OWNER TO whatsacc_internal;
+-- Hand ownership of the privileged helpers to lintel_internal.
+ALTER FUNCTION app.is_account_member(uuid)             OWNER TO lintel_internal;
+ALTER FUNCTION app.is_account_admin(uuid)              OWNER TO lintel_internal;
+ALTER FUNCTION app.access_points_init_meters()         OWNER TO lintel_internal;
+ALTER FUNCTION app.access_logs_advance_meter()         OWNER TO lintel_internal;
+ALTER FUNCTION app.maintenance_events_after_insert()   OWNER TO lintel_internal;
+ALTER FUNCTION app.try_consume_grant(text, uuid, timestamptz) OWNER TO lintel_internal;
 
 -- Make sure the app role can call them.
 GRANT EXECUTE ON FUNCTION app.is_account_member(uuid) TO PUBLIC;
@@ -1483,34 +1483,34 @@ GRANT EXECUTE ON FUNCTION app.try_consume_grant(text, uuid, timestamptz) TO PUBL
 -- Creates a NOLOGIN, non-BYPASSRLS role that the backend SET LOCAL ROLEs to
 -- inside every request transaction (see lib/db.ts withRLS). The connection
 -- itself still authenticates as the database owner (neondb_owner on Neon,
--- whatsacc_app on local) — but on Neon that role has BYPASSRLS=true, which
+-- lintel_app on local) — but on Neon that role has BYPASSRLS=true, which
 -- silently disables every RLS policy. Switching role per-transaction to a
 -- non-BYPASSRLS role re-arms the policies without burning a separate
 -- connection pool. Idempotent.
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'whatsacc_app') THEN
-        CREATE ROLE whatsacc_app NOLOGIN;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lintel_app') THEN
+        CREATE ROLE lintel_app NOLOGIN;
     END IF;
-    IF current_user <> 'whatsacc_app' THEN
-        EXECUTE format('GRANT whatsacc_app TO %I', current_user);
+    IF current_user <> 'lintel_app' THEN
+        EXECUTE format('GRANT lintel_app TO %I', current_user);
     END IF;
 END $$;
 
 -- Schema + table privileges. RLS will still filter rows; these grants only
 -- decide whether the role can see/touch the relations at all.
-GRANT USAGE ON SCHEMA public TO whatsacc_app;
-GRANT USAGE ON SCHEMA app TO whatsacc_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO whatsacc_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO whatsacc_app;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO whatsacc_app;
+GRANT USAGE ON SCHEMA public TO lintel_app;
+GRANT USAGE ON SCHEMA app TO lintel_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO lintel_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO lintel_app;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO lintel_app;
 
 -- Default privileges so future tables/sequences/functions are also reachable
 -- without re-running this migration. Run with neondb_owner / table owner.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO whatsacc_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lintel_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT USAGE, SELECT ON SEQUENCES TO whatsacc_app;
+    GRANT USAGE, SELECT ON SEQUENCES TO lintel_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA app
-    GRANT EXECUTE ON FUNCTIONS TO whatsacc_app;
+    GRANT EXECUTE ON FUNCTIONS TO lintel_app;

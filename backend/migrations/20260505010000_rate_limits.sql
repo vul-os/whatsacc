@@ -1,15 +1,15 @@
 -- 20260505010000_rate_limits.sql
 -- Abuse-protection rate limits + admin-configured usage quotas.
 --
--- Strictly NON-MONETARY: whatsacc has no billing. These are physical-access
+-- Strictly NON-MONETARY: lintel has no billing. These are physical-access
 -- abuse guards (cooldowns / hourly caps) plus optional per-location policy
 -- caps that admins configure ("the cleaner can open 4x per day").
 --
 --   1. rate_limit_counters — fixed-window counters keyed (scope, subject,
 --      window_start). INTERNAL table: RLS is enabled + forced with NO
---      policies, so no request role (whatsacc_app) can touch rows directly.
+--      policies, so no request role (lintel_app) can touch rows directly.
 --      All access goes through the SECURITY DEFINER app.rate_limit_*
---      functions owned by whatsacc_internal (BYPASSRLS), mirroring the
+--      functions owned by lintel_internal (BYPASSRLS), mirroring the
 --      baseline's meters / try_consume_grant machinery.
 --   2. location_settings gains two nullable quota columns. NULL = unlimited.
 
@@ -40,11 +40,11 @@ COMMENT ON TABLE rate_limit_counters
 ALTER TABLE rate_limit_counters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_counters FORCE ROW LEVEL SECURITY;
 
--- Table privileges still required for whatsacc_internal (BYPASSRLS) which
+-- Table privileges still required for lintel_internal (BYPASSRLS) which
 -- owns the accessor functions. Default privileges from the baseline should
 -- already cover this; explicit grants keep it robust.
-GRANT SELECT, INSERT, UPDATE, DELETE ON rate_limit_counters TO whatsacc_internal;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rate_limit_counters TO whatsacc_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON rate_limit_counters TO lintel_internal;
+GRANT SELECT, INSERT, UPDATE, DELETE ON rate_limit_counters TO lintel_app;
 
 -- ============================================================================
 -- Location quotas (admin policy, off by default)
@@ -62,7 +62,7 @@ COMMENT ON COLUMN location_settings.max_opens_per_location_per_day
     IS 'Optional policy cap: total successful opens per UTC day across the whole location. NULL = unlimited. Account owners/admins are exempt.';
 
 -- ============================================================================
--- Accessor functions (SECURITY DEFINER, owned by whatsacc_internal)
+-- Accessor functions (SECURITY DEFINER, owned by lintel_internal)
 -- ============================================================================
 
 -- Atomic upsert-increment. Returns the post-increment count for the window.
@@ -140,9 +140,9 @@ $$;
 
 -- Hand ownership to the BYPASSRLS internal role (baseline pattern) so the
 -- functions can cross the policy-less FORCEd RLS on rate_limit_counters.
-ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int) OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)       OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_last(text, text)                   OWNER TO whatsacc_internal;
+ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int) OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)       OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_last(text, text)                   OWNER TO lintel_internal;
 
 GRANT EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)       TO PUBLIC;

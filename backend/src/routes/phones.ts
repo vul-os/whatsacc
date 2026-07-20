@@ -31,7 +31,7 @@ export async function sendVerificationCodeText(phoneE164: string, codePlain: str
   try {
     const sent = await sendWhatsAppText(
       to,
-      `Your whatsacc verification code is ${codePlain}. It expires in 10 minutes. If you didn't request this, ignore this message.`,
+      `Your lintel verification code is ${codePlain}. It expires in 10 minutes. If you didn't request this, ignore this message.`,
     );
     if (!sent.ok && sent.error !== 'whatsapp_credentials_unset') {
       console.warn('[whatsapp-send] verification code failed:', sent.error ?? 'unknown_error');
@@ -73,7 +73,7 @@ async function sendConnectedWhatsAppMessage(userId: string, phoneE164: string): 
       await sendWhatsAppText(
         to,
         [
-          'Your WhatsApp number is connected to whatsacc.',
+          'Your WhatsApp number is connected to lintel.',
           "You don't have a location set up yet. Open the dashboard to add Home, HQ, or your first site.",
           `${appUrl}/app`,
         ].join('\n\n'),
@@ -86,7 +86,7 @@ async function sendConnectedWhatsAppMessage(userId: string, phoneE164: string): 
       await sendWhatsAppText(
         to,
         [
-          'Your WhatsApp number is connected to whatsacc.',
+          'Your WhatsApp number is connected to lintel.',
           `I found your ${details.locations.length === 1 ? 'location' : 'locations'}: ${names}${details.locations.length > 3 ? ', ...' : ''}.`,
           "No gates or doors are ready yet. Add an access point in the dashboard, then message 'open'.",
           `${appUrl}/app/access-points`,
@@ -97,7 +97,7 @@ async function sendConnectedWhatsAppMessage(userId: string, phoneE164: string): 
 
     await sendWhatsAppText(
       to,
-      "Your WhatsApp number is connected to whatsacc. Here's what you can open from this number.",
+      "Your WhatsApp number is connected to lintel. Here's what you can open from this number.",
     );
 
     const interactive: WhatsAppInteractive = details.gates.length === 1
@@ -281,7 +281,7 @@ function phonesRouter() {
         throw BadRequest('invalid_code');
     }
 
-    // The "connected to whatsacc" rundown only makes sense once the number
+    // The "connected to lintel" rundown only makes sense once the number
     // is actually proven — send it after first successful verification.
     if (outcome.verifiedNow) {
       await sendConnectedWhatsAppMessage(user.sub, outcome.phone_e164);

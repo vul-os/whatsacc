@@ -1,4 +1,4 @@
-name = "whatsacc-backend"
+name = "lintel-backend"
 main = "src/index.ts"
 compatibility_date = "2026-05-06"
 compatibility_flags = ["nodejs_compat"]
@@ -17,16 +17,16 @@ APP_PUBLIC_URL = "http://localhost:5173"
 # RESEND_API_KEY, GOOGLE_*, WHATSAPP_*) must be set via:
 #   wrangler secret put <NAME> --env=dev
 [env.dev]
-name = "whatsacc-backend-dev"
+name = "lintel-backend-dev"
 
 [env.dev.vars]
 APP_ENV = "dev"
-APP_PUBLIC_URL = "https://whats-acc-dev.web.app"
+APP_PUBLIC_URL = "https://lintel-dev.web.app"
 
 # ── Main (production) environment (Neon production branch) ──────────────
 [env.main]
-name = "whatsacc-backend-main"
+name = "lintel-backend-main"
 
 [env.main.vars]
 APP_ENV = "main"
-APP_PUBLIC_URL = "https://whatsacc.com"
+APP_PUBLIC_URL = "https://lintel.com"

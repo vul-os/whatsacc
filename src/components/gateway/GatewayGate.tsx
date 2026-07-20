@@ -166,7 +166,7 @@ function GatewayPicker({
       <header className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-6">
         <span className="inline-flex items-center gap-2.5 text-ink">
           <ArchMark className="h-7 w-7" />
-          <span className="font-display italic text-lg">whatsacc</span>
+          <span className="font-display italic text-lg">lintel</span>
         </span>
         <ThemeToggle variant="auth" />
       </header>
@@ -181,7 +181,7 @@ function GatewayPicker({
             Connect to your gateway
           </h1>
           <p className="mt-2 sm:mt-3 text-[15px] text-ink/65 leading-relaxed">
-            Your account and gates live on a whatsacc gateway. Enter its address — ask your
+            Your account and gates live on a lintel gateway. Enter its address — ask your
             gateway operator if you&rsquo;re not sure.
           </p>
 

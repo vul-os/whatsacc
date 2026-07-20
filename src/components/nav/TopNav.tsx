@@ -39,11 +39,11 @@ export function TopNav() {
       )}
     >
       <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-10 py-4 sm:py-5 flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-2.5 shrink-0" aria-label="whatsacc home">
+        <Link to="/" className="flex items-center gap-2.5 shrink-0" aria-label="lintel home">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-ink">
             <ArchMark className="h-5 w-5 text-paper" />
           </span>
-          <span className="font-display italic text-xl tracking-tight">whatsacc</span>
+          <span className="font-display italic text-xl tracking-tight">lintel</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">

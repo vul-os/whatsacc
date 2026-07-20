@@ -319,7 +319,7 @@ dbTest('wa flow: unlinked phone gets the signup message with a wa_phone-prefille
     assertEquals(out.length, 1);
     assertEquals(out[0]!.kind, 'text');
     const text = (out[0]!.body as { text: { body: string } }).text.body;
-    assert(text.includes("This WhatsApp number isn't linked to a whatsacc account yet."), text);
+    assert(text.includes("This WhatsApp number isn't linked to a lintel account yet."), text);
     assert(text.includes('http://test.local/signup?wa_phone=%2B27831230005'), text);
     assert(text.includes("After signup, we'll ask if you want to connect this number."), text);
   } finally {
@@ -346,7 +346,7 @@ dbTest('wa flow: linked phone with no location / no gates gets the matching setu
     let out = await outboundBodies(`+${phone}`);
     assertEquals(out.length, 1);
     let text = (out[0]!.body as { text: { body: string } }).text.body;
-    assert(text.includes('Welcome to whatsacc. Your number is connected.'), text);
+    assert(text.includes('Welcome to lintel. Your number is connected.'), text);
     assert(text.includes("You don't have a location set up yet."), text);
     assert(text.includes('http://test.local/app'), text);
 
@@ -421,7 +421,7 @@ dbTest('wa flow: visitor grant phone can open, uses are counted, exhaustion clos
     assertEquals((await postText(app, visitorPhone, 'open')).status, 200);
     out = await outboundBodies(`+${visitorPhone}`);
     assert(
-      out[out.length - 1]!.json.includes("isn't linked to a whatsacc account yet"),
+      out[out.length - 1]!.json.includes("isn't linked to a lintel account yet"),
       `got: ${out[out.length - 1]!.json}`,
     );
     assertEquals((await accessLogsFor(apId)).filter((l) => l.success).length, 2, 'no extra open');

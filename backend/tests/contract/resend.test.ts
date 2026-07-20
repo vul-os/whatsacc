@@ -5,7 +5,7 @@
 // Required env to actually run:
 //   RESEND_TEST_API_KEY=re_xxx
 //   RESEND_TEST_TO_EMAIL=you@yourdomain.com   (a real inbox you own)
-//   RESEND_TEST_FROM=whatsacc <noreply@yourdomain.com>   (optional override)
+//   RESEND_TEST_FROM=lintel <noreply@yourdomain.com>   (optional override)
 //
 // Run only the contract suite:
 //   deno test -A --env-file=../.env tests/contract/resend.test.ts
@@ -44,11 +44,11 @@ contractTest(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: from ?? 'whatsacc <noreply@whatsacc.com>',
+        from: from ?? 'lintel <noreply@lintel.com>',
         to: [to],
-        subject: 'whatsacc contract test',
-        text: 'This is a contract test from the whatsacc test suite.',
-        html: '<p>This is a contract test from the whatsacc test suite.</p>',
+        subject: 'lintel contract test',
+        text: 'This is a contract test from the lintel test suite.',
+        html: '<p>This is a contract test from the lintel test suite.</p>',
       }),
     });
     const body = await res.json().catch(() => ({}));
@@ -62,7 +62,7 @@ contractTest(
     // Now also exercise our wrapper (it should not throw).
     await sendEmail({
       to,
-      subject: 'whatsacc contract test (wrapper)',
+      subject: 'lintel contract test (wrapper)',
       html: '<p>via sendEmail()</p>',
       text: 'via sendEmail()',
       from,
@@ -76,7 +76,7 @@ contractTest(
   async () => {
     setupRealResendEnv();
     const to = envValue('RESEND_TEST_TO_EMAIL')!;
-    const from = process.env.RESEND_TEST_FROM ?? 'whatsacc <noreply@whatsacc.com>';
+    const from = process.env.RESEND_TEST_FROM ?? 'lintel <noreply@lintel.com>';
     const key = envValue('RESEND_TEST_API_KEY')!;
 
     const res = await fetch('https://api.resend.com/emails', {
@@ -88,7 +88,7 @@ contractTest(
       body: JSON.stringify({
         from,
         to: [to],
-        subject: 'whatsacc domain check',
+        subject: 'lintel domain check',
         text: 'Domain check.',
       }),
     });

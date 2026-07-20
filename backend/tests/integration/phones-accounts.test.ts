@@ -212,7 +212,7 @@ dbTest('phones: add sends the OTP over WhatsApp; the connected rundown moves to 
     assertEquals(calls.length, 3);
     const connected = calls[1]!.body as { to: string; text: { body: string } };
     assertEquals(connected.to, '27831112230');
-    assert(connected.text.body.includes('Your WhatsApp number is connected to whatsacc.'), connected.text.body);
+    assert(connected.text.body.includes('Your WhatsApp number is connected to lintel.'), connected.text.body);
     const rundown = calls[2]!.body as { type: string; interactive: { action: { buttons: Array<{ reply: { id: string } }> } } };
     assertEquals(rundown.type, 'interactive');
     assertEquals(rundown.interactive.action.buttons[0]!.reply.id, `open_ap:${seeded.access_point_id!}`);

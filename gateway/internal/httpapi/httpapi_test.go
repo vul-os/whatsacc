@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/keys"
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/keys"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 func newTestServer(t *testing.T, claimToken string) http.Handler {
@@ -99,8 +99,8 @@ func TestPortalPlaceholderServed(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	// Build-agnostic: the default build serves the static/ placeholder, the
-	// -tags portal build serves dist/index.html — both contain "whatsacc".
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "whatsacc") {
+	// -tags portal build serves dist/index.html — both contain "lintel".
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "lintel") {
 		t.Errorf("portal root: %d", rec.Code)
 	}
 }

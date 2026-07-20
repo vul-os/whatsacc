@@ -1,6 +1,6 @@
 # API reference
 
-The HTTP API isn't required to use whatsacc — most people only ever touch chat. But if
+The HTTP API isn't required to use lintel — most people only ever touch chat. But if
 you're integrating with property-management software, wiring the gate into a home
 automation, or building on top of a gateway, this is for you.
 
@@ -21,7 +21,7 @@ Authorization: Bearer <session_token>
 
 **Planned**: long-lived, location-scoped, read/read-write **API tokens** issued from
 the portal under **Settings → API tokens** (tracked in the repo todo), shaped like
-`Authorization: Bearer wacc_live_<token>`. Until that ships, integrating means logging
+`Authorization: Bearer lintel_live_<token>`. Until that ships, integrating means logging
 in a service account and refreshing its session token like any other client.
 
 Every gateway issues its own tokens/sessions — there is no central token authority.
@@ -29,7 +29,7 @@ Every gateway issues its own tokens/sessions — there is no central token autho
 ## Open an access point
 
 This one is real today, authenticated with the bearer session token from
-`POST /v1/auth/login` (not a scoped `wacc_live_…` API token yet — see
+`POST /v1/auth/login` (not a scoped `lintel_live_…` API token yet — see
 [Authentication](#authentication)):
 
 ```

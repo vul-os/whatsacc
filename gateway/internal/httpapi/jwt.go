@@ -11,7 +11,7 @@ import (
 )
 
 // Minimal HS256 JWT — std-lib only, deliberately no dependency. Only what the
-// gateway needs: iss "whatsacc", sub, email, admin flag, iat/exp.
+// gateway needs: iss "lintel", sub, email, admin flag, iat/exp.
 
 // Claims is the access-token payload.
 type Claims struct {
@@ -30,7 +30,7 @@ var (
 	ErrTokenExpired = errors.New("token_expired")
 )
 
-const jwtIssuer = "whatsacc"
+const jwtIssuer = "lintel"
 
 var jwtHeaderB64 = b64(`{"alg":"HS256","typ":"JWT"}`)
 

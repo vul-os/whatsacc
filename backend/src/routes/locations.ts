@@ -38,7 +38,7 @@ const createTopLevelLocationSchema = z
   })
   .strict();
 
-// Abuse-protection quotas (NOT billing — whatsacc has none). NULL clears a
+// Abuse-protection quotas (NOT billing — lintel has none). NULL clears a
 // cap (= unlimited); omitted fields are left unchanged.
 const patchLimitsSchema = z
   .object({

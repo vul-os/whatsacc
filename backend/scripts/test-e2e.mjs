@@ -87,7 +87,7 @@ function expect(label, r, wanted = [200, 201, 204]) {
 
 async function seedUser(email, name) {
   const envFile = process.env.NPM_ENV_FILE
-    ?? join(dirname(__dirname), 'Documents/whatsacc-mono/.env.dev'); // best-effort
+    ?? join(dirname(__dirname), 'Documents/lintel-mono/.env.dev'); // best-effort
   const cmd = spawnSync(
     'node',
     [
@@ -95,7 +95,7 @@ async function seedUser(email, name) {
       'scripts/seed-user.mjs',
       `--email=${email}`, `--password=${password}`, `--name=${name}`,
     ],
-    { cwd: '/home/exo/Documents/whatsacc-mono/backend', stdio: 'pipe' },
+    { cwd: '/home/exo/Documents/lintel-mono/backend', stdio: 'pipe' },
   );
   return cmd.status === 0;
 }

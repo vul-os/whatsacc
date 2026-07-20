@@ -1,6 +1,6 @@
 {
-  "title": "whatsacc",
-  "logo": "/product-logos/whatsacc.svg",
+  "title": "lintel",
+  "logo": "/product-logos/lintel.svg",
   "brand": {
     "accent": "#C86848",
     "accentHover": "#A24F32",
@@ -11,37 +11,37 @@
         "family": "Fraunces",
         "weight": "100 900",
         "style": "normal",
-        "src": "/products/whatsacc/fonts/fraunces-var.woff2"
+        "src": "/products/lintel/fonts/fraunces-var.woff2"
       },
       {
         "family": "Fraunces",
         "weight": "100 900",
         "style": "italic",
-        "src": "/products/whatsacc/fonts/fraunces-italic-var.woff2"
+        "src": "/products/lintel/fonts/fraunces-italic-var.woff2"
       },
       {
         "family": "Inter",
         "weight": "100 900",
         "style": "normal",
-        "src": "/products/whatsacc/fonts/inter-var.woff2"
+        "src": "/products/lintel/fonts/inter-var.woff2"
       },
       {
         "family": "Inter",
         "weight": "100 900",
         "style": "italic",
-        "src": "/products/whatsacc/fonts/inter-italic-var.woff2"
+        "src": "/products/lintel/fonts/inter-italic-var.woff2"
       },
       {
         "family": "JetBrains Mono",
         "weight": "100 800",
         "style": "normal",
-        "src": "/products/whatsacc/fonts/jetbrains-mono-var.woff2"
+        "src": "/products/lintel/fonts/jetbrains-mono-var.woff2"
       },
       {
         "family": "JetBrains Mono",
         "weight": "100 800",
         "style": "italic",
-        "src": "/products/whatsacc/fonts/jetbrains-mono-italic-var.woff2"
+        "src": "/products/lintel/fonts/jetbrains-mono-italic-var.woff2"
       }
     ]
   },

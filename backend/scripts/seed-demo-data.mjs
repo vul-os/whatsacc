@@ -8,7 +8,7 @@
 //   3. node --env-file=../.env scripts/seed-demo-data.mjs
 //
 // After it finishes, log in at http://localhost:5173/login as
-//   demo@whatsacc.com / DemoSeed_99
+//   demo@lintel.com / DemoSeed_99
 
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -24,9 +24,9 @@ if (!DB_URL) {
   process.exit(2);
 }
 
-const DEMO_EMAIL = 'whatsaccsupport@gmail.com';
+const DEMO_EMAIL = 'lintelsupport@gmail.com';
 const DEMO_PASSWORD = 'happy123';
-const DEMO_NAME = 'Whatsacc Support';
+const DEMO_NAME = 'Lintel Support';
 
 // Force single-IPv4 to dodge Node's multi-IP connect failure mode
 // (broken IPv6 + Neon load-balanced AWS IPs).

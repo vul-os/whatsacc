@@ -4309,7 +4309,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "whatsacc"
+name = "lintel"
 version = "0.1.0"
 dependencies = [
  "serde",

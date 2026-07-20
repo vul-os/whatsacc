@@ -13,7 +13,7 @@
 
   <!-- editorial label -->
   <g font-family="Helvetica, Arial, sans-serif" fill="#F4EDE2" fill-opacity="0.55" font-size="20" letter-spacing="6">
-    <text x="100" y="100">WHATSACC · ACCESS, BY MESSAGE</text>
+    <text x="100" y="100">LINTEL · ACCESS, BY MESSAGE</text>
   </g>
 
   <!-- arch motif — same path as public/favicon.svg, scaled (64x64 viewBox) -->
@@ -24,7 +24,7 @@
   </g>
 
   <!-- wordmark + tagline -->
-  <text x="100" y="335" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="148" fill="#F4EDE2">whatsacc</text>
+  <text x="100" y="335" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="148" fill="#F4EDE2">lintel</text>
 
   <text x="100" y="410" font-family="Helvetica, Arial, sans-serif" font-size="34" fill="#F4EDE2" fill-opacity="0.78">Texts that open gates.</text>
 
@@ -33,7 +33,7 @@
 
   <!-- footer caption -->
   <g font-family="Helvetica, Arial, sans-serif" fill="#F4EDE2" fill-opacity="0.5" font-size="22">
-    <text x="100" y="555">whatsacc.com</text>
+    <text x="100" y="555">vulos.org/products/lintel</text>
     <text x="1100" y="555" text-anchor="end">Geofenced · Audited · Multi-tenant</text>
   </g>
 </svg>

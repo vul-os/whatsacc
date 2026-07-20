@@ -60,7 +60,7 @@ export function AuthLayout({
         <div className="relative z-10 h-full flex flex-col p-6 sm:p-10 lg:p-12">
           <Link to="/" className="inline-flex items-center gap-2.5 group w-fit text-ink">
             <ArchMark className="h-7 w-7 sm:h-8 sm:w-8 transition-transform group-hover:-translate-y-0.5" />
-            <span className="font-display italic text-lg sm:text-xl">whatsacc</span>
+            <span className="font-display italic text-lg sm:text-xl">lintel</span>
           </Link>
 
           <div className="mt-7 sm:mt-12">
@@ -81,7 +81,7 @@ export function AuthLayout({
           {/* footer signature — pinned to the bottom, riding above the gate */}
           <div className="hidden lg:flex items-center justify-between mt-auto pt-6">
             <span className="text-[10px] uppercase tracking-[0.22em] text-ink/40">
-              whatsacc &middot; access by message
+              lintel &middot; access by message
             </span>
             <span className="text-[10px] uppercase tracking-[0.22em] text-ink/40">
               made in ZA
@@ -97,7 +97,7 @@ export function AuthLayout({
         <header className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-6 lg:absolute lg:inset-x-0 lg:top-0 lg:z-10 lg:px-8 lg:pt-6 lg:justify-end">
           <Link to="/" className="lg:hidden inline-flex items-center gap-2.5 group w-fit text-ink">
             <ArchMark className="h-7 w-7 transition-transform group-hover:-translate-y-0.5" />
-            <span className="font-display italic text-lg">whatsacc</span>
+            <span className="font-display italic text-lg">lintel</span>
           </Link>
           <ThemeToggle variant="auth" />
         </header>

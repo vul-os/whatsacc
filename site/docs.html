@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>whatsacc — docs</title>
-<meta name="description" content="Documentation for whatsacc — the decentralized chat-to-gate access network. Run a gateway, wire a controller, link WhatsApp or Slack.">
+<title>lintel — docs</title>
+<meta name="description" content="Documentation for lintel — the decentralized chat-to-gate access network. Run a gateway, wire a controller, link WhatsApp or Slack.">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231A1F36'/%3E%3Cpath d='M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z' fill='none' stroke='%23F4EDE2' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='42' r='3' fill='%23D6624D'/%3E%3C/svg%3E">
 <script>
 (function(){
   var t;
-  try { t = localStorage.getItem('whatsacc.theme'); } catch(e){}
+  try { t = localStorage.getItem('lintel.theme'); } catch(e){}
   if (t !== 'light' && t !== 'dark')
     t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', t);
@@ -172,14 +172,14 @@ a{color:inherit}
 
 <header class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="./" aria-label="whatsacc home">
+    <a class="brand" href="./" aria-label="lintel home">
       <span class="brand-mark" aria-hidden="true">
         <svg width="17" height="17" viewBox="0 0 64 64" fill="none">
           <path d="M14 50 V32 a18 18 0 0 1 36 0 V50 H40 V32 a8 8 0 0 0 -16 0 V50 Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
           <circle cx="32" cy="42" r="3.4" fill="var(--terracotta)"/>
         </svg>
       </span>
-      <span class="brand-name">whatsacc</span>
+      <span class="brand-name">lintel</span>
       <span class="brand-docs">docs</span>
     </a>
     <div class="search-wrap">
@@ -188,7 +188,7 @@ a{color:inherit}
       <kbd>/</kbd>
     </div>
     <nav class="top-links" aria-label="Top">
-      <a href="https://github.com/vul-os/whatsacc" rel="noopener">GitHub</a>
+      <a href="https://github.com/vul-os/lintel" rel="noopener">GitHub</a>
       <a href="./">Home</a>
     </nav>
     <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
@@ -226,7 +226,7 @@ a{color:inherit}
   document.getElementById('themeToggle').addEventListener('click', function(){
     var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
-    try { localStorage.setItem('whatsacc.theme', next); } catch(e){}
+    try { localStorage.setItem('lintel.theme', next); } catch(e){}
   });
 
   /* ---------- mobile sidebar ---------- */
@@ -317,7 +317,7 @@ a{color:inherit}
 
   function renderPage(id, anchor){
     var page = pageById[id];
-    document.title = page.title + ' — whatsacc docs';
+    document.title = page.title + ' — lintel docs';
     markActive(id);
     loadMd(id).then(function(md){
       var html = marked.parse(md, { mangle: false, headerIds: false });

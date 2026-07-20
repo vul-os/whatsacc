@@ -4,7 +4,7 @@
 // Usage:
 //   cd backend
 //   node --env-file=../.env scripts/seed-user.mjs \
-//     --email=whatsaccsupport.com --password=happy123 --name=Acc bot
+//     --email=lintelsupport.com --password=happy123 --name=Acc bot
 
 import pg from 'pg';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';

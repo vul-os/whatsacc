@@ -1,4 +1,4 @@
-# whatsacc conformance vectors — v0
+# lintel conformance vectors — v0
 
 Executable, deterministic test vectors for the four wire contracts in
 [`proto/`](../README.md). The Go gateway, controller firmware and the app verify
@@ -113,4 +113,4 @@ covered by the signature when present.
 | stale-clock refusal | offline > 1 209 600 s (14 d = 2 × default grant TTL) |
 | grant TTL in vectors | 604 800 s (7 d) |
 | controller timezone for `windows` | UTC |
-| test seeds | sha256(`"whatsacc-test-vector:<name>"`), hardcoded in `lib.mjs` |
+| test seeds | sha256(`"lintel-test-vector:<name>"`), hardcoded in `lib.mjs` |

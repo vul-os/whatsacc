@@ -1,4 +1,4 @@
-# whatsacc e2e — cross-module integration harness
+# lintel e2e — cross-module integration harness
 
 Proves the **gateway** (`../gateway`) and the **controller** (`../controller`)
 interoperate over the *real* wire protocol (`../proto`), by booting the actual
@@ -22,8 +22,8 @@ via `go.work` / `replace`). **That is impossible here, and no `go.work` or
 (`gateway/internal/...`, `controller/internal/...`). Go's internal-package rule
 keys on *import paths*, not modules or workspaces — an importer is allowed only
 if its path is under the parent of `internal/`. This module's path is
-`github.com/vul-os/whatsacc/e2e`, a **sibling** of
-`github.com/vul-os/whatsacc/gateway`, so it can never import
+`github.com/vul-os/lintel/e2e`, a **sibling** of
+`github.com/vul-os/lintel/gateway`, so it can never import
 `.../gateway/internal/*` (or the controller's). `go.work`/`replace` only change
 module *resolution*; they do not relax `internal/`. The only in-process routes
 would be relocating this module under one of the others, or adding public

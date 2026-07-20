@@ -24,7 +24,7 @@ import (
 )
 
 // canonicalize renders v as RFC 8785 (JCS) canonical JSON (integers + strings
-// + bools + arrays + objects subset the whatsacc contracts use).
+// + bools + arrays + objects subset the lintel contracts use).
 func canonicalize(v any) ([]byte, error) {
 	var b strings.Builder
 	if err := writeJCS(&b, v); err != nil {

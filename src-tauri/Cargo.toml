@@ -1,7 +1,7 @@
 [package]
-name = "whatsacc"
+name = "lintel"
 version = "0.1.0"
-description = "whatsacc desktop portal — texts that open gates"
+description = "lintel desktop portal — texts that open gates"
 authors = ["imranparuk"]
 license = "MIT"
 edition = "2021"
@@ -9,7 +9,7 @@ rust-version = "1.77.2"
 
 # The binary would collide with the lib name if we ever add one; keep explicit.
 [[bin]]
-name = "whatsacc"
+name = "lintel"
 path = "src/main.rs"
 
 [build-dependencies]

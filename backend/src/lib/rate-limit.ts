@@ -1,6 +1,6 @@
 // Abuse-protection rate limits + admin-configured quotas.
 //
-// Strictly NON-MONETARY — whatsacc has no billing. Two layers:
+// Strictly NON-MONETARY — lintel has no billing. Two layers:
 //
 //   1. Rate limits (always on, env-tunable): per-member open cooldown,
 //      per-member opens/hour, per-account opens/hour ceiling, and a
@@ -592,7 +592,7 @@ export function chatDenialMessage(denial: {
     return 'This account has been suspended by the gateway operator — the gate cannot be opened. Contact your operator for help.';
   }
   if (denial.reason === 'user_disabled') {
-    return 'Your whatsacc user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help.';
+    return 'Your lintel user has been disabled by the gateway operator — the gate cannot be opened. Contact your operator for help.';
   }
   if (denial.reason === 'quota_exceeded') {
     const base = getEnv().APP_PUBLIC_URL.replace(/\/$/, '');

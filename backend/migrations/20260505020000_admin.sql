@@ -1,7 +1,7 @@
 -- 20260505020000_admin.sql
 -- Instance-admin (gateway operator) system.
 --
--- whatsacc is a self-hosted gateway: each deployment is run by an operator.
+-- lintel is a self-hosted gateway: each deployment is run by an operator.
 -- This migration adds the operator plumbing:
 --
 --   1. instance_settings — internal-only key/value store. Holds the runtime
@@ -9,7 +9,7 @@
 --      one-time admin-claim burn flag (key 'admin_claimed'). FORCEd RLS with
 --      NO policies (same pattern as rate_limit_counters): request roles can
 --      never touch rows directly; all access goes through the SECURITY
---      DEFINER app.instance_setting_* functions owned by whatsacc_internal.
+--      DEFINER app.instance_setting_* functions owned by lintel_internal.
 --   2. admin_audit_log — append-only log of admin actions AND denied
 --      /admin/* attempts. Readable by platform admins only; written only via
 --      app.admin_audit_write (no INSERT policy on purpose, so a tenant can
@@ -50,8 +50,8 @@ COMMENT ON TABLE instance_settings
 ALTER TABLE instance_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instance_settings FORCE ROW LEVEL SECURITY;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON instance_settings TO whatsacc_internal;
-GRANT SELECT, INSERT, UPDATE, DELETE ON instance_settings TO whatsacc_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON instance_settings TO lintel_internal;
+GRANT SELECT, INSERT, UPDATE, DELETE ON instance_settings TO lintel_app;
 
 -- ============================================================================
 -- admin_audit_log
@@ -86,8 +86,8 @@ CREATE POLICY admin_audit_log_admin_read ON admin_audit_log
     FOR SELECT
     USING (app.is_platform_admin());
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON admin_audit_log TO whatsacc_internal;
-GRANT SELECT ON admin_audit_log TO whatsacc_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON admin_audit_log TO lintel_internal;
+GRANT SELECT ON admin_audit_log TO lintel_app;
 
 -- ============================================================================
 -- Audit-friendly indexes
@@ -102,7 +102,7 @@ CREATE INDEX users_created_at_idx ON users (created_at DESC);
 CREATE INDEX accounts_created_at_idx ON accounts (created_at DESC);
 
 -- ============================================================================
--- Accessor functions (SECURITY DEFINER, owned by whatsacc_internal)
+-- Accessor functions (SECURITY DEFINER, owned by lintel_internal)
 -- ============================================================================
 
 -- Read one setting. PUBLIC: the rate limiter must read overrides under every
@@ -169,7 +169,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-    PERFORM pg_advisory_xact_lock(hashtextextended('whatsacc:admin_claim', 0));
+    PERFORM pg_advisory_xact_lock(hashtextextended('lintel:admin_claim', 0));
 
     IF EXISTS (SELECT 1 FROM users WHERE is_platform_admin) THEN
         RETURN false;
@@ -223,11 +223,11 @@ $$;
 
 -- Hand ownership to the BYPASSRLS internal role (baseline pattern) so the
 -- functions can cross the FORCEd RLS on the internal tables.
-ALTER FUNCTION app.instance_setting_get(text)                            OWNER TO whatsacc_internal;
-ALTER FUNCTION app.instance_setting_set(text, jsonb, uuid)               OWNER TO whatsacc_internal;
-ALTER FUNCTION app.platform_admin_exists()                               OWNER TO whatsacc_internal;
-ALTER FUNCTION app.claim_platform_admin(uuid)                            OWNER TO whatsacc_internal;
-ALTER FUNCTION app.admin_audit_write(uuid, text, text, text, boolean, jsonb) OWNER TO whatsacc_internal;
+ALTER FUNCTION app.instance_setting_get(text)                            OWNER TO lintel_internal;
+ALTER FUNCTION app.instance_setting_set(text, jsonb, uuid)               OWNER TO lintel_internal;
+ALTER FUNCTION app.platform_admin_exists()                               OWNER TO lintel_internal;
+ALTER FUNCTION app.claim_platform_admin(uuid)                            OWNER TO lintel_internal;
+ALTER FUNCTION app.admin_audit_write(uuid, text, text, text, boolean, jsonb) OWNER TO lintel_internal;
 
 GRANT EXECUTE ON FUNCTION app.instance_setting_get(text)                            TO PUBLIC;
 GRANT EXECUTE ON FUNCTION app.instance_setting_set(text, jsonb, uuid)               TO PUBLIC;

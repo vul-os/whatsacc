@@ -1,7 +1,7 @@
 # Instance admin
 
 Every gateway has an operator: the person who runs the machine, sets the env, and
-answers the phone when something breaks. whatsacc gives that person a real seat —
+answers the phone when something breaks. lintel gives that person a real seat —
 the **instance admin** — with its own claim flow, its own surfaces, and its own audit
 trail. This chapter is how you claim it, what it lets you do, and exactly where its
 power stops.

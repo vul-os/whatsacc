@@ -1,4 +1,4 @@
-# Contributing to whatsacc
+# Contributing to lintel
 
 Thanks for helping build texts that open gates. Small, focused PRs against `main`
 are the easiest to review and land.
@@ -8,7 +8,7 @@ are the easiest to review and land.
 Prereqs: **Node 20+** and **Postgres 16+** (local; no TLS needed).
 
 ```bash
-git clone https://github.com/vul-os/whatsacc && cd whatsacc
+git clone https://github.com/vul-os/lintel && cd lintel
 
 npm install                      # frontend deps
 cd backend && npm install && cd ..   # backend deps
@@ -16,7 +16,7 @@ cd backend && npm install && cd ..   # backend deps
 cp .env.example .env             # node scripts + tests read this (repo root)
 cp backend/.dev.vars.example backend/.dev.vars   # wrangler dev reads THIS
 
-createdb whatsacc                # or point DATABASE_URL anywhere throwaway
+createdb lintel                # or point DATABASE_URL anywhere throwaway
 cd backend && npm run migrate    # apply migrations
 npm run dev                      # API via wrangler on :8787
 cd .. && npm run dev             # Vite portal on :5173
@@ -63,5 +63,5 @@ run of the table above should mean green CI.
 
 ## License
 
-whatsacc is [MIT](LICENSE). By contributing you agree your contributions are
+lintel is [MIT](LICENSE). By contributing you agree your contributions are
 licensed under the same terms. There is no CLA.

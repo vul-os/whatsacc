@@ -1,4 +1,4 @@
-module github.com/vul-os/whatsacc/controller
+module github.com/vul-os/lintel/controller
 
 go 1.23.8
 

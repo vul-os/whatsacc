@@ -35,7 +35,7 @@ export function AppTopBar() {
 
           <div className="flex items-baseline gap-2 sm:gap-3 min-w-0">
             <span className="hidden sm:inline text-[11px] uppercase tracking-[0.18em] text-ink/45">
-              whatsacc
+              lintel
             </span>
             <span className="hidden sm:inline text-ink/30">/</span>
             <span className="font-display text-lg sm:text-xl capitalize truncate">{title}</span>

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/pairing"
-	"github.com/vul-os/whatsacc/controller/internal/state"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/pairing"
+	"github.com/vul-os/lintel/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
 )
 
 // fakeGateway implements /pair/redeem with single-use token burn.
@@ -80,7 +80,7 @@ func TestRedeemHappyPathAndTokenBurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := &pairing.Client{}
-	hw := pairing.HW{Model: "wacc-c1", FW: "0.1.0", Ifaces: []string{"wifi"}}
+	hw := pairing.HW{Model: "lintel-c1", FW: "0.1.0", Ifaces: []string{"wifi"}}
 	g, err := c.RedeemClaim(context.Background(), st, ts.URL, "claim-123", k.Keys["controller"].PublicKeyB64u, hw)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestGatewayKeyChangeRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := &pairing.Client{}
-	hw := pairing.HW{Model: "wacc-c1", FW: "0.1.0"}
+	hw := pairing.HW{Model: "lintel-c1", FW: "0.1.0"}
 	if _, err := c.RedeemClaim(context.Background(), st, ts.URL, "claim-1", k.Keys["controller"].PublicKeyB64u, hw); err != nil {
 		t.Fatal(err)
 	}

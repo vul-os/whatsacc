@@ -6,7 +6,7 @@ import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
 import { ApiError, api } from '@/lib/api';
 
-const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
+const PENDING_INVITE_KEY = 'lintel.pendingInviteToken';
 
 type Status = 'idle' | 'accepting' | 'success' | 'error' | 'no-token' | 'needs-auth';
 

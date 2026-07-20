@@ -4,7 +4,7 @@ A gate that opens on a text message needs a speed limit. This chapter covers the
 layers that provide one: **rate limits** (always on, operator-tunable) and **quotas**
 (off by default, set per location by admins). One honest line first: these exist for
 abuse protection — a runaway script, a stolen phone, a flood of webhooks — and for
-nothing else. whatsacc has no billing, so no limit here is ever about money.
+nothing else. lintel has no billing, so no limit here is ever about money.
 
 ## The two layers
 

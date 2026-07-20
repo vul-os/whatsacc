@@ -11,16 +11,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vul-os/whatsacc/controller/internal/clock"
-	"github.com/vul-os/whatsacc/controller/internal/command"
-	"github.com/vul-os/whatsacc/controller/internal/events"
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
-	"github.com/vul-os/whatsacc/controller/internal/noncestore"
-	"github.com/vul-os/whatsacc/controller/internal/relay"
-	"github.com/vul-os/whatsacc/controller/internal/state"
-	"github.com/vul-os/whatsacc/controller/internal/transport"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
-	"github.com/vul-os/whatsacc/controller/internal/wire"
+	"github.com/vul-os/lintel/controller/internal/clock"
+	"github.com/vul-os/lintel/controller/internal/command"
+	"github.com/vul-os/lintel/controller/internal/events"
+	"github.com/vul-os/lintel/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/noncestore"
+	"github.com/vul-os/lintel/controller/internal/relay"
+	"github.com/vul-os/lintel/controller/internal/state"
+	"github.com/vul-os/lintel/controller/internal/transport"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/wire"
 )
 
 func vectorKeys(t *testing.T) (gwPriv, ctrlPriv ed25519.PrivateKey, gwPubB64 string, ctrlPub ed25519.PublicKey) {

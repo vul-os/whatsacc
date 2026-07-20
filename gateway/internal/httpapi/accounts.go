@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Accounts + members + invites, porting backend/src/routes/accounts.ts.

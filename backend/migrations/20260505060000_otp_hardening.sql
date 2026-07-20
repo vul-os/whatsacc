@@ -168,20 +168,20 @@ $$;
 
 -- Re-assert ownership + privileges (CREATE OR REPLACE preserves them, but
 -- keep the migration self-contained and robust against partial replays).
-ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)           OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_last(text, text)                       OWNER TO whatsacc_internal;
-ALTER FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) OWNER TO whatsacc_internal;
+ALTER FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_get(text, text, timestamptz)           OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_last(text, text)                       OWNER TO lintel_internal;
+ALTER FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) OWNER TO lintel_internal;
 
 REVOKE EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.rate_limit_last(text, text)                       FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_last(text, text)                       TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) TO whatsacc_app, whatsacc_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_bump(text, text, timestamptz, int)     TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_get(text, text, timestamptz)           TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_last(text, text)                       TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.rate_limit_try_bump(text, text, timestamptz, int) TO lintel_app, lintel_internal;
 
 -- ============================================================================
 -- 2. Per-challenge salt for OTP code hashes
@@ -323,7 +323,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION app.phone_verification_start(uuid, text, timestamptz)  OWNER TO whatsacc_internal;
-ALTER FUNCTION app.phone_verification_consume(uuid, text, int)        OWNER TO whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.phone_verification_start(uuid, text, timestamptz) TO whatsacc_app, whatsacc_internal;
-GRANT EXECUTE ON FUNCTION app.phone_verification_consume(uuid, text, int)       TO whatsacc_app, whatsacc_internal;
+ALTER FUNCTION app.phone_verification_start(uuid, text, timestamptz)  OWNER TO lintel_internal;
+ALTER FUNCTION app.phone_verification_consume(uuid, text, int)        OWNER TO lintel_internal;
+GRANT EXECUTE ON FUNCTION app.phone_verification_start(uuid, text, timestamptz) TO lintel_app, lintel_internal;
+GRANT EXECUTE ON FUNCTION app.phone_verification_consume(uuid, text, int)       TO lintel_app, lintel_internal;

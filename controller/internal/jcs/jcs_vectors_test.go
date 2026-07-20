@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/vul-os/whatsacc/controller/internal/jcs"
-	"github.com/vul-os/whatsacc/controller/internal/vectorfile"
+	"github.com/vul-os/lintel/controller/internal/jcs"
+	"github.com/vul-os/lintel/controller/internal/vectorfile"
 )
 
 // TestCanonicalBytesAllVectors is conformance layer 1 (proto/vectors/README):

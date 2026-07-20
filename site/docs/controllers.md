@@ -1,6 +1,6 @@
 # Controllers
 
-A controller is the unit at the gate: a Pi-class board running the whatsacc agent,
+A controller is the unit at the gate: a Pi-class board running the lintel agent,
 wired to the motor's relay input, on Wi-Fi or a GSM 4G SIM. It dials **out** to exactly
 one gateway, verifies every command's signature against that gateway's pinned key, and
 pulses the relay.
@@ -11,7 +11,7 @@ volunteer configured in 2014. Zero inbound ports, zero port-forwarding.
 
 ## The reference agent (real today)
 
-The agent in [`controller/`](https://github.com/vul-os/whatsacc/tree/main/controller) is
+The agent in [`controller/`](https://github.com/vul-os/lintel/tree/main/controller) is
 a real, standalone Go module — std-lib first, no CGO. What's **implemented and
 conformance-tested** against the `proto/` vectors: fail-closed command verification
 (signature, addressing, replay window, lockdown), pairing with gateway-key **pinning**,
@@ -33,7 +33,7 @@ proves the money path end to end.
 Build and drive it without any hardware:
 
 ```sh
-cd whatsacc/controller
+cd lintel/controller
 go build ./...                                   # default build, zero external deps
 
 # Live agent against a dev gateway (mock relay; prints state transitions)
@@ -47,7 +47,7 @@ On a real device the agent pairs once with a claim token and persists the result
 
 ```sh
 go run ./cmd/controller \
-  --state /var/lib/whatsacc --gateway https://gate.example.com \
+  --state /var/lib/lintel --gateway https://gate.example.com \
   --claim-token <TOKEN> --access-points <ACCESS_POINT_ID>
 ```
 
@@ -62,13 +62,13 @@ Find the two terminals on the gate motor that the receiver pulses — usually la
 
 ```
 gate motor        COM ──┬── existing receiver relay
-                        └── whatsacc controller relay
+                        └── lintel controller relay
                   NO  ──┴───────────────┘
 ```
 
 - Most installs share the motor's 12&nbsp;V supply instead of the included adapter.
 - For 24&nbsp;V or AC motors, use an optoisolated relay board between controller and motor.
-- Your existing remotes, keypads and intercom keep working. whatsacc is in parallel,
+- Your existing remotes, keypads and intercom keep working. lintel is in parallel,
   never in the way.
 
 ## Pairing: the claim-token flow

@@ -1,4 +1,4 @@
-// Command controller is the whatsacc reference controller agent: pairs to a
+// Command controller is the lintel reference controller agent: pairs to a
 // gateway with a claim token on first run (persisting the PINNED gateway
 // key), then maintains the outbound WSS connection, processes signed
 // commands fail-closed, serves offline grants on the LAN (and BLE with
@@ -6,7 +6,7 @@
 //
 // First run:
 //
-//	controller --state /var/lib/whatsacc --gateway https://gate.example.com --claim-token …
+//	controller --state /var/lib/lintel --gateway https://gate.example.com --claim-token …
 //
 // Subsequent runs need only --state; the pairing is durable.
 package main
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/vul-os/whatsacc/controller/internal/agent"
+	"github.com/vul-os/lintel/controller/internal/agent"
 )
 
 const firmware = "0.1.0"

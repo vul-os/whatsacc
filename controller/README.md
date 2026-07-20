@@ -1,4 +1,4 @@
-# whatsacc controller — reference implementation
+# lintel controller — reference implementation
 
 The reference controller agent: it runs on a Raspberry Pi (or any Linux box)
 at a physical gate, is owned by exactly one gateway, and drives a gate relay.
@@ -11,7 +11,7 @@ pre-issued grants against its pinned gateway key.
 > (verification, framing, offline grants, event queue, transport) is real and
 > conformance-tested against `proto/vectors/`.
 
-This is its **own Go module** (`github.com/vul-os/whatsacc/controller`) so it
+This is its **own Go module** (`github.com/vul-os/lintel/controller`) so it
 can be vendored onto devices without dragging in the gateway. It deliberately
 **copies** the small JCS + Ed25519 verify code from `gateway/internal/keys`
 rather than importing it — see [Code duplication](#code-duplication).
@@ -24,7 +24,7 @@ default builds have zero external dependencies.
 
 ```
 controller/
-  go.mod                         # module github.com/vul-os/whatsacc/controller (Go 1.22+)
+  go.mod                         # module github.com/vul-os/lintel/controller (Go 1.22+)
   cmd/
     controller/                  # the agent binary
     controller-sim/              # interactive/scriptable simulator + demos
@@ -42,7 +42,7 @@ controller/
     blesession/                  # open→challenge→proof→result sequencing over framing + grants
     bleperiph/                   # BLE GATT peripheral (real glue behind `-tags ble` on Linux)
     lanserver/                   # LAN HTTP grant transport + mDNS advertise
-    mdns/                        # minimal std-lib _whatsacc._tcp responder
+    mdns/                        # minimal std-lib _lintel._tcp responder
     events/                      # durable event queue (JSONL ring, reserved grant partition) + Recorder
     transport/                   # RFC 6455 WSS client, ws.auth, backoff, long-poll fallback, runner
     pairing/                     # claim-token redeem client (pins gateway key)
@@ -60,7 +60,7 @@ controller/
 | Pairing redeem + gateway-key pinning + repair rotation | **Real**, tested against an httptest fake gateway |
 | Durable event queue (ring + reserved grant partition, crash-safe) | **Real**, kill/reload tested |
 | WSS transport (RFC 6455 client, challenge/auth, backoff, long-poll) | **Real**, tested against a fake WS gateway |
-| mDNS `_whatsacc._tcp` advertise + LAN HTTP grant transport | **Real** |
+| mDNS `_lintel._tcp` advertise + LAN HTTP grant transport | **Real** |
 | BLE **framing codec + session + verification** | **Real**, unit-tested at MTUs 23/185/512 |
 | BLE **radio** (GATT peripheral) | **Stub** — real BlueZ glue under `-tags ble` on Linux, **not hardware-validated**; `ErrUnsupported` elsewhere |
 | **GPIO relay driver** | **Stub** — `-tags gpio` scaffold that panics; default build uses the mock relay and logs actuations |
@@ -92,7 +92,7 @@ the result, pinning the gateway's public key:
 
 ```
 go run ./cmd/controller \
-  --state /var/lib/whatsacc \
+  --state /var/lib/lintel \
   --gateway https://gate.example.com \
   --claim-token <TOKEN> \
   --access-points main,pedestrian

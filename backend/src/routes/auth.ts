@@ -317,14 +317,14 @@ function authRouter() {
     const env = getEnv();
     const verifyUrl = `${env.APP_PUBLIC_URL}/auth/verify-email?token=${encodeURIComponent(verifyTokenPlain)}`;
     const verifyMail = renderEmail({
-      preheader: 'Confirm your email to finish setting up whatsacc.',
+      preheader: 'Confirm your email to finish setting up lintel.',
       heading: `Welcome, ${escapeHtml(display_name)}.`,
       bodyParagraphs: [
-        "Thanks for signing up for whatsacc. Confirm your email so we know it's really you — it takes one click.",
+        "Thanks for signing up for lintel. Confirm your email so we know it's really you — it takes one click.",
         'This link expires in 24 hours.',
       ],
       cta: { label: 'Verify my email', url: verifyUrl },
-      footnote: "If you didn't create a whatsacc account, you can safely ignore this email.",
+      footnote: "If you didn't create a lintel account, you can safely ignore this email.",
     });
     // Best-effort — register must succeed even if Resend hiccups. The user's
     // status is already 'active' so they can sign in without the verify
@@ -332,7 +332,7 @@ function authRouter() {
     try {
       await sendEmail({
         to: email,
-        subject: 'Verify your whatsacc email',
+        subject: 'Verify your lintel email',
         html: verifyMail.html,
         text: verifyMail.text,
       });
@@ -501,10 +501,10 @@ function authRouter() {
       const env = getEnv();
       const url = `${env.APP_PUBLIC_URL}/auth/reset-password?token=${encodeURIComponent(tokenPlain)}`;
       const resetMail = renderEmail({
-        preheader: 'Reset your whatsacc password.',
+        preheader: 'Reset your lintel password.',
         heading: 'Reset your password',
         bodyParagraphs: [
-          'We received a request to reset the password on your whatsacc account. Use the button below to set a new one.',
+          'We received a request to reset the password on your lintel account. Use the button below to set a new one.',
           'This link expires in 1 hour.',
         ],
         cta: { label: 'Reset password', url },
@@ -514,7 +514,7 @@ function authRouter() {
       try {
         await sendEmail({
           to: email,
-          subject: 'Reset your whatsacc password',
+          subject: 'Reset your lintel password',
           html: resetMail.html,
           text: resetMail.text,
         });

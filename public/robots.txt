@@ -4,4 +4,4 @@ Disallow: /app
 Disallow: /login
 Disallow: /signup
 
-Sitemap: https://whatsacc.com/sitemap.xml
+Sitemap: https://vulos.org/products/lintel/sitemap.xml

@@ -11,7 +11,7 @@ import (
 var ErrDeviceNotAtLocation = errors.New("device_not_at_location")
 
 // AccessPointDetail is the GET /access-points shape: the row plus the meter
-// summary. whatsacc-gateway derives the meter from access_logs (the Postgres
+// summary. lintel-gateway derives the meter from access_logs (the Postgres
 // backend kept a separate access_point_meters table fed by device acks;
 // movement metering is deferred with the maintenance module — see README).
 type AccessPointDetail struct {

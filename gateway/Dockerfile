@@ -1,21 +1,21 @@
 # syntax=docker/dockerfile:1
 #
-# whatsacc gateway — one static Go binary, one SQLite file.
+# lintel gateway — one static Go binary, one SQLite file.
 #
-# Build (from repo root):   docker build -t whatsacc-gateway gateway
-# Run:                      docker run -d -p 8080:8080 -v whatsacc-data:/data \
-#                             ghcr.io/vul-os/whatsacc-gateway:latest
+# Build (from repo root):   docker build -t lintel-gateway gateway
+# Run:                      docker run -d -p 8080:8080 -v lintel-data:/data \
+#                             ghcr.io/vul-os/lintel-gateway:latest
 #
 # Configuration (flags-over-env, see cmd/gateway/main.go):
-#   WACC_DATA_DIR      data directory (SQLite db, signing keys)  default /data (set below)
-#   WACC_LISTEN        listen address                            default :8080
-#   WACC_PUBLIC_URL    external base URL (webhooks, links)       default ""
+#   LINTEL_DATA_DIR    data directory (SQLite db, signing keys)  default /data (set below)
+#   LINTEL_LISTEN      listen address                            default :8080
+#   LINTEL_PUBLIC_URL  external base URL (webhooks, links)       default ""
 #   ADMIN_CLAIM_TOKEN  one-shot admin claim token                default "" (claiming disabled)
 #
 # The final image is distroless (no shell, no curl/wget). The HEALTHCHECK is a
 # tiny stdlib-only Go probe compiled here in the builder stage — it lives in
 # this Dockerfile, not in the gateway source tree — that GETs /health on the
-# WACC_LISTEN port and exits non-zero unless it answers 200.
+# LINTEL_LISTEN port and exits non-zero unless it answers 200.
 #
 # Data note: /data is baked owned by nonroot (uid 65532). Named volumes inherit
 # that ownership; if you bind-mount a host directory instead, chown it to 65532.
@@ -48,7 +48,7 @@ import (
 )
 
 func main() {
-	addr := os.Getenv("WACC_LISTEN")
+	addr := os.Getenv("LINTEL_LISTEN")
 	if addr == "" {
 		addr = ":8080"
 	}
@@ -80,8 +80,8 @@ COPY --from=build /out/gateway /gateway
 COPY --from=build /out/healthprobe /healthprobe
 COPY --from=build --chown=65532:65532 /out/data /data
 
-ENV WACC_DATA_DIR=/data \
-    WACC_LISTEN=:8080
+ENV LINTEL_DATA_DIR=/data \
+    LINTEL_LISTEN=:8080
 
 VOLUME ["/data"]
 EXPOSE 8080

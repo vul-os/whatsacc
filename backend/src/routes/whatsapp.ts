@@ -437,7 +437,7 @@ function whatsappRouter() {
                     to: msg.from,
                     chatId: chat.id,
                     body: [
-                      "Hello! This WhatsApp number isn't linked to a whatsacc account yet.",
+                      "Hello! This WhatsApp number isn't linked to a lintel account yet.",
                       `Create your account here: ${signupLinkForPhone(from)}`,
                       "After signup, we'll ask if you want to connect this number.",
                     ].join('\n\n'),
@@ -450,7 +450,7 @@ function whatsappRouter() {
                     to: msg.from,
                     chatId: chat.id,
                     body: [
-                      'Welcome to whatsacc. Your number is connected.',
+                      'Welcome to lintel. Your number is connected.',
                       "You don't have a location set up yet. Open the dashboard to add Home, HQ, or your first site.",
                       `${getEnv().APP_PUBLIC_URL.replace(/\/$/, '')}/app`,
                     ].join('\n\n'),
@@ -462,7 +462,7 @@ function whatsappRouter() {
                   to: msg.from,
                   chatId: chat.id,
                   body: [
-                    `Welcome to ${locations.length === 1 ? locations[0]!.name : 'whatsacc'}.`,
+                    `Welcome to ${locations.length === 1 ? locations[0]!.name : 'lintel'}.`,
                     locations.length === 1
                       ? 'No gates or doors are ready at this location yet.'
                       : `I found ${locations.length} locations, but none have active gates or doors ready yet.`,

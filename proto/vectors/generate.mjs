@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // proto/vectors/generate.mjs — deterministic conformance-vector generator for the
-// whatsacc v0 wire contracts (../pairing.md ../commands.md ../grants.md ../events.md).
+// lintel v0 wire contracts (../pairing.md ../commands.md ../grants.md ../events.md).
 //
 // Fully deterministic: fixed seeds (lib.mjs), fixed timestamps, fixed nonces, and
 // Ed25519 signing is itself deterministic (RFC 8032) — running this twice produces
@@ -87,7 +87,7 @@ writeFileSync(
     {
       $comment:
         '*** TEST KEYS ONLY — PUBLIC, DETERMINISTIC, NEVER USE IN PRODUCTION *** ' +
-        'Seeds are sha256("whatsacc-test-vector:<name>"). private_seed_hex is the raw ' +
+        'Seeds are sha256("lintel-test-vector:<name>"). private_seed_hex is the raw ' +
         '32-byte Ed25519 seed (RFC 8032); public_key_hex/b64u is the raw 32-byte public key.',
       keys: Object.fromEntries(
         Object.entries(KEYS).map(([name, k]) => [
@@ -121,7 +121,7 @@ console.log('wrote keys.json');
       typ: 'pair.redeem',
       claim_token: 'dGVzdC1jbGFpbS10b2tlbi0xMjNBQkNERUZHSElKS0w',
       controller_pubkey: KEYS.controller.pubB64u,
-      hw: { model: 'wacc-c1', fw: '0.1.0', ifaces: ['wifi', 'gsm'] },
+      hw: { model: 'lintel-c1', fw: '0.1.0', ifaces: ['wifi', 'gsm'] },
     }),
   });
 

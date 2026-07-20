@@ -4,7 +4,7 @@
 // from the OTHER user's session. Anything that leaks Org A data to User B
 // (or vice versa) is a real security finding.
 //
-//   cd backend && BASE_URL=https://whatsacc-backend-dev.whatsaccsupport.workers.dev \
+//   cd backend && BASE_URL=https://lintel-backend-dev.lintelsupport.workers.dev \
 //     node --env-file=../.env.dev scripts/test-rls-isolation.mjs
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8787';

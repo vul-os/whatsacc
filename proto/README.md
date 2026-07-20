@@ -1,4 +1,4 @@
-# whatsacc wire contracts
+# lintel wire contracts
 
 These are the contracts that outlive binaries. Controllers get installed at physical
 gates and stay there for years; the app ends up on phones we don't control. Everything

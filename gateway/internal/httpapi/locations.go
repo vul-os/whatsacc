@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vul-os/whatsacc/gateway/internal/store"
+	"github.com/vul-os/lintel/gateway/internal/store"
 )
 
 // Locations + quotas, porting backend/src/routes/locations.ts.

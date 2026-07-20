@@ -171,7 +171,7 @@ dbTest('slack flow: unlinked slack user asking "open" gets the link prompt with 
     const calls = outbound.to('slack.com/api/chat.postMessage');
     assertEquals(calls.length, 1);
     const text = (calls[0]!.body as { text: string }).text;
-    assert(text.includes("I don't know which whatsacc profile this Slack user belongs to yet."), text);
+    assert(text.includes("I don't know which lintel profile this Slack user belongs to yet."), text);
     assert(text.includes('U-STRANGER'), 'prompt must tell the user which Slack ID to link');
   } finally {
     outbound.restore();

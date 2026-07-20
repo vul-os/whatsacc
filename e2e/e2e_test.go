@@ -1,4 +1,4 @@
-// Package e2e is the whatsacc cross-module integration suite. Each test boots
+// Package e2e is the lintel cross-module integration suite. Each test boots
 // a REAL gateway binary and (mostly) a REAL controller binary and drives them
 // over the real wire (HTTP + WebSocket + LAN grant HTTP), asserting the two
 // independent implementations agree on the proto/ contracts.
@@ -341,7 +341,7 @@ func TestPairing_PathContract(t *testing.T) {
 		return map[string]any{
 			"v": 0, "typ": "pair.redeem", "claim_token": claim,
 			"controller_pubkey": fakePub,
-			"hw":                map[string]any{"model": "wacc-ref", "fw": "0.1.0", "ifaces": []string{"wifi"}},
+			"hw":                map[string]any{"model": "lintel-ref", "fw": "0.1.0", "ifaces": []string{"wifi"}},
 		}
 	}
 

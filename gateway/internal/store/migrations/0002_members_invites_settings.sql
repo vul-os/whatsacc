@@ -14,7 +14,7 @@ CREATE TABLE location_members (
 );
 CREATE INDEX location_members_user_id_idx ON location_members (user_id);
 
--- Abuse-protection quotas (NOT billing — whatsacc has none). NULL = unlimited.
+-- Abuse-protection quotas (NOT billing — lintel has none). NULL = unlimited.
 CREATE TABLE location_settings (
     location_id                    TEXT PRIMARY KEY REFERENCES locations(id) ON DELETE CASCADE,
     max_opens_per_member_per_day   INTEGER,

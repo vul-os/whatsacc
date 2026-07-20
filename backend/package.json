@@ -1,12 +1,12 @@
 {
-  "name": "whatsacc-backend",
+  "name": "lintel-backend",
   "private": true,
-  "description": "whatsacc API — Cloudflare Workers + Hono + Postgres; the behavioral spec for the Go gateway port",
+  "description": "lintel API — Cloudflare Workers + Hono + Postgres; the behavioral spec for the Go gateway port",
   "license": "MIT",
   "author": "imranparuk",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vul-os/whatsacc",
+    "url": "https://github.com/vul-os/lintel",
     "directory": "backend"
   },
   "type": "module",
