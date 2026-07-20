@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useAuth } from '@/lib/auth';
-import { ApiError, api, type CountryRef } from '@/lib/api';
-import { isTauri } from '@/lib/gateway';
+import { ApiError, api, friendlyApiError, type CountryRef } from '@/lib/api';
 
-const PENDING_INVITE_KEY = 'whatsacc.pendingInviteToken';
-export const PENDING_WHATSAPP_PHONE_KEY = 'whatsacc.pendingWhatsAppPhone';
+const PENDING_INVITE_KEY = 'lintel.pendingInviteToken';
+export const PENDING_WHATSAPP_PHONE_KEY = 'lintel.pendingWhatsAppPhone';
 const PHONE_E164_RE = /^\+[1-9]\d{6,14}$/;
 
 type Step = 'auth' | 'kind' | 'location';
@@ -65,13 +64,6 @@ export default function Signup() {
     }
   }, [searchParams]);
 
-  const googleStartUrl = api.googleStartUrl();
-
-  function rememberPendingWhatsAppPhone() {
-    if (!pendingWhatsAppPhone) return;
-    try { sessionStorage.setItem(PENDING_WHATSAPP_PHONE_KEY, pendingWhatsAppPhone); } catch {/**/}
-  }
-
   useEffect(() => {
     let cancelled = false;
     api
@@ -106,7 +98,13 @@ export default function Signup() {
         password,
         display_name: name,
         phone_e164: phone.trim() || undefined,
-        location_name: isInviteSignup ? undefined : (locationName.trim() || placeholderForKind).trim(),
+        // The gateway's /v1/auth/register always creates an anchor location
+        // (there's no "join-only, no location" registration mode) — even
+        // for invite signups, so a placeholder name is used there. The
+        // invite is then accepted as a separate step inside
+        // registerWithPassword (see lib/auth.tsx); the placeholder location
+        // just becomes an extra location the new user owns.
+        location_name: isInviteSignup ? 'My account' : (locationName.trim() || placeholderForKind).trim(),
         country_code: country,
         account_type: kind,
         invite_token: pendingInviteToken ?? undefined,
@@ -218,27 +216,17 @@ export default function Signup() {
 
               {!isInviteSignup && (
                 <>
-                  {isTauri() ? (
-                    // Google's OAuth redirect can't round-trip through the
-                    // desktop webview — email + password only in the app.
-                    <div
-                      aria-disabled="true"
-                      title="Google sign-in isn’t available in the desktop app — use email + password."
-                      className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/15 bg-paper-cool/40 opacity-45 cursor-not-allowed select-none"
-                    >
-                      <GoogleMark />
-                      <span className="text-sm font-medium">Continue with Google</span>
-                    </div>
-                  ) : (
-                    <a
-                      href={googleStartUrl}
-                      onClick={rememberPendingWhatsAppPhone}
-                      className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/20 bg-paper-cool/40 hover:border-ink hover:bg-ink hover:text-paper transition-colors"
-                    >
-                      <GoogleMark />
-                      <span className="text-sm font-medium">Continue with Google</span>
-                    </a>
-                  )}
+                  {/* Google sign-in is disabled unconditionally: the gateway
+                      has no OAuth routes ported yet (see api.ts's
+                      googleStartUrl doc comment). */}
+                  <div
+                    aria-disabled="true"
+                    title="Google sign-in isn’t available on this gateway yet — use email + password."
+                    className="mt-3 flex items-center justify-center gap-3 h-10 rounded-full border border-ink/15 bg-paper-cool/40 opacity-45 cursor-not-allowed select-none"
+                  >
+                    <GoogleMark />
+                    <span className="text-sm font-medium">Continue with Google</span>
+                  </div>
 
                   <div className="my-3 flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
                     <span className="flex-1 h-px bg-ink/12" />
@@ -666,10 +654,8 @@ function toMessage(err: unknown): string {
     if (err.code === 'invite_expired') return 'This invitation has expired. Ask the sender to send a new one.';
     if (err.code === 'invite_revoked') return 'This invitation was revoked by the sender.';
     if (err.code === 'invite_not_found') return 'We could not find this invitation. The link may be wrong.';
-    return err.detail ?? err.code;
   }
-  if (err instanceof Error) return err.message;
-  return 'Something went wrong.';
+  return friendlyApiError(err);
 }
 
 function GoogleMark() {

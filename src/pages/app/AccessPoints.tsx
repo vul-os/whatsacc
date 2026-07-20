@@ -13,6 +13,7 @@ import {
   type MaintenanceCreateInput,
   type MaintenanceEvent,
 } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-moss/15 text-moss',
@@ -26,10 +27,11 @@ function formatMeters(m: number): string {
   return `${m.toFixed(1)} m`;
 }
 
-function relTime(ts: string | null): string {
+function relTime(sec: number | null): string {
+  const ts = fromUnix(sec);
   if (!ts) return '—';
-  const ms = Date.now() - new Date(ts).getTime();
-  if (ms < 0) return new Date(ts).toLocaleString();
+  const ms = Date.now() - ts.getTime();
+  if (ms < 0) return ts.toLocaleString();
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
@@ -38,7 +40,7 @@ function relTime(ts: string | null): string {
   if (h < 24) return `${h} hr ago`;
   const d = Math.floor(h / 24);
   if (d < 60) return `${d} d ago`;
-  return new Date(ts).toLocaleDateString();
+  return ts.toLocaleDateString();
 }
 
 export default function AccessPointsPage() {
@@ -391,7 +393,7 @@ function MaintenanceModal({
                 <div>
                   <p className="font-medium capitalize">{ev.kind}</p>
                   <p className="text-xs text-ink/55">
-                    {new Date(ev.performed_at).toLocaleDateString()}
+                    {fromUnix(ev.performed_at)?.toLocaleDateString() ?? '—'}
                     {ev.technician_name ? ` · ${ev.technician_name}` : ''}
                   </p>
                 </div>

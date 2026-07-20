@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { AuthLayout } from '@/components/auth/AuthLayout';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, friendlyApiError } from '@/lib/api';
 
 type Status = 'verifying' | 'success' | 'missing' | 'error';
 
@@ -22,17 +22,13 @@ export default function VerifyEmail() {
       .then(() => setStatus('success'))
       .catch((err: unknown) => {
         const msg =
-          err instanceof ApiError
-            ? err.code === 'invalid_token'
-              ? 'This verification link is invalid.'
-              : err.code === 'token_used'
-                ? 'This email has already been verified. You can sign in.'
-                : err.code === 'token_expired'
-                  ? 'This verification link has expired. Sign in to request a new one.'
-                  : (err.detail ?? err.code)
-            : err instanceof Error
-              ? err.message
-              : 'Something went wrong.';
+          err instanceof ApiError && err.code === 'invalid_token'
+            ? 'This verification link is invalid.'
+            : err instanceof ApiError && err.code === 'token_used'
+              ? 'This email has already been verified. You can sign in.'
+              : err instanceof ApiError && err.code === 'token_expired'
+                ? 'This verification link has expired. Sign in to request a new one.'
+                : friendlyApiError(err);
         setErrorMsg(msg);
         setStatus('error');
       });

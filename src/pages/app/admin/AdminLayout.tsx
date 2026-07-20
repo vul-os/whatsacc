@@ -35,7 +35,7 @@ export default function AdminLayout() {
       <PageHeader
         kicker="Operator"
         title="Instance admin"
-        description="Observe and moderate this whatsacc deployment — every account, user, and gate movement on the instance."
+        description="Observe and moderate this lintel deployment — every account, user, and gate movement on the instance."
       />
       <nav className="flex flex-wrap gap-1.5 mb-6 -mt-2" aria-label="Admin sections">
         {TABS.map((t) => (
@@ -101,7 +101,7 @@ function Forbidden() {
         </p>
         <h1 className="font-display text-3xl mb-3">Operators only</h1>
         <p className="text-sm text-ink/60 leading-relaxed">
-          This console belongs to whoever runs this whatsacc instance. Your account doesn't have
+          This console belongs to whoever runs this lintel instance. Your account doesn't have
           platform-admin access — if you think it should, ask the operator to grant it from their
           Users tab.
         </p>

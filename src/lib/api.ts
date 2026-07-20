@@ -1,15 +1,37 @@
-// Lightweight API client for the whatsacc backend.
+// Lightweight API client for the lintel backend.
 // Handles base URL, bearer auth, JSON, and one-shot refresh-on-401.
+//
+// IMPORTANT — this targets the Go gateway (gateway/internal/httpapi), which
+// is the product that actually ships (embedded into the gateway binary as
+// the portal, and reused by the Tauri desktop shell). It does NOT target
+// backend/src/app.ts (the historical Cloudflare Workers reference — kept in
+// the repo for behavioral-spec purposes only, never deployed as the product).
+// See gateway/README.md for the route-porting map.
 
 import { gatewayFetch, getApiBaseUrl } from './gateway';
 
-const ACCESS_KEY = 'whatsacc.access_token';
-const REFRESH_KEY = 'whatsacc.refresh_token';
+const ACCESS_KEY = 'lintel.access_token';
+const REFRESH_KEY = 'lintel.refresh_token';
 
 // The base URL is resolved per-request (not a build-time constant) so the
 // desktop app can point at any gateway. Resolution order: the user's stored
-// gateway ('whatsacc.gateway_url'), then VITE_API_BASE_URL, then localhost.
+// gateway ('lintel.gateway_url'), then VITE_API_BASE_URL, then localhost.
 export { getApiBaseUrl } from './gateway';
+
+// Every route below lives under this prefix on the gateway (see
+// gateway/internal/httpapi/server.go's Router() — every mux.Handle(Func) call
+// registers "METHOD /v1/..."). Centralized here — NOT repeated in each path
+// string below — so a new endpoint can't be added without it; the
+// alternative (baking /v1 into each path literal) is exactly the kind of
+// per-call-site detail that's easy to forget and was part of how this
+// portal drifted from the gateway in the first place. `getApiBaseUrl()`
+// itself stays un-prefixed because a couple of gateway routes (/health, the
+// controller-pairing endpoints) are intentionally NOT under /v1.
+//
+// gateway/cmd/routegen and src/lib/__tests__/routeParity.test.ts both import
+// this constant so the parity test can't drift from what apiFetch actually
+// sends.
+export const API_VERSION_PREFIX = '/v1';
 
 export type ApiErrorBody = {
   error: string;
@@ -35,7 +57,7 @@ export class ApiError extends Error {
       if (typeof body.error === 'string') {
         code = body.error;
         detail = typeof body.detail === 'string' ? body.detail : undefined;
-      } 
+      }
       // 2. Handle Hono/Zod error shape: { success: false, error: { issues: [...], name: 'ZodError' } }
       else if (body.error && typeof body.error === 'object' && Array.isArray(body.error.issues)) {
         code = 'validation_error';
@@ -56,6 +78,33 @@ export class ApiError extends Error {
       this.retryAfterS = body.retry_after_s;
     }
   }
+}
+
+/**
+ * Sentinel ApiError code thrown by apiFetch when a 2xx response isn't JSON.
+ * Every gateway endpoint below returns either JSON or 204 — a non-JSON 2xx
+ * only happens when `path` doesn't match any registered gateway route: the
+ * embedded portal's SPA fallback (gateway/internal/portal) answers
+ * everything unmatched with 200 + index.html rather than 404, so treating
+ * "the request didn't throw" as success would silently render that HTML
+ * page's bytes as if they were real API data. This is the guard against
+ * that trap — every call site that hits a route the gateway genuinely
+ * doesn't implement yet (see gateway/README.md's porting map) should expect
+ * this code and degrade to an explicit "not available" state, never an
+ * infinite spinner or fabricated data.
+ */
+export const UNAVAILABLE_CODE = 'gateway_route_unavailable';
+
+export function isUnavailable(err: unknown): boolean {
+  return err instanceof ApiError && err.code === UNAVAILABLE_CODE;
+}
+
+/** Friendly, ready-to-render message for any error apiFetch can throw. */
+export function friendlyApiError(err: unknown, fallback = 'Something went wrong.'): string {
+  if (isUnavailable(err)) return "This isn't available on this gateway yet.";
+  if (err instanceof ApiError) return err.detail ?? err.code;
+  if (err instanceof Error) return err.message;
+  return fallback;
 }
 
 export type RateLimitDenial = {
@@ -102,7 +151,7 @@ async function refreshAccessToken(): Promise<boolean> {
   if (!refresh) return false;
   refreshing = (async () => {
     try {
-      const res = await gatewayFetch(`${getApiBaseUrl()}/auth/refresh`, {
+      const res = await gatewayFetch(`${getApiBaseUrl()}${API_VERSION_PREFIX}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh }),
@@ -111,8 +160,17 @@ async function refreshAccessToken(): Promise<boolean> {
         tokenStore.clear();
         return false;
       }
-      const j = (await res.json()) as { access_token: string; refresh_token: string };
-      tokenStore.set(j.access_token, j.refresh_token);
+      const ct = res.headers.get('Content-Type') ?? '';
+      if (!ct.includes('application/json')) {
+        tokenStore.clear();
+        return false;
+      }
+      const j = (await res.json().catch(() => null)) as RefreshResponse | null;
+      if (!j?.tokens?.access_token || !j.tokens.refresh_token) {
+        tokenStore.clear();
+        return false;
+      }
+      tokenStore.set(j.tokens.access_token, j.tokens.refresh_token);
       return true;
     } catch {
       tokenStore.clear();
@@ -126,7 +184,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
 export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T> {
   const { body, headers, ...rest } = init;
-  const url = path.startsWith('http') ? path : `${getApiBaseUrl()}${path}`;
+  const url = path.startsWith('http') ? path : `${getApiBaseUrl()}${API_VERSION_PREFIX}${path}`;
 
   const doRequest = async (): Promise<Response> => {
     const h = new Headers(headers as HeadersInit | undefined);
@@ -149,6 +207,15 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('Content-Type') ?? '';
   const isJson = ct.includes('application/json');
+
+  // SPA-fallback trap guard (see UNAVAILABLE_CODE's doc comment above): a
+  // 2xx that isn't JSON is never a real answer from this API — it's the
+  // embedded portal's catch-all. Fail loudly instead of returning HTML bytes
+  // typed as T.
+  if (res.ok && !isJson) {
+    throw new ApiError(res.status, UNAVAILABLE_CODE);
+  }
+
   const payload = isJson ? await res.json().catch(() => null) : await res.text();
 
   if (!res.ok) {
@@ -167,45 +234,55 @@ export async function apiFetch<T>(path: string, init: FetchInit = {}): Promise<T
 }
 
 // Typed surface ------------------------------------------------------------
+//
+// Gateway timestamps are Unix seconds (int64 / sql.NullInt64 on the Go
+// side — see gateway/internal/store), NOT ISO-8601 strings. The one
+// exception is LocationLimits.usage.day_start, which the gateway explicitly
+// formats via time.Format(time.RFC3339) — see handleLocationLimitsGet.
+export type UnixSeconds = number;
 
+// Tokens are nested under `tokens` (not flattened onto the response), per
+// gateway/internal/httpapi/auth.go's issueTokensCtx.
 export type AuthTokens = {
   access_token: string;
   refresh_token: string;
-  token_type: 'Bearer';
-  expires_in: number;
 };
 
+export type LoginResponse = {
+  user: { id: string; email: string; is_platform_admin: boolean };
+  tokens: AuthTokens;
+  token_type: 'Bearer';
+};
+
+export type RegisterResponse = {
+  user: { id: string; email: string };
+  account: { id: string; name: string };
+  location: { id: string; name: string; slug: string | null };
+  tokens: AuthTokens;
+  token_type: 'Bearer';
+};
+
+export type RefreshResponse = {
+  tokens: AuthTokens;
+  token_type: 'Bearer';
+};
+
+// GET /v1/auth/me — the gateway's skeleton auth (see gateway/internal/httpapi/auth.go's
+// handleMe) does not carry profile/phones/email-verification/Slack/avatar
+// data; none of that is implemented on this backend yet (no /auth/me/profile,
+// /auth/me/slack, or /phones/me/phones routes exist). Keep this type honest
+// to what the gateway actually returns rather than the richer shape the old
+// Workers backend (backend/src/routes/auth.ts) used to send.
 export type MeResponse = {
   user: {
     id: string;
     email: string;
-    status: string;
-    email_verified_at: string | null;
     is_platform_admin: boolean;
-    /** false when the user has only ever signed in via OAuth (no password set). */
-    has_password: boolean;
   };
-  profile: {
-    id: string;
-    display_name: string | null;
-    avatar_url: string | null;
-    avatar_cdn_url: string | null;
-    avatar_source: 'google' | 'user' | null;
-    locale: string | null;
-    slack_user_id: string | null;
-    slack_handle: string | null;
-  } | null;
-  phones: Array<{
-    id: string;
-    phone_e164: string;
-    verified_at: string | null;
-    is_primary: boolean;
-  }>;
   accounts: Array<{
-    account_id: string;
+    id: string;
     name: string;
     role: string;
-    status: string;
   }>;
 };
 
@@ -217,8 +294,17 @@ export type CountryRef = {
 
 export const api = {
   login: (body: { email: string; password: string }) =>
-    apiFetch<AuthTokens>('/auth/login', { method: 'POST', body }),
+    apiFetch<LoginResponse>('/auth/login', { method: 'POST', body }),
 
+  // account_type and invite_token are UI-only concerns the gateway's
+  // registerReq (gateway/internal/httpapi/auth.go) doesn't accept — and
+  // because readJSON there calls json.Decoder.DisallowUnknownFields(),
+  // sending them at all would 400 the whole request, not just get ignored.
+  // phone_e164 is accepted by the parameter for call-site compatibility but
+  // is similarly dropped: there is no /phones route on the gateway to attach
+  // it to. Invite acceptance is a separate explicit api.inviteAccept() call
+  // (see src/pages/Signup.tsx) — the gateway registers accounts+invites as
+  // two independent steps, not one atomic register-and-join.
   register: (body: {
     email: string;
     password: string;
@@ -226,67 +312,79 @@ export const api = {
     phone_e164?: string;
     location_name?: string;
     country_code: string;
-    account_type: 'personal' | 'business';
+    account_type?: 'personal' | 'business';
     invite_token?: string;
-  }) => apiFetch<AuthTokens & { id: string; account_id: string }>('/auth/register', { method: 'POST', body }),
+  }) =>
+    apiFetch<RegisterResponse>('/auth/register', {
+      method: 'POST',
+      body: {
+        email: body.email,
+        password: body.password,
+        display_name: body.display_name,
+        location_name: body.location_name,
+        country_code: body.country_code,
+      },
+    }),
 
   refresh: (refresh_token: string) =>
-    apiFetch<AuthTokens>('/auth/refresh', { method: 'POST', body: { refresh_token } }),
+    apiFetch<RefreshResponse>('/auth/refresh', { method: 'POST', body: { refresh_token } }),
 
   logout: (refresh_token: string) =>
-    apiFetch<void>('/auth/logout', { method: 'POST', body: { refresh_token } }),
+    apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST', body: { refresh_token } }),
 
   me: () => apiFetch<MeResponse>('/auth/me'),
 
-  phones: () => apiFetch<{ phones: MeResponse['phones'] }>('/phones/me/phones'),
-
+  // NOT IMPLEMENTED on the gateway (no /phones route at all). Kept so call
+  // sites can attempt it and get a clean UNAVAILABLE_CODE ApiError instead
+  // of a dead link; UI must treat failure as "not available", not an error.
+  phones: () => apiFetch<{ phones: Array<{ id: string; phone_e164: string; verified_at: string | null; is_primary: boolean }> }>('/phones/me/phones'),
   phoneAdd: (body: { phone_e164: string; is_primary?: boolean }) =>
     apiFetch<{ id: string }>('/phones/me/phones', { method: 'POST', body }),
 
+  // NOT IMPLEMENTED on the gateway (no /auth/me/slack route).
   slackUpdate: (body: { slack_user_id?: string; slack_handle?: string }) =>
     apiFetch<void>('/auth/me/slack', { method: 'PUT', body }),
 
+  // NOT IMPLEMENTED on the gateway (no /auth/me/profile route).
   profileUpdate: (body: { display_name?: string; avatar_url?: string | null }) =>
-    apiFetch<{ profile: NonNullable<MeResponse['profile']> }>('/auth/me/profile', {
-      method: 'PATCH',
-      body,
-    }),
+    apiFetch<{ profile: { id: string; display_name: string | null; avatar_url: string | null } }>(
+      '/auth/me/profile',
+      { method: 'PATCH', body },
+    ),
 
+  // NOT IMPLEMENTED on the gateway — no password-reset/verify-email ceremony
+  // ported yet (see gateway/internal/httpapi/auth.go's doc comment: "the
+  // ceremony around them... is deferred").
   forgotPassword: (email: string) =>
     apiFetch<void>('/auth/forgot-password', { method: 'POST', body: { email } }),
-
   resetPassword: (token: string, new_password: string) =>
-    apiFetch<void>('/auth/reset-password', {
-      method: 'POST',
-      body: { token, new_password },
-    }),
-
+    apiFetch<void>('/auth/reset-password', { method: 'POST', body: { token, new_password } }),
   verifyEmail: (token: string) =>
-    apiFetch<void>('/auth/verify-email', {
-      method: 'POST',
-      body: { token },
-    }),
-
+    apiFetch<void>('/auth/verify-email', { method: 'POST', body: { token } }),
   updatePassword: (current_password: string, new_password: string) =>
     apiFetch<void>('/auth/update-password', {
       method: 'POST',
       body: { current_password, new_password },
     }),
 
+  // NOT IMPLEMENTED on the gateway (no /reference/countries route). Callers
+  // already fall back to a static list on failure (see src/pages/Signup.tsx).
   countries: () => apiFetch<{ countries: CountryRef[] }>('/reference/countries'),
 
-  googleStartUrl: () => `${getApiBaseUrl()}/auth/google/start`,
+  // NOT IMPLEMENTED on the gateway — no OAuth routes exist at all. Google
+  // sign-in is unconditionally disabled in the UI (Login.tsx / Signup.tsx)
+  // rather than pointed at a dead link.
+  googleStartUrl: () => `${getApiBaseUrl()}${API_VERSION_PREFIX}/auth/google/start`,
 
   accountUpdate: (accountId: string, body: { name?: string }) =>
     apiFetch<void>(`/accounts/${accountId}`, { method: 'PATCH', body }),
 
   accessPoints: (accountId?: string) => {
     const qs = accountId ? `?account_id=${encodeURIComponent(accountId)}` : '';
-    return apiFetch<{ access_points: AccessPointDetail[] }>(`/access/access-points${qs}`);
+    return apiFetch<{ access_points: AccessPointDetail[] }>(`/access-points${qs}`);
   },
 
-  accessPoint: (id: string) =>
-    apiFetch<AccessPointDetail>(`/access/access-points/${id}`),
+  accessPoint: (id: string) => apiFetch<AccessPointDetail>(`/access-points/${id}`),
 
   accessPointCreate: (body: {
     location_id: string;
@@ -295,17 +393,17 @@ export const api = {
     device_id?: string | null;
     lat?: number;
     long?: number;
-  }) =>
-    apiFetch<AccessPointDetail>('/access/access-points', { method: 'POST', body }),
+  }) => apiFetch<AccessPointDetail>('/access-points', { method: 'POST', body }),
 
+  // NOT IMPLEMENTED on the gateway — movement metering + maintenance
+  // scheduling is a documented deviation (see accessPointJSON's comment in
+  // gateway/internal/httpapi/access.go: "maintenance block carries the
+  // 'nothing recorded' shape"). No /access-points/{id}/maintenance route
+  // exists to list or log against.
   maintenanceList: (id: string) =>
-    apiFetch<{ events: MaintenanceEvent[] }>(`/access/access-points/${id}/maintenance`),
-
+    apiFetch<{ events: MaintenanceEvent[] }>(`/access-points/${id}/maintenance`),
   maintenanceCreate: (id: string, body: MaintenanceCreateInput) =>
-    apiFetch<MaintenanceEvent>(`/access/access-points/${id}/maintenance`, {
-      method: 'POST',
-      body,
-    }),
+    apiFetch<MaintenanceEvent>(`/access-points/${id}/maintenance`, { method: 'POST', body }),
 
   grants: (q: { account_id?: string; phone_e164?: string; status?: 'active' | 'revoked' } = {}) => {
     const qs = new URLSearchParams();
@@ -313,20 +411,21 @@ export const api = {
     if (q.phone_e164) qs.set('phone_e164', q.phone_e164);
     if (q.status) qs.set('status', q.status);
     const s = qs.toString();
-    return apiFetch<{ grants: TemporaryAccessGrant[] }>(`/access/grants${s ? `?${s}` : ''}`);
+    return apiFetch<{ grants: TemporaryAccessGrant[] }>(`/grants${s ? `?${s}` : ''}`);
   },
 
-  grant: (id: string) => apiFetch<TemporaryAccessGrant>(`/access/grants/${id}`),
+  grant: (id: string) => apiFetch<TemporaryAccessGrant>(`/grants/${id}`),
 
   grantCreate: (body: GrantCreateInput) =>
-    apiFetch<TemporaryAccessGrant>('/access/grants', { method: 'POST', body }),
+    apiFetch<TemporaryAccessGrant>('/grants', { method: 'POST', body }),
 
   grantRevoke: (id: string) =>
-    apiFetch<TemporaryAccessGrant>(`/access/grants/${id}/revoke`, { method: 'POST' }),
+    apiFetch<TemporaryAccessGrant>(`/grants/${id}/revoke`, { method: 'POST' }),
 
-  // Locations
+  // Locations — nested under /accounts/{id}/locations on the gateway, NOT
+  // /locations/accounts/{id}/locations (the old Workers backend's shape).
   locationsList: (accountId: string) =>
-    apiFetch<{ locations: LocationRow[] }>(`/locations/accounts/${accountId}/locations`),
+    apiFetch<{ locations: LocationRow[] }>(`/accounts/${accountId}/locations`),
 
   locationCreate: (
     accountId: string,
@@ -339,7 +438,7 @@ export const api = {
       lat?: number;
       long?: number;
     },
-  ) => apiFetch<{ id: string }>(`/locations/accounts/${accountId}/locations`, { method: 'POST', body }),
+  ) => apiFetch<{ id: string }>(`/accounts/${accountId}/locations`, { method: 'POST', body }),
 
   // Top-level: each location is its own account+location (no shared org).
   locationCreateNew: (body: {
@@ -378,6 +477,7 @@ export const api = {
       body,
     }),
 
+  // NOT IMPLEMENTED on the gateway (no /analytics route group ported yet).
   locationSummary: (id: string) =>
     apiFetch<LocationSummary>(`/analytics/locations/${id}/summary`),
 
@@ -393,15 +493,12 @@ export const api = {
   deviceCreate: (body: { location_id: string; label?: string; claim_ttl_seconds?: number }) =>
     apiFetch<DeviceCreateResponse>('/devices', { method: 'POST', body }),
 
-  deviceClaim: (claim_token: string, public_key?: string) =>
-    apiFetch<{ id: string }>('/devices/claim', { method: 'POST', body: { claim_token, public_key } }),
-
   // Members
   accountMembers: (accountId: string) =>
     apiFetch<{ members: AccountMemberRow[] }>(`/accounts/${accountId}/members`),
 
   inviteCreate: (accountId: string, body: { email: string; role?: 'owner' | 'admin' | 'member' | 'viewer'; phone_e164: string }) =>
-    apiFetch<{ id: string; accept_url: string; email_sent: boolean; whatsapp_sent: boolean }>(
+    apiFetch<{ id: string; email_sent: boolean; whatsapp_sent: boolean }>(
       `/accounts/${accountId}/invites`,
       { method: 'POST', body },
     ),
@@ -414,21 +511,20 @@ export const api = {
 
   // Access ops
   accessOpen: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
-    apiFetch<{ ok: boolean; command: 'open' }>(`/access/access-points/${id}/open`, {
+    apiFetch<{ ok: boolean; command: 'open'; delivery: string }>(`/access-points/${id}/open`, {
       method: 'POST',
       body: { source: 'web', ...body },
     }),
 
   accessClose: (id: string, body: { lat?: number; long?: number; source?: 'web' | 'whatsapp' | 'telegram' | 'slack' | 'api' } = {}) =>
-    apiFetch<{ ok: boolean; command: 'close' }>(`/access/access-points/${id}/close`, {
+    apiFetch<{ ok: boolean; command: 'close'; delivery: string }>(`/access-points/${id}/close`, {
       method: 'POST',
       body: { source: 'web', ...body },
     }),
 
-  // Analytics
+  // NOT IMPLEMENTED on the gateway (no /analytics route group ported yet).
   accountSummary: (accountId: string) =>
     apiFetch<AccountSummary>(`/analytics/accounts/${accountId}/summary`),
-
   accountInsights: (accountId: string) =>
     apiFetch<AccountInsights>(`/analytics/accounts/${accountId}/insights`),
 
@@ -508,7 +604,7 @@ export type LocationRow = {
   address: { city?: string; [k: string]: unknown } | null;
   access_point_count: number;
   member_count: number;
-  last_opened_at: string | null;
+  last_opened_at: UnixSeconds | null;
 };
 
 export type LocationQuotas = {
@@ -525,6 +621,8 @@ export type LocationLimits = {
   location_id: string;
   quotas: LocationQuotas;
   usage: {
+    // Formatted server-side via time.RFC3339 (handleLocationLimitsGet) — an
+    // actual ISO string, unlike the UnixSeconds fields elsewhere in this file.
     day_start: string;
     location_opens_today: number;
     my_opens_today: number;
@@ -554,10 +652,10 @@ export type DeviceRow = {
   location_id: string;
   label: string | null;
   status: 'unpaired' | 'active' | 'offline' | string;
-  paired_at: string | null;
-  last_seen_at: string | null;
-  claim_expires_at: string | null;
-  created_at: string;
+  paired_at: UnixSeconds | null;
+  last_seen_at: UnixSeconds | null;
+  claim_expires_at: UnixSeconds | null;
+  created_at: UnixSeconds;
 };
 
 export type DeviceCreateResponse = {
@@ -566,7 +664,7 @@ export type DeviceCreateResponse = {
   label: string | null;
   status: string;
   claim_token: string;
-  claim_expires_at: string;
+  claim_expires_at: UnixSeconds;
 };
 
 export type AccountMemberRow = {
@@ -585,7 +683,7 @@ export type AccountSummary = {
   member_count: number;
   recent_activity: Array<{
     id: string;
-    ts: string;
+    ts: UnixSeconds;
     command: string;
     success: boolean;
     source: string | null;
@@ -622,17 +720,17 @@ export type TemporaryAccessGrant = {
   granted_by_user_id: string | null;
   phone_e164: string;
   visitor_name: string | null;
-  starts_at: string;
-  ends_at: string;
+  starts_at: UnixSeconds;
+  ends_at: UnixSeconds;
   max_uses: number | null;
   uses_count: number;
   status: 'active' | 'revoked';
   effective_status: 'pending' | 'active' | 'expired' | 'exhausted' | 'revoked';
-  revoked_at: string | null;
+  revoked_at: UnixSeconds | null;
   notes: string | null;
-  last_used_at: string | null;
+  last_used_at: UnixSeconds | null;
   access_point_ids: string[];
-  created_at: string;
+  created_at: UnixSeconds;
 };
 
 export type GrantCreateInput = {
@@ -656,13 +754,13 @@ export type AccessPointDetail = {
     movement_m: number;
     total_opens: number;
     total_closes: number;
-    last_op_at: string | null;
+    last_op_at: UnixSeconds | null;
   };
   maintenance: {
-    last_serviced_at: string | null;
+    last_serviced_at: UnixSeconds | null;
     last_service_movement_m: number | null;
     next_due_movement_m: number | null;
-    next_due_at: string | null;
+    next_due_at: UnixSeconds | null;
     due_now: boolean;
     movement_remaining_m: number | null;
     pct_used: number | null;
@@ -673,7 +771,7 @@ export type MaintenanceEvent = {
   id: string;
   access_point_id: string;
   kind: 'inspection' | 'service' | 'repair' | 'replacement';
-  performed_at: string;
+  performed_at: UnixSeconds;
   performed_by: string | null;
   technician_name: string | null;
   notes: string | null;
@@ -681,8 +779,8 @@ export type MaintenanceEvent = {
   cost_zar_cents: number | null;
   movement_m_at_event: number | null;
   next_due_movement_m: number | null;
-  next_due_at: string | null;
-  created_at: string;
+  next_due_at: UnixSeconds | null;
+  created_at: UnixSeconds;
 };
 
 // ── Instance admin (gateway operator) ───────────────────────────────────────
@@ -718,7 +816,7 @@ export type AdminOverview = {
     display_name: string | null;
     status: string;
     is_platform_admin: boolean;
-    created_at: string;
+    created_at: UnixSeconds;
   }>;
 };
 
@@ -727,7 +825,7 @@ export type AdminAccountRow = {
   name: string;
   status: 'active' | 'suspended' | string;
   country_code: string;
-  created_at: string;
+  created_at: UnixSeconds;
   member_count: number;
   location_count: number;
   opens_7d: number;
@@ -742,7 +840,7 @@ export type AdminAccountsResponse = {
 
 export type AdminAccessLogEntry = {
   id: string;
-  ts: string;
+  ts: UnixSeconds;
   command: string | null;
   source: string | null;
   success: boolean;
@@ -763,8 +861,7 @@ export type AdminAccountDetail = {
     name: string;
     status: 'active' | 'suspended' | string;
     country_code: string;
-    created_at: string;
-    updated_at: string;
+    created_at: UnixSeconds;
   };
   members: Array<{
     user_id: string;
@@ -772,7 +869,6 @@ export type AdminAccountDetail = {
     display_name: string | null;
     role: string;
     status: string;
-    joined_at: string;
   }>;
   locations: Array<{
     id: string;
@@ -780,7 +876,6 @@ export type AdminAccountDetail = {
     type: string;
     slug: string | null;
     status: string;
-    created_at: string;
   }>;
   recent_access_logs: AdminAccessLogEntry[];
 };
@@ -790,10 +885,10 @@ export type AdminUserRow = {
   email: string;
   status: 'active' | 'disabled' | string;
   is_platform_admin: boolean;
-  created_at: string;
+  created_at: UnixSeconds;
   display_name: string | null;
   accounts: Array<{ account_id: string; name: string; role: string }>;
-  last_access_at: string | null;
+  last_access_at: UnixSeconds | null;
 };
 
 export type AdminUsersResponse = {
@@ -860,7 +955,7 @@ export type AdminAuditActionRow = {
   target_id: string | null;
   allowed: boolean;
   detail: unknown;
-  created_at: string;
+  created_at: UnixSeconds;
 };
 
 export type AdminAuditActionsResponse = {

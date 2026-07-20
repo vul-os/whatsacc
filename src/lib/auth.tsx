@@ -9,6 +9,14 @@ import {
 } from 'react';
 import { ApiError, api, tokenStore, type MeResponse } from './api';
 
+// NOTE: the gateway's GET /v1/auth/me (gateway/internal/httpapi/auth.go)
+// doesn't carry profile/avatar/phone-verification/Slack data — none of that
+// is implemented on this backend (no /auth/me/profile, /auth/me/slack, or
+// /phones/me/phones routes exist). The fields below that can never be true
+// against this gateway are kept (typed, always their "off" value) rather
+// than removed, so the UI that reads them (Settings, AppLayout banners)
+// degrades to an honest "not available" state instead of needing every
+// consumer ripped out in this pass — see api.ts's MeResponse doc comment.
 export type SessionUser = {
   id: string;
   email: string;
@@ -55,11 +63,11 @@ type AuthState = {
   refreshMe: () => Promise<void>;
 };
 
-const ACTIVE_ACCOUNT_KEY = 'whatsacc.activeAccount';
+const ACTIVE_ACCOUNT_KEY = 'lintel.activeAccount';
 // Cached /me response for instant rehydration on refresh. Bumping the version
 // invalidates older shapes (e.g. when SessionUser gains/loses a field) so
 // stale caches don't mis-render the UI on the next deploy.
-const ME_CACHE_KEY = 'whatsacc.me.v5';
+const ME_CACHE_KEY = 'lintel.me.v5';
 
 type CachedMe = { user: SessionUser; accounts: SessionAccount[] };
 
@@ -87,24 +95,29 @@ function writeMeCache(value: CachedMe | null): void {
 const Ctx = createContext<AuthState | null>(null);
 
 function toSession(me: MeResponse): { user: SessionUser; accounts: SessionAccount[] } {
-  const fallbackName = me.profile?.display_name ?? me.user.email.split('@')[0] ?? me.user.email;
+  const fallbackName = me.user.email.split('@')[0] ?? me.user.email;
   return {
     user: {
       id: me.user.id,
       email: me.user.email,
       name: fallbackName,
-      avatar_url: me.profile?.avatar_url ?? null,
-      avatar_cdn_url: me.profile?.avatar_cdn_url ?? null,
-      avatar_source: me.profile?.avatar_source ?? null,
-      has_verified_phone: me.phones.some((p) => p.verified_at !== null),
-      has_password: me.user.has_password,
+      avatar_url: null,
+      avatar_cdn_url: null,
+      avatar_source: null,
+      // None of profile/phone-verification/Slack is implemented on the
+      // gateway yet (see MeResponse's doc comment in api.ts) — always "off".
+      has_verified_phone: false,
+      // No Google OAuth on the gateway either, so every account is
+      // password-based; showing the password-change form (rather than the
+      // "signed in with Google" explainer) is the correct default here.
+      has_password: true,
       is_platform_admin: me.user.is_platform_admin,
-      has_slack_identity: Boolean(me.profile?.slack_user_id || me.profile?.slack_handle),
-      slack_user_id: me.profile?.slack_user_id ?? null,
-      slack_handle: me.profile?.slack_handle ?? null,
+      has_slack_identity: false,
+      slack_user_id: null,
+      slack_handle: null,
     },
     accounts: me.accounts.map((a) => ({
-      id: a.account_id,
+      id: a.id,
       name: a.name,
       role: a.role,
     })),
@@ -181,8 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithPassword = useCallback(
     async (email: string, password: string) => {
       setError(null);
-      const tokens = await api.login({ email, password });
-      tokenStore.set(tokens.access_token, tokens.refresh_token);
+      const res = await api.login({ email, password });
+      tokenStore.set(res.tokens.access_token, res.tokens.refresh_token);
       await refreshMe();
     },
     [refreshMe],
@@ -200,8 +213,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       invite_token?: string;
     }) => {
       setError(null);
-      const tokens = await api.register(input);
-      tokenStore.set(tokens.access_token, tokens.refresh_token);
+      const res = await api.register(input);
+      tokenStore.set(res.tokens.access_token, res.tokens.refresh_token);
+      // The gateway registers an account+anchor location unconditionally
+      // (there is no invite_token param on its /auth/register — see api.ts's
+      // register() doc comment) — invite acceptance is a second explicit
+      // call, made here once the new account has a valid session to make it
+      // with. A failed accept is surfaced to the caller (e.g. Signup.tsx)
+      // rather than swallowed, since silently dropping someone's invite
+      // would be worse than showing them the error.
+      if (input.invite_token) {
+        await api.inviteAccept(input.invite_token, input.phone_e164);
+      }
       await refreshMe();
     },
     [refreshMe],

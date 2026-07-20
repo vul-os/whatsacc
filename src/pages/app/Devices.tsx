@@ -12,6 +12,7 @@ import {
   type DeviceRow,
   type LocationRow,
 } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 
 const STATUS_DOT: Record<string, string> = {
   unpaired: 'bg-gold',
@@ -27,9 +28,10 @@ const STATUS_LABEL: Record<string, string> = {
   offline: 'offline',
 };
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return '—';
-  const ms = Date.now() - new Date(iso).getTime();
+function relativeTime(sec: number | null): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
+  const ms = Date.now() - d.getTime();
   if (ms < 0) {
     const s = Math.abs(ms) / 1000;
     if (s < 60) return `in ${Math.round(s)}s`;
@@ -39,7 +41,7 @@ function relativeTime(iso: string | null): string {
   if (ms < 60_000) return 'just now';
   if (ms < 60 * 60_000) return `${Math.round(ms / 60_000)} min ago`;
   if (ms < 24 * 60 * 60_000) return `${Math.round(ms / (60 * 60_000))} h ago`;
-  return new Date(iso).toLocaleDateString();
+  return d.toLocaleDateString();
 }
 
 export default function DevicesPage() {
@@ -283,7 +285,7 @@ function ClaimTokenModal({ info, onClose }: { info: DeviceCreateResponse; onClos
         {info.claim_token}
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-ink/55">
-        <span>Expires {new Date(info.claim_expires_at).toLocaleString()}</span>
+        <span>Expires {fromUnix(info.claim_expires_at)?.toLocaleString() ?? '—'}</span>
         <button
           type="button"
           onClick={() => navigator.clipboard.writeText(info.claim_token)}

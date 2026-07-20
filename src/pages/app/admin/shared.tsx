@@ -12,30 +12,37 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, isUnavailable } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/cn';
 
 // ── Formatting ──────────────────────────────────────────────────────────────
+// Gateway admin timestamps are Unix seconds, not ISO strings — see api.ts's
+// UnixSeconds doc comment.
 
-export function fmtDateTime(iso: string): string {
-  const d = new Date(iso);
+export function fmtDateTime(sec: number): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
   return `${d.toLocaleDateString([], { day: '2-digit', month: 'short' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 }
 
-export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+export function fmtDate(sec: number): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export function fmtRelative(iso: string | null): string {
-  if (!iso) return 'never';
-  const ms = Date.now() - new Date(iso).getTime();
+export function fmtRelative(sec: number | null): string {
+  const d = fromUnix(sec);
+  if (!d) return 'never';
+  const ms = Date.now() - d.getTime();
   if (ms < 60_000) return 'just now';
   if (ms < 60 * 60_000) return `${Math.round(ms / 60_000)} min ago`;
   if (ms < 24 * 60 * 60_000) return `${Math.round(ms / (60 * 60_000))} h ago`;
   if (ms < 30 * 24 * 60 * 60_000) return `${Math.round(ms / (24 * 60 * 60_000))} d ago`;
-  return fmtDate(iso);
+  return fmtDate(sec as number); // non-null: `d` above is only null when `sec` is
 }
 
 /** Friendly copy for the admin API's coded 400/403 errors. */
@@ -56,6 +63,7 @@ const ADMIN_ERROR_COPY: Record<string, string> = {
 };
 
 export function adminErrorMessage(err: unknown): string {
+  if (isUnavailable(err)) return "This isn't available on this gateway yet.";
   if (err instanceof ApiError) {
     return ADMIN_ERROR_COPY[err.code] ?? err.detail ?? err.code;
   }

@@ -11,23 +11,25 @@ import {
   type GrantCreateInput,
   type TemporaryAccessGrant,
 } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 
 const PHONE_E164 = /^\+[1-9][0-9]{6,14}$/;
 
-function formatRelative(iso: string | null): string {
-  if (!iso) return '—';
-  const ms = new Date(iso).getTime() - Date.now();
+function formatRelative(sec: number | null): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
+  const ms = d.getTime() - Date.now();
   const abs = Math.abs(ms);
   const m = Math.round(abs / 60_000);
   if (m < 60) return ms > 0 ? `in ${m} min` : `${m} min ago`;
   const h = Math.round(m / 60);
   if (h < 48) return ms > 0 ? `in ${h} h` : `${h} h ago`;
-  const d = Math.round(h / 24);
-  return ms > 0 ? `in ${d} d` : `${d} d ago`;
+  const dAmt = Math.round(h / 24);
+  return ms > 0 ? `in ${dAmt} d` : `${dAmt} d ago`;
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+function formatDateTime(sec: number): string {
+  return fromUnix(sec)?.toLocaleString() ?? '—';
 }
 
 function defaultEndsAtIso(): string {

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar, resolveAvatarUrl } from '@/components/ui/Avatar';
-import { ApiError, api, type LocationRow } from '@/lib/api';
+import { ApiError, api, friendlyApiError, isUnavailable, type LocationRow } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { getApiBaseUrl, getStoredGatewayUrl, isTauri, openGatewayPicker } from '@/lib/gateway';
 
@@ -47,8 +47,8 @@ function GatewaySection() {
       <h2 className="font-display text-2xl">Gateway</h2>
       <p className="text-sm text-ink/65 mt-1">
         {isTauri()
-          ? 'The whatsacc gateway this desktop app is connected to.'
-          : 'The whatsacc gateway this portal is connected to.'}
+          ? 'The lintel gateway this desktop app is connected to.'
+          : 'The lintel gateway this portal is connected to.'}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <code className="rounded-xl bg-paper-cool border border-ink/10 px-4 py-2.5 text-[13.5px] text-ink/85 break-all">
@@ -169,7 +169,7 @@ function ProfileSection() {
     <Card>
       <h2 className="font-display text-xl mb-1">Your profile</h2>
       <p className="text-sm text-ink/55 mb-5">
-        How you appear inside whatsacc. Avatar can be any https URL — Google picture, Gravatar,
+        How you appear inside lintel. Avatar can be any https URL — Google picture, Gravatar,
         a hosted image, anywhere.
       </p>
 
@@ -239,7 +239,45 @@ function ProfileSection() {
   );
 }
 
+// The gateway has no /phones or /auth/me/slack routes (see api.ts's phones()
+// and slackUpdate() doc comments) — every call in this section resolves to
+// UNAVAILABLE_CODE. Rather than show two forms that always fail on submit
+// (and an error banner on every Settings visit from the initial phones()
+// load), detect that once and render a single explicit "not available" card.
 function ContactSection() {
+  const [unavailable, setUnavailable] = useState<boolean | null>(null); // null = checking
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .phones()
+      .then(() => { if (!cancelled) setUnavailable(false); })
+      .catch((err) => { if (!cancelled) setUnavailable(isUnavailable(err) ? true : false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (unavailable) {
+    return (
+      <Card>
+        <h2 className="font-display text-2xl">Contact channels</h2>
+        <p className="text-sm text-ink/65 mt-1">
+          WhatsApp and Slack linking aren&rsquo;t available on this gateway build yet.
+        </p>
+      </Card>
+    );
+  }
+  if (unavailable === null) {
+    return (
+      <Card>
+        <h2 className="font-display text-2xl">Contact channels</h2>
+        <p className="text-sm text-ink/55 mt-4">Loading…</p>
+      </Card>
+    );
+  }
+  return <ContactSectionForms />;
+}
+
+function ContactSectionForms() {
   const { user, refreshMe } = useAuth();
   const [phones, setPhones] = useState<Array<{ id: string; phone_e164: string; verified_at: string | null; is_primary: boolean }> | null>(null);
   const [phone, setPhone] = useState('');
@@ -254,7 +292,7 @@ function ContactSection() {
       const r = await api.phones();
       setPhones(r.phones);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Could not load phone numbers.');
+      setErrorMsg(friendlyApiError(err, 'Could not load phone numbers.'));
     }
   }, []);
 
@@ -390,11 +428,7 @@ function ContactSection() {
 }
 
 function toApiMessage(err: unknown, fallback: string): string {
-  return err instanceof ApiError
-    ? (err.detail ?? err.code)
-    : err instanceof Error
-      ? err.message
-      : fallback;
+  return friendlyApiError(err, fallback);
 }
 
 function LocationsSection() {
@@ -730,17 +764,13 @@ function PasswordSection() {
       setConfirm('');
     } catch (err) {
       const msg =
-        err instanceof ApiError
-          ? err.code === 'invalid_current_password'
-            ? 'Current password is incorrect.'
-            : err.code === 'same_password'
-              ? 'New password must be different from the current one.'
-              : err.code === 'no_password_set'
-                ? 'This account uses Google sign-in. Set a password from the security flow.'
-                : (err.detail ?? err.code)
-          : err instanceof Error
-            ? err.message
-            : 'Could not update password.';
+        err instanceof ApiError && err.code === 'invalid_current_password'
+          ? 'Current password is incorrect.'
+          : err instanceof ApiError && err.code === 'same_password'
+            ? 'New password must be different from the current one.'
+            : err instanceof ApiError && err.code === 'no_password_set'
+              ? 'This account uses Google sign-in. Set a password from the security flow.'
+              : friendlyApiError(err, 'Could not update password.');
       setErrorMsg(msg);
     } finally {
       setSubmitting(false);

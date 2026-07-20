@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
-import { api } from '@/lib/api';
+import { api, friendlyApiError } from '@/lib/api';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -19,7 +19,7 @@ export default function ForgotPassword() {
       await api.forgotPassword(email.trim().toLowerCase());
       setSent(true);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Could not send the reset email.');
+      setErrorMsg(friendlyApiError(err, 'Could not send the reset email.'));
     } finally {
       setSubmitting(false);
     }

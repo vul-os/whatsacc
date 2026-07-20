@@ -11,18 +11,22 @@ import {
   type AccountSummary,
   type LocationRow,
 } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 import { cn } from '@/lib/cn';
 
-function relativeTime(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
+function relativeTime(sec: number): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
+  const ms = Date.now() - d.getTime();
   if (ms < 60_000) return 'just now';
   if (ms < 60 * 60_000) return `${Math.round(ms / 60_000)} min ago`;
   if (ms < 24 * 60 * 60_000) return `${Math.round(ms / (60 * 60_000))} h ago`;
-  return new Date(iso).toLocaleDateString();
+  return d.toLocaleDateString();
 }
 
-function shortTime(iso: string): string {
-  const d = new Date(iso);
+function shortTime(sec: number): string {
+  const d = fromUnix(sec);
+  if (!d) return '—';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
@@ -37,6 +41,16 @@ function greetForHour(h: number): string {
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+// /analytics/accounts/:id/summary isn't ported to the Go gateway yet (see
+// gateway/README.md's porting map). An unrouted gateway path can come back
+// as a non-JSON 200 (the portal's SPA fallback) instead of throwing, so
+// validate the shape before trusting it — and never let its absence block
+// the rest of the dashboard (locations, access points) from loading.
+function isRealSummary(data: unknown): data is AccountSummary {
+  if (!data || typeof data !== 'object') return false;
+  return Array.isArray((data as Partial<AccountSummary>).recent_activity);
 }
 
 type QuotaWatchEntry = {
@@ -62,7 +76,7 @@ export default function Dashboard() {
     if (!currentAccount) return;
     try {
       const s = await api.accountSummary(currentAccount.id);
-      setSummary(s);
+      if (isRealSummary(s)) setSummary(s);
     } catch {
       // silent — stays stale
     }
@@ -72,12 +86,15 @@ export default function Dashboard() {
     if (!currentAccount) return;
     setDataLoaded(false);
     try {
+      // Summary isn't available on every gateway (see isRealSummary above) —
+      // its absence must never block locations/access points from loading,
+      // otherwise a fully set-up account falls back to the onboarding screen.
       const [s, l, ap] = await Promise.all([
-        api.accountSummary(currentAccount.id),
+        api.accountSummary(currentAccount.id).catch(() => null),
         api.locationsList(currentAccount.id),
         api.accessPoints(currentAccount.id).catch(() => ({ access_points: [] })),
       ]);
-      setSummary(s);
+      setSummary(isRealSummary(s) ? s : null);
       setLocations(l.locations);
       setAccessPoints(ap.access_points);
       // Non-blocking: check each location's daily quota consumption so admins
@@ -219,7 +236,7 @@ export default function Dashboard() {
           <Card className="p-4 sm:p-5">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-ink/55">Locations</p>
             <p className="font-display text-3xl sm:text-4xl mt-1.5 sm:mt-2 leading-none tabular-nums">
-              {summary ? summary.location_count.toString() : '—'}
+              {summary ? summary.location_count.toString() : locations.length.toString()}
             </p>
             <p className="text-[10px] sm:text-xs text-ink/55 mt-1 sm:mt-1.5">active</p>
           </Card>
@@ -259,7 +276,9 @@ export default function Dashboard() {
             <Link to="/app/analytics" className="text-sm text-ink/60 hover:text-ink">View all</Link>
           </div>
           {summary === null ? (
-            <p className="px-5 sm:px-6 py-6 text-ink/55 text-sm">Loading…</p>
+            <p className="px-5 sm:px-6 py-6 text-ink/55 text-sm">
+              Recent activity isn&rsquo;t available on this gateway yet.
+            </p>
           ) : summary.recent_activity.length === 0 ? (
             <p className="px-5 sm:px-6 py-6 text-ink/55 text-sm">
               No activity yet — opens and closes will appear here.

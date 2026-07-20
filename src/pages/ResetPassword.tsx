@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { AuthLayout } from '@/components/auth/AuthLayout';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, friendlyApiError } from '@/lib/api';
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -37,17 +37,13 @@ export default function ResetPassword() {
       setDone(true);
     } catch (err) {
       const msg =
-        err instanceof ApiError
-          ? err.code === 'invalid_token'
-            ? 'This reset link is invalid or has been replaced.'
-            : err.code === 'token_used'
-              ? 'This reset link has already been used. Request a new one.'
-              : err.code === 'token_expired'
-                ? 'This reset link has expired. Request a new one.'
-                : (err.detail ?? err.code)
-          : err instanceof Error
-            ? err.message
-            : 'Something went wrong.';
+        err instanceof ApiError && err.code === 'invalid_token'
+          ? 'This reset link is invalid or has been replaced.'
+          : err instanceof ApiError && err.code === 'token_used'
+            ? 'This reset link has already been used. Request a new one.'
+            : err instanceof ApiError && err.code === 'token_expired'
+              ? 'This reset link has expired. Request a new one.'
+              : friendlyApiError(err);
       setErrorMsg(msg);
       setSubmitting(false);
     }

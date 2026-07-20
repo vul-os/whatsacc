@@ -26,6 +26,7 @@ import {
   type MaintenanceEvent,
   type RateLimitDenial,
 } from '@/lib/api';
+import { fromUnix } from '@/lib/time';
 import { cn } from '@/lib/cn';
 
 type Stage = 'idle' | 'opening' | 'closing' | 'open' | 'error';
@@ -37,10 +38,11 @@ function formatMeters(m: number): string {
   return `${m.toFixed(0)} m`;
 }
 
-function relTime(ts: string | null): string {
+function relTime(sec: number | null): string {
+  const ts = fromUnix(sec);
   if (!ts) return '—';
-  const ms = Date.now() - new Date(ts).getTime();
-  if (ms < 0) return new Date(ts).toLocaleString();
+  const ms = Date.now() - ts.getTime();
+  if (ms < 0) return ts.toLocaleString();
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
@@ -359,7 +361,7 @@ export default function AccessPointPage() {
                     <div className="min-w-0">
                       <p className="font-medium capitalize text-ink/90">{ev.kind}</p>
                       <p className="text-xs text-ink/55 truncate">
-                        {new Date(ev.performed_at).toLocaleDateString()}
+                        {fromUnix(ev.performed_at)?.toLocaleDateString() ?? '—'}
                         {ev.technician_name ? ` · ${ev.technician_name}` : ''}
                       </p>
                     </div>

@@ -2,9 +2,9 @@
 //
 // The portal historically baked the backend origin in at build time via
 // VITE_API_BASE_URL. The desktop (Tauri) build must be able to connect to ANY
-// whatsacc gateway, so the effective base URL is now resolved at call time:
+// lintel gateway, so the effective base URL is now resolved at call time:
 //
-//   1. localStorage 'whatsacc.gateway_url'  — the user's explicit choice
+//   1. localStorage 'lintel.gateway_url'  — the user's explicit choice
 //   2. VITE_API_BASE_URL                    — build-time default (web deploys)
 //   3. http://localhost:8787                — bare dev fallback
 //
@@ -13,7 +13,7 @@
 //
 // This module must stay dependency-free of api.ts (api.ts imports us).
 
-export const GATEWAY_KEY = 'whatsacc.gateway_url';
+export const GATEWAY_KEY = 'lintel.gateway_url';
 
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 
@@ -104,7 +104,7 @@ export async function gatewayFetch(input: string | URL, init?: RequestInit): Pro
       // useless against CORS-strict gateways, but it keeps a broken plugin
       // setup from bricking every request. Never retry an aborted request.
       if (!f.native || init?.signal?.aborted) throw err;
-      console.warn('whatsacc: native fetch failed, retrying via webview fetch', err);
+      console.warn('lintel: native fetch failed, retrying via webview fetch', err);
       return fetch(input, init);
     }
   }
@@ -149,15 +149,15 @@ export async function testGatewayUrl(baseUrl: string, timeoutMs = 8000): Promise
 
 /**
  * Tokens/caches belong to the gateway that minted them. When the effective
- * base URL changes, drop every whatsacc.* key except the gateway choice
+ * base URL changes, drop every lintel.* key except the gateway choice
  * itself and the theme.
  */
 function clearPerGatewayState(): void {
-  const keep = new Set([GATEWAY_KEY, 'whatsacc.theme']);
+  const keep = new Set([GATEWAY_KEY, 'lintel.theme']);
   try {
     for (let i = window.localStorage.length - 1; i >= 0; i--) {
       const k = window.localStorage.key(i);
-      if (k && k.startsWith('whatsacc.') && !keep.has(k)) window.localStorage.removeItem(k);
+      if (k && k.startsWith('lintel.') && !keep.has(k)) window.localStorage.removeItem(k);
     }
   } catch {
     /* storage unavailable — nothing to clear */
@@ -182,7 +182,7 @@ export function applyGatewayUrl(url: string | null): void {
 
 // ── opening the picker from anywhere (Login link, Settings) ────────────────
 
-const OPEN_PICKER_EVENT = 'whatsacc:open-gateway-picker';
+const OPEN_PICKER_EVENT = 'lintel:open-gateway-picker';
 
 export function openGatewayPicker(): void {
   window.dispatchEvent(new Event(OPEN_PICKER_EVENT));
