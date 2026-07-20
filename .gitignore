@@ -35,6 +35,12 @@ backend/coverage
 # build caches
 .firebase/
 *.tsbuildinfo
+
+# Playwright (e2e-browser/) artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 # secrets scratch
 backend/.secrets.*.json
 

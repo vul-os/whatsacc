@@ -19,7 +19,14 @@ export default function AppLayout() {
       .catch(() => setNeedsLocationSetup(false)); // fail open — don't block on network error
   }, [signedIn, currentAccount?.id]);
 
-  if (loading || needsLocationSetup === null) {
+  // `needsLocationSetup` only ever leaves `null` inside the effect above,
+  // which itself bails out for a signed-out user (no account to check) — so
+  // gating on it here unconditionally would strand a signed-out visitor on
+  // this loading screen forever, since the `!signedIn` redirect below would
+  // never be reached. Resolve auth state (`loading`) and the signed-out
+  // redirect first; only a signed-in user needs to wait on the locations
+  // check.
+  if (loading) {
     return (
       <div className="min-h-screen bg-paper grid place-items-center text-ink/50 text-sm">
         Loading…
@@ -27,6 +34,13 @@ export default function AppLayout() {
     );
   }
   if (!signedIn) return <Navigate to="/login" replace />;
+  if (needsLocationSetup === null) {
+    return (
+      <div className="min-h-screen bg-paper grid place-items-center text-ink/50 text-sm">
+        Loading…
+      </div>
+    );
+  }
 
   if (needsLocationSetup && currentAccount) {
     return (

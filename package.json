@@ -18,6 +18,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "screenshotter": "node scripts/screenshotter.mjs",
     "tauri": "tauri",
     "app:dev": "tauri dev",
@@ -36,6 +37,7 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.6.0",
