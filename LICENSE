@@ -19,3 +19,33 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+The following notice is explanatory text about this software's intended use.
+It is not a license term, does not modify the MIT License above in any way,
+and does not limit or expand the rights or obligations granted by it.
+
+## Safety notice (non-license, informational)
+
+This software actuates physical gates, doors and barriers. Its failure modes are
+physical: a gate that fails to open during a fire, or opens for someone it shouldn't,
+can hurt people.
+
+- This software must never be the sole means of egress. Fire and building codes in
+  most jurisdictions require code-compliant fail-safe mechanical or electrical
+  release hardware on egress routes, independent of any access-control system.
+  Install this software in parallel with that required hardware — never in series
+  with it, and never as a replacement for it.
+- The operator of any installation is responsible for compliance with local fire,
+  building, safety and accessibility codes. Nothing in this software, or in this
+  notice, determines what those codes require at a given site.
+- The warranty disclaimer above ("AS IS", no warranty, no liability) is a standard
+  MIT term limiting the authors' and copyright holders' liability. It does not
+  excuse an incorrect installation, and it does not transfer the operator's legal
+  duties to anyone else.
+- The authors are not lawyers, and neither this notice nor the project's
+  documentation is legal advice. Obtain your own legal/compliance review before
+  deploying this software to control a real gate, door or barrier.
+
+Questions or reports: security@vulos.org.

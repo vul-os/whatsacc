@@ -1,7 +1,7 @@
 # Security
 
 A gate is the smallest serious piece of infrastructure in your day. This chapter is how
-whatsacc earns the right to open one — and it applies to every gateway alike, because
+lintel earns the right to open one — and it applies to every gateway alike, because
 there is only one binary.
 
 ## The layers
@@ -10,7 +10,7 @@ there is only one binary.
 | --- | --- |
 | Command integrity | Ed25519-signed commands with nonce + expiry; the controller pins the gateway's key at pairing |
 | Pairing | Claim-token flow: admin creates a claim, the device redeems it once, keys are exchanged |
-| Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response |
+| Emergency grants | Short-TTL signed capability bound to the app's keypair; nonce challenge-response — **controller-side verification is real and conformance-tested; gateway-side issuance isn't built yet, see below** |
 | Channel ingress | Per-channel verification (Meta HMAC, Slack signed-request scheme + replay window, Telegram secret-token header) — fail closed |
 | Tenancy | Tenant-isolated at the database layer — app-layer org scoping on every SQLite query in the Go gateway; the current Postgres reference enforces forced row-level security |
 | Transport | TLS terminated by the gateway itself; tunnels stay content-blind via SNI passthrough where supported |
@@ -30,10 +30,16 @@ once — at pairing — and pins it. The consequences are pleasant:
 - Each controller has its own keypair, generated on first boot; the private key never
   leaves the device. Losing one device never compromises another.
 
-Because the controller dials out and verifies content, not network position, whatsacc
+Because the controller dials out and verifies content, not network position, lintel
 doesn't need to trust the path — including any tunnel you put in front.
 
 ## Geofence safety
+
+**Status: designed, not implemented.** Nothing below runs yet — there is no
+geofencing code in either the Go gateway or the reference backend today. This section
+describes the intended design so operators know what's coming and implementers know
+the target; treat it as a spec, not a live control, until this notice is removed. See
+the [README](https://github.com/vul-os/lintel#features) for current, verified status.
 
 A geofence stops people from opening your gate when they're nowhere near it. It's
 optional and per-location: off by default for houses, on by default for complexes.
@@ -64,7 +70,10 @@ Edge cases handled explicitly:
 The offline grant path is designed to add no new soft spot: the controller checks a
 grant **signed by the pinned gateway key**, then a fresh nonce signed by the app key
 the grant names. Neither the LAN nor Bluetooth is trusted. Revocation converges within
-the grant TTL; see [Emergency access](emergency-access.md) for the full trade-off.
+the grant TTL. **Status:** that verification logic is real, and conformance-tested on
+the controller side today; what's not built yet is the gateway actually minting and
+serving the grants it verifies, so the path doesn't run end-to-end yet — see
+[Emergency access](emergency-access.md) for the full trade-off and current status.
 
 ## Abuse limits
 
@@ -100,14 +109,36 @@ deliberately narrow:
 
 ## What we deliberately don't claim
 
-- whatsacc is not end-to-end encrypted messaging — chat channels are WhatsApp's and
+- lintel is not end-to-end encrypted messaging — chat channels are WhatsApp's and
   Slack's infrastructure, and the gateway must read messages to act on them.
 - Your gateway is as secure as the machine it runs on. Back up your data
   directory; protect your `.env`.
 - The audit log is append-only at the application layer; if an attacker owns the host,
   they own the SQLite file too.
 
+## Physical safety
+
+Security and safety are related but not the same question. Everything above is about
+who can *trigger* an open; this is about what happens to the *hardware* when they do,
+and a security chapter that ignored the physical consequences of "the gate opened"
+would be dishonest.
+
+lintel must never be the only way out of a building. Fire and building codes in most
+jurisdictions require code-compliant fail-safe mechanical or electrical release
+hardware on egress routes, regardless of what any access-control system does — lintel
+is designed to run **in parallel** with that hardware, never in series with it and
+never as a replacement for it. The reference controller's relay driver is specified
+fail-safe (normally-open output, line drops on process exit or panic), though the
+shipped `-tags gpio` driver is a documented scaffold, not yet hardware-validated —
+see [Controllers](controllers.md) and the
+[controller README](https://github.com/vul-os/lintel/blob/main/controller/README.md#what-is-real-vs-stubbed).
+Compliance with local fire, building, safety and accessibility codes is the operator's
+responsibility. Full notice in
+[Safety](https://github.com/vul-os/lintel#safety) in the main README, and the safety
+addendum appended to
+[LICENSE](https://github.com/vul-os/lintel/blob/main/LICENSE).
+
 ## Reporting
 
-Found something? Mail security@whatsacc.com — no sales gauntlet, just an engineer who
+Found something? Mail security@vulos.org — no sales gauntlet, just an engineer who
 built it. We're happy to walk through this model with your IT team or HOA committee.
