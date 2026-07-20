@@ -141,13 +141,23 @@ func TestBridgeWhatsAppSenderInteractiveDegradesToText(t *testing.T) {
 }
 
 // TestWhatsAppBanRiskWarningNamesTheRisk is a content guard: the warning
-// string must actually name the ban risk and the required LAN/BLE fallback,
-// not be softened into something vague in a later edit.
+// string must actually name the ban risk and a fallback that genuinely works,
+// not be softened into something vague in a later edit — and it must NOT
+// point operators at the offline LAN/BLE grant path as if that path ran
+// end to end. Gateway-side issuance is real now (POST /v1/offline-grants,
+// see gateway/internal/httpapi/offline_grants.go), but the app still doesn't
+// request, store or present a grant (site/docs/emergency-access.md), so the
+// path still doesn't run end to end for a resident. Claiming otherwise would
+// ship a false promise: "fall back to offline grants" when nothing on a
+// resident's phone can present one.
 func TestWhatsAppBanRiskWarningNamesTheRisk(t *testing.T) {
 	w := WhatsAppBanRiskWarning
-	for _, must := range []string{"UNOFFICIAL", "ban", "LAN/BLE", "REQUIRED"} {
+	for _, must := range []string{"UNOFFICIAL", "ban", "REQUIRED", "web portal", "Slack Socket Mode", "Telegram"} {
 		if !strings.Contains(w, must) {
 			t.Errorf("ban-risk warning must mention %q: %q", must, w)
 		}
+	}
+	if !strings.Contains(w, "LAN/BLE") || !strings.Contains(w, "NOT a working fallback") {
+		t.Errorf("ban-risk warning must explicitly disclaim the LAN/BLE grant path as broken, not silently drop it: %q", w)
 	}
 }

@@ -391,6 +391,11 @@ async function main() {
     ];
 
     const written = [];
+    // Counted per scheme (not from written.length twice) — light and dark are
+    // captured independently and can legitimately differ, e.g. when
+    // APP_HAS_DARK_MODE is false and dark/ is populated by copying instead.
+    let lightCount = 0;
+    let darkCount = 0;
     for (const scheme of ['light', 'dark']) {
       if (scheme === 'dark' && !APP_HAS_DARK_MODE) break;
       for (const { label, shots, options, admin } of contexts) {
@@ -412,6 +417,8 @@ async function main() {
           const out = path.join(outDir, shot.file);
           await capture(page, origin, shot, out);
           written.push(out);
+          if (scheme === 'dark') darkCount++;
+          else lightCount++;
         }
         await context.close();
       }
@@ -425,10 +432,11 @@ async function main() {
         const dst = path.join(OUT_DARK, path.basename(file));
         fs.copyFileSync(file, dst);
         console.log(`  ok dark/${path.basename(dst)}`);
+        darkCount++;
       }
     }
 
-    console.log(`\nDone. ${written.length} light + ${written.length} dark PNGs in site/screenshots/`);
+    console.log(`\nDone. ${lightCount} light + ${darkCount} dark PNGs in site/screenshots/`);
   } catch (err) {
     console.error('\nScreenshotter failed:', err.message ?? err);
     if (viteLog.trim()) {

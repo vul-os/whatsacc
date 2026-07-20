@@ -181,12 +181,23 @@ func postGraph(ctx context.Context, client *http.Client, url, auth string, paylo
 //     opt-in string.
 //   - Selecting the bridge engine MUST log WhatsAppBanRiskWarning at startup
 //     (wired in httpapi.Server.New) — never a quiet switch.
-//   - The offline LAN/BLE grant path (the app's emergency-access flow) is the
-//     REQUIRED fallback whenever the bridge engine is in use. This is
-//     documented, not enforced in code (the gateway cannot verify an operator
-//     actually configured the fallback) — see site/docs/linking-whatsapp.md /
-//     site/docs/emergency-access.md, which need an explicit callout (not
-//     added here — this repo's channel-layer owner does not touch site/docs).
+//   - The offline LAN/BLE grant path (the app's emergency-access flow) is STILL NOT
+//     a working fallback — but the reason changed: the gateway now mints and signs
+//     real `typ:"grant"` objects (POST /v1/offline-grants, see
+//     gateway/internal/httpapi/offline_grants.go and gateway/internal/keys/grant.go),
+//     conformance-tested the same as the controller side always was. What's missing
+//     is the app: nothing on the phone requests, stores or presents a grant, so no
+//     resident can actually walk up to a gate and use this path today (see
+//     site/docs/emergency-access.md). Naming it as the required fallback here would
+//     still ship a false promise — "fall back to offline grants" when nothing on a
+//     resident's device can present one. The REQUIRED fallback instead is what
+//     actually runs today — the web portal (unlimited opens, always available, see
+//     site/docs/overview.md's "three ways in") and/or a second shipped chat channel
+//     (Slack Socket Mode or Telegram, see site/docs/channels.md) — set up and
+//     verified before relying on this engine. This is documented, not enforced in
+//     code (the gateway cannot verify an operator actually configured a fallback
+//     channel) — see site/docs/linking-whatsapp.md and site/docs/channels.md, which
+//     carry the matching callout.
 
 // WhatsAppEngine selects which implementation sends outbound WhatsApp
 // messages.
@@ -219,13 +230,20 @@ func ResolveWhatsAppEngine(raw string) WhatsAppEngine {
 // WhatsAppBanRiskWarning is the exact operator-facing warning logged at
 // startup whenever the bridge engine is selected (httpapi.Server.New). Not
 // softened: this is the honesty requirement the task that added this engine
-// was explicit must not be diluted.
+// was explicit must not be diluted. The fallback it names points at what
+// actually runs today (the web portal, and Slack/Telegram as a second chat
+// channel) rather than the offline LAN/BLE grant path, which still isn't
+// usable end to end — the gateway issues grants now, but the app doesn't
+// hold or present one — see the block above.
 const WhatsAppBanRiskWarning = "LINTEL_WHATSAPP_ENGINE=bridge selected: this uses an UNOFFICIAL WhatsApp Web " +
 	"client (Baileys-based, e.g. Evolution API), NOT Meta's Cloud API. Meta actively detects and bans " +
 	"automated clients, and tightened its terms further on 2026-01-15; reported number survival on " +
 	"unofficial APIs is commonly WEEKS, not years. A ban means this gate silently stops responding on " +
-	"WhatsApp. The offline LAN/BLE grant path is REQUIRED as a fallback whenever this engine is in use — " +
-	"do not rely on WhatsApp as the only way to open a gate."
+	"WhatsApp. The offline LAN/BLE grant path is NOT a working fallback today — the app doesn't hold or " +
+	"present a grant yet (site/docs/emergency-access.md). The REQUIRED fallback whenever this engine is in " +
+	"use is the web portal (unlimited opens, always available) and/or a second shipped chat channel — " +
+	"Slack Socket Mode or Telegram — set up and verified beforehand: do not let WhatsApp be the only way " +
+	"to open a gate."
 
 // NewWhatsAppSender builds the configured WhatsAppSender. Each concrete
 // sender fails closed on its own missing credentials (returns an "…_unset"
