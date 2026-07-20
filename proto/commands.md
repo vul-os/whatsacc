@@ -88,3 +88,100 @@ cnonce_unknown | cnonce_expired | cnonce_replay | hw:…`
 
 The gateway records the ack in the audit log; an unacked command past `exp` is recorded
 as `undelivered` and surfaces in chat ("couldn't reach the gate — it may be offline").
+
+## Delivery semantics under partition
+
+A signed envelope can be lost at any of three points: before the controller
+receives it, after actuation but before the ack is sent, or after the ack is
+sent but before the gateway receives it. The gateway cannot tell these three
+apart. This section specifies what each visible outcome means — and, just as
+important, what it does not resolve.
+
+### Dispatch outcomes
+
+| Outcome | Wire meaning | What it does NOT tell you |
+| --- | --- | --- |
+| `acked` | A verified `cmd.ack` for this exact `nonce` arrived within the ack-wait deadline (reference gateway: 5 s default, configurable, always shorter than the envelope's own up-to-60-s window). | — |
+| `undelivered` | No `cmd.ack` for this `nonce` arrived within the deadline. | Whether the controller ever received the envelope, actuated it, or sent an ack still in flight. The envelope stays valid — and the controller will still act on it and reply — until `exp + skew`, which can be well *after* the gateway has already reported `undelivered`, because the ack-wait deadline is shorter than the envelope's own validity window. |
+| `queued` | The controller was offline; the envelope was appended to its poll queue, TTL'd to the envelope's own `exp`. | Whether the controller reconnects before `exp`. Reconnect backoff is jittered exponential (seconds up to minutes); an envelope's window is ≤ 60 s + skew. In practice `queued` only turns into an actual open if the controller happens to reconnect within roughly a minute of dispatch; for a controller offline longer than that, `queued` quietly expires with no further signal to the gateway or the resident. |
+
+### The lost-ack case, specified honestly
+
+If the link drops between the controller acting and its ack reaching the
+gateway, the gateway reports `undelivered` — a **dispatch outcome, not a
+negative result**. The gate may have opened. The chat reply reflects that
+ambiguity and never claims a definite outcome it cannot back up: "couldn't
+reach the gate — it may be offline" is deliberately non-committal, not "the
+gate did not open."
+
+What IS guaranteed:
+
+- **A lost ack can never itself cause a second physical open.** The gateway
+  does not retry a dispatch — `undelivered` is terminal for that one signed
+  envelope. If the *same* envelope were ever redelivered (e.g. a duplicate
+  frame at the transport layer), the controller's nonce store (step 4 above)
+  makes the redelivery a no-op, not a second actuation.
+- **The gateway never reports success when the controller did not answer.**
+  `acked` only ever reflects a verified `cmd.ack`; there is no "assume
+  success" path.
+
+### Late-ack reconciliation
+
+A `cmd.ack` for a `nonce` can legitimately arrive after the ack-wait
+deadline has already elapsed — the envelope stays valid, and the controller
+keeps acting on and replying to it, until `exp + skew`, which is routinely
+later than the deadline (see the `undelivered` row above). The reference
+gateway does not just log a late ack and move on: it reconciles it against
+the access-log row the original dispatch wrote, **within a bounded window**
+and **without ever rewriting that row**.
+
+- **Bounded window.** A late-arriving, correctly-verified ack is only
+  eligible to reconcile for a fixed window after its dispatch (reference
+  gateway: 10 minutes — comfortable headroom over the envelope's worst-case
+  validity plus reconnect jitter, without being "arbitrarily long"). Outside
+  that window the ack is logged and dropped, not reconciled: a controller's
+  signed word has no business rewriting an audit row from a shift that
+  ended hours or days ago, and an unbounded window only widens the
+  (already-authenticated) opportunity for a compromised-but-still-enrolled
+  controller to backdate outcomes. Matching is exact and one-shot: the
+  same `nonce`, addressed to the same `device_id` the original dispatch
+  targeted, consumed on first match — a duplicated/replayed late ack cannot
+  reconcile twice.
+- **Append, not overwrite.** A reconciled ack does not edit the original
+  access-log row. It inserts a **new** row, tagged `late_ack:<result>`
+  (`late_ack:<result>:<detail>` when `detail` is present) and pointing back
+  at the original row it reconciles. "We didn't hear back by the deadline"
+  stays true forever, exactly as it was recorded at the time; "we heard
+  back late, and here is what it said" becomes a second, equally durable
+  fact instead of silently replacing the first. This is a deliberate audit
+  property, not an implementation detail: an implementer must not
+  "simplify" this into an in-place update — the whole point is that both
+  facts remain independently visible in the audit-of-record. The
+  reconciliation row's success reflects the controller's own signed word:
+  `opened` / `held` / `closed` mean the gate did the thing; `denied` /
+  `error` mean it did not.
+- Reconciliation only ever runs on an ack that has **already passed full
+  signature verification** against the enrolled controller key (the same
+  check the on-time path applies) — the window and nonce/device match above
+  are what decide whether an already-authenticated message is still
+  entitled to correct the record, never a substitute for authenticating it.
+
+A late ack outside the window, or one whose nonce the gateway no longer
+recognizes at all, is logged and otherwise dropped — same as before.
+
+### Resending "open" is not the same as retrying a dispatch
+
+The nonce only makes the *exact signed envelope* idempotent — it says
+nothing about the resident. If an "open" appears to fail or stall and the
+resident sends "open" again, the gateway mints a **new** envelope with a
+**new** nonce: a fresh authorization event, not a retry of the first one. If
+the first envelope's ack was merely delayed (the lost-ack case above) and it
+lands after the second envelope has already been dispatched, the controller
+will legitimately actuate **twice** — once per envelope, each individually
+valid and correctly authorized. That is correct per-envelope behavior, but
+it means the system-level assumption a resident might reasonably make — "if
+it doesn't confirm, nothing happened, so asking again is safe" — does not
+hold for `open`/`hold` across an ambiguous outcome. **v0: undefined /
+unaddressed.** De-duplicating *repeated human intent* (as opposed to
+de-duplicating one signed envelope) is a UX/rate-limit concern, not a wire
+contract concern, so it is flagged here rather than specified.

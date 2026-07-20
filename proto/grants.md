@@ -27,7 +27,7 @@ member's rights; the controller verifies it offline against its pinned gateway k
 - The grant binds the **app's own keypair** (generated on device, stored in the
   platform keystore). Possession of the grant alone is worthless.
 
-## Offline redemption (LAN mDNS `_whatsacc._tcp` or BLE GATT)
+## Offline redemption (LAN mDNS `_lintel._tcp` or BLE GATT)
 
 ```
 App                                   Controller
@@ -96,6 +96,74 @@ chat/portal paths still work when connectivity returns.
 Every offline open is queued as an audit event and uploaded on reconnect (events.md),
 including the full grant_id + proof material, so the audit trail has no offline hole.
 
+## Revocation vs. in-flight grants
+
+The whole point of this path is "no gateway involvement" — which means a
+controller mid-redemption has no way to ask "has this been revoked?" and no
+way to be told. This is a genuine, structural exposure window. Specify it
+honestly rather than implying real-time revocation exists.
+
+### What bounds the exposure
+
+Only the grant's own `exp`. Default TTL is 7 days (top of this file). A
+member revoked the instant after their app last refreshed a grant keeps
+everything that grant authorizes — every `access_point` it lists, for the
+rest of its `windows`, at any controller listing this device in `devices`
+— for up to that long. There is nothing else:
+
+- Deleting or disabling the member's account on the gateway does not reach
+  an already-issued grant; the grant is a self-contained, offline-verifiable
+  object (the 11-step check above touches nothing but the presented bytes
+  and the controller's own pinned key / clock / lockdown state).
+- The next `grant` the gateway signs for that member can simply not be
+  issued, or be scoped down — but that only takes effect on the member's
+  *next* refresh, and does nothing to a copy already on their device.
+
+### What an operator must actually do to revoke fast
+
+Latch `lockdown` on the specific controller(s) the member could reach
+(commands.md `lockdown`; the verification order above denies every offline
+redemption with `lockdown` while latched, exactly as it denies every live
+command except `lift`/`ping`/`config`/`repair`). This is the **only**
+sub-TTL lever in v0, and it is blunt on purpose: it has no notion of "this
+one member" — it stops everyone, including legitimate members, until
+`lift`. There is no per-member or per-grant offline deny-list; the
+verification core takes no input besides the presented grant and local
+controller state, by design — that locality is the feature this whole path
+exists for.
+
+### Does the controller learn of revocation on reconnect?
+
+No. There is no message anywhere in this contract set — not here, not in
+events.md, commands.md or pairing.md — that tells a controller "grant `X`
+/ member `Y` is now revoked." A controller that goes offline holding no
+cached deny-state and reconnects a week later has exactly the same
+offline-grant behavior it had before it went offline, governed only by
+each grant's own `exp`. **v0: undefined / open question.**
+
+### Honest summary
+
+This is a **bounded-exposure tradeoff**, not a defect to paper over:
+offline-capable access control cannot also be instantly revocable without
+either (a) a live channel to the controller at redemption time — which
+would defeat the entire point of this path — or (b) a revocation list the
+controller caches and consults while still offline. v0 has neither. If (b)
+is ever wanted, treat it as a v1 proposal, not a v0 fix: it needs new wire
+surface (e.g. a `revocations` list, or a per-member generation counter the
+controller caches on last contact and checks against the grant's `iat`),
+which this additive pass does not add.
+
+### Implementation status
+
+The controller side of this contract (verification, the 11-step order,
+stale-clock, windows, cnonce handling) is real and conformance-tested. The
+**gateway side — minting and refreshing a member's `grant` object — has no
+implementation in this codebase yet**; nothing in `gateway/` issues a
+`typ: "grant"` object. The "refreshes on every online launch, so revocation
+converges within the TTL" reasoning above describes the intended contract;
+it is not yet an observable guarantee, because the issuing half of it does
+not exist yet. **v0: undefined / unbuilt.**
+
 ## Transports
 
 The redemption messages (`grant.open` / `grant.challenge` / `grant.proof` /
@@ -104,7 +172,7 @@ carry the identical message layer, so verification code is shared.
 
 ### LAN (primary)
 
-Controller advertises mDNS `_whatsacc._tcp` (TXT: `device=<device_id>`,
+Controller advertises mDNS `_lintel._tcp` (TXT: `device=<device_id>`,
 `proto=0`) and serves plain HTTP on the advertised port: `POST /grant/open`
 (body `grant.open`) → `grant.challenge`; `POST /grant/proof` → `grant.result`.
 Plain HTTP is acceptable: every message is Ed25519-signed and single-use; the
@@ -115,8 +183,8 @@ transport adds no trust.
 For the darkest scenario — no Wi-Fi, no LAN, phone in hand at the gate — the
 controller MAY expose a BLE peripheral:
 
-- **Service UUID** `9f0a0001-8f7c-4b62-9d5e-7acc00000001` ("whatsacc-grant"),
-  advertised with local name `wacc-<first 8 hex of device_id>`.
+- **Service UUID** `9f0a0001-8f7c-4b62-9d5e-7acc00000001` ("lintel-grant"),
+  advertised with local name `lintel-<first 8 hex of device_id>`.
 - Characteristics:
   | UUID (`9f0a…`) | Name | Properties |
   | --- | --- | --- |
