@@ -213,7 +213,7 @@ func TestOfflineGrant_Redeem(t *testing.T) {
 
 	appPriv, appPub := newAppKey(t)
 	now := time.Now().Unix()
-	g := grantWire(t, gw, appPub, []string{dev}, []string{ap}, now)
+	g := gw.issueOfflineGrant(t, ten, appPub, []string{ap})
 	gid := grantIDOf(t, g)
 
 	pulseBefore := c.logs.countLines("relay", "state=pulsing")
@@ -237,8 +237,10 @@ func TestOfflineGrant_Redeem(t *testing.T) {
 // TestOfflineGrant_Rejects drives adversarial inputs at the REAL controller's
 // grants.Exchange over the real LAN wire — the one controller-side verification
 // surface reachable from an external harness (the WS command path only accepts
-// input from the pinned gateway, which the harness cannot impersonate).
-// Every rejection must fail-closed with no relay pulse.
+// input from the pinned gateway, which the harness cannot impersonate). Every
+// grant here is minted by the REAL gateway issuance path (gw.issueOfflineGrant);
+// only the transport-level tampering in (a) mutates bytes after the fact. Every
+// rejection must fail-closed with no relay pulse.
 func TestOfflineGrant_Rejects(t *testing.T) {
 	gw := startGateway(t)
 	ten := gw.register(t)
@@ -250,8 +252,9 @@ func TestOfflineGrant_Rejects(t *testing.T) {
 	appPriv, appPub := newAppKey(t)
 	now := time.Now().Unix()
 
-	// (a) tampered grant → badsig.
-	valid := grantWire(t, gw, appPub, []string{dev}, []string{ap}, now)
+	// (a) tampered grant → badsig. Issued for real, then mutated in transit —
+	// exactly the scenario the signature exists to catch.
+	valid := gw.issueOfflineGrant(t, ten, appPub, []string{ap})
 	gid := grantIDOf(t, valid)
 	tampered := tamperGrant(t, valid)
 	cn := grantOpen(t, c, tampered, ap)
@@ -259,11 +262,16 @@ func TestOfflineGrant_Rejects(t *testing.T) {
 		t.Fatalf("tampered grant: result=%q detail=%q, want denied/badsig", res, det)
 	}
 
-	// (b) grant for a different device → wrong_device.
-	wrongDev := grantWire(t, gw, appPub, []string{"device-not-this-one"}, []string{ap}, now)
+	// (b) grant for a DIFFERENT, real access point/controller → wrong_device.
+	// A member who genuinely has access to another gate (its own real device,
+	// real issuance) must still be denied at THIS controller — device_id is
+	// per-controller, not per-member.
+	dev2, _ := gw.createDevice(t, ten, "other-gate-controller") // never paired; issuance only needs it attached to an AP
+	ap2 := gw.createAP(t, ten, "Other Gate", dev2)
+	wrongDev := gw.issueOfflineGrant(t, ten, appPub, []string{ap2})
 	gidWD := grantIDOf(t, wrongDev)
-	cn = grantOpen(t, c, wrongDev, ap)
-	if res, det := grantProof(t, c, appPriv, gidWD, cn, ap, now); res != "denied" || det != "wrong_device" {
+	cn = grantOpen(t, c, wrongDev, ap2)
+	if res, det := grantProof(t, c, appPriv, gidWD, cn, ap2, now); res != "denied" || det != "wrong_device" {
 		t.Fatalf("wrong-device grant: result=%q detail=%q, want denied/wrong_device", res, det)
 	}
 
@@ -274,7 +282,7 @@ func TestOfflineGrant_Rejects(t *testing.T) {
 
 	// (c) replay: a valid redemption opens once; re-presenting the SAME proof
 	// (same cnonce) is rejected cnonce_replay and does NOT pulse again.
-	okGrant := grantWire(t, gw, appPub, []string{dev}, []string{ap}, now)
+	okGrant := gw.issueOfflineGrant(t, ten, appPub, []string{ap})
 	gidOK := grantIDOf(t, okGrant)
 	cn = grantOpen(t, c, okGrant, ap)
 	proof := signedProof(t, appPriv, gidOK, cn, ap, now)
@@ -293,15 +301,21 @@ func TestOfflineGrant_Rejects(t *testing.T) {
 	}
 }
 
-// TestLockdown_DeniesOfflineRedeem exercises the lockdown matrix end-to-end.
-// No gateway API can push a `lockdown` command (dispatch is open/close only —
-// reported gap), so the latch is set through the controller-sim's stdin
-// override, then a valid offline grant is denied `lockdown` by the REAL
-// grants.Exchange over the wire, with no relay pulse.
+// TestLockdown_DeniesOfflineRedeem exercises the lockdown matrix end-to-end
+// against a REAL gateway-issued grant. No gateway API can push a `lockdown`
+// command (dispatch is open/close only — reported gap), so the latch is set
+// through the controller-sim's stdin override; the grant itself is minted by
+// the real POST /v1/offline-grants path for a real access point bound to the
+// sim's device, and denied `lockdown` by the REAL grants.Exchange over the
+// wire, with no relay pulse. This is also the negative-authorization case the
+// gateway-issuance work item asked for: proof that lockdown — the one
+// sub-TTL revocation lever proto/grants.md specifies — actually holds
+// against a document the real issuance endpoint produced, not a fixture.
 func TestLockdown_DeniesOfflineRedeem(t *testing.T) {
 	gw := startGateway(t)
 	ten := gw.register(t)
 	dev, claim := gw.createDevice(t, ten, "sim-controller")
+	ap := gw.createAP(t, ten, "Main Gate", dev)
 
 	s := startSim(t, gw, dev, claim)
 	s.send(t, "lockdown")
@@ -312,13 +326,11 @@ func TestLockdown_DeniesOfflineRedeem(t *testing.T) {
 
 	appPriv, appPub := newAppKey(t)
 	now := time.Now().Unix()
-	// The sim serves "main"/"pedestrian"; grants are keyed on device + the
-	// grant's own access_points, so use "main".
-	g := grantWire(t, gw, appPub, []string{dev}, []string{"main"}, now)
+	g := gw.issueOfflineGrant(t, ten, appPub, []string{ap})
 	gid := grantIDOf(t, g)
 
-	cn := grantOpen(t, s.controller, g, "main")
-	res, det := grantProof(t, s.controller, appPriv, gid, cn, "main", now)
+	cn := grantOpen(t, s.controller, g, ap)
+	res, det := grantProof(t, s.controller, appPriv, gid, cn, ap, now)
 	if res != "denied" || det != "lockdown" {
 		t.Fatalf("locked-down redeem: result=%q detail=%q, want denied/lockdown", res, det)
 	}

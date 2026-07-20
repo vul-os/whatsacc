@@ -201,8 +201,11 @@ func startGateway(t *testing.T) *gateway {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// Load the gateway's private signing key from its data dir so the harness
-	// can act as the gateway when pre-signing offline grants (proto/grants.md).
+	// Load the gateway's private signing key from its data dir. The harness
+	// no longer uses this to self-sign offline grants (see issueOfflineGrant
+	// below — grants now come from the REAL POST /v1/offline-grants issuance
+	// path); it stays only as the seed the following block cross-checks
+	// against what /v1/gateway/key actually serves.
 	seedHex, err := os.ReadFile(filepath.Join(dataDir, "gateway_ed25519.seed"))
 	if err != nil {
 		t.Fatalf("read gateway seed: %v", err)
@@ -287,6 +290,29 @@ func (gw *gateway) createAP(t *testing.T, ten *tenant, name, deviceID string) st
 		t.Fatalf("create AP: %d %s", st, raw)
 	}
 	return body["id"].(string)
+}
+
+// issueOfflineGrant calls the REAL gateway-side issuance endpoint
+// (POST /v1/offline-grants, proto/grants.md's gateway-signed `typ:"grant"`)
+// as ten and returns the signed grant as raw wire JSON, ready to hand to
+// grantOpen/grantIDOf. This is the harness's money-path proof: the grant it
+// hands to a controller is produced by the actual product code
+// (gateway/internal/httpapi/offline_grants.go +
+// gateway/internal/keys.SignGrant), not a fixture standing in for it.
+func (gw *gateway) issueOfflineGrant(t *testing.T, ten *tenant, appPubB64 string, apIDs []string) []byte {
+	t.Helper()
+	st, body, raw := httpJSON(t, http.MethodPost, gw.url+"/v1/offline-grants", ten.token, map[string]any{
+		"app_pubkey":       appPubB64,
+		"access_point_ids": apIDs,
+	})
+	if st != http.StatusCreated {
+		t.Fatalf("issue offline grant: %d %s", st, raw)
+	}
+	out, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal issued grant: %v", err)
+	}
+	return out
 }
 
 // open POSTs the open command and returns (status, delivery, full body).
@@ -480,22 +506,6 @@ func signObject(t *testing.T, priv ed25519.PrivateKey, obj map[string]any) []byt
 	return raw
 }
 
-// grantWire builds and gateway-signs an all-hours grant for (devices, aps).
-func grantWire(t *testing.T, gw *gateway, appPubB64 string, devices, aps []string, now int64) []byte {
-	t.Helper()
-	return signObject(t, gw.priv, map[string]any{
-		"v": 0, "typ": "grant",
-		"grant_id":      "grant-" + randHex(8),
-		"member":        "visitor@example.com",
-		"app_pubkey":    appPubB64,
-		"devices":       toAnyList(devices),
-		"access_points": toAnyList(aps),
-		"windows":       []any{map[string]any{"days": "mon-sun", "from": "00:00", "to": "24:00"}},
-		"iat":           now - 60,
-		"exp":           now + 3600,
-	})
-}
-
 // grantOpen posts a grant.open and returns the issued cnonce (or fails).
 func grantOpen(t *testing.T, c *controller, grantRaw []byte, ap string) string {
 	t.Helper()
@@ -640,14 +650,6 @@ func doReq(t *testing.T, req *http.Request) (int, map[string]any, string) {
 func asList(v any) []any {
 	l, _ := v.([]any)
 	return l
-}
-
-func toAnyList(ss []string) []any {
-	out := make([]any, len(ss))
-	for i, s := range ss {
-		out[i] = s
-	}
-	return out
 }
 
 func randHex(n int) string {
