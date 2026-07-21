@@ -11,7 +11,7 @@ Socket Mode) or Telegram today — Discord next — into an Ed25519-signed comma
 controller guarding your gate, door or barrier, with an offline LAN/BLE path for when
 the internet isn't there. Signed, audited, built for trust.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-1a1f36.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1a1f36.svg)](LICENSE-MIT)
 [![Architecture](https://img.shields.io/badge/read-ARCHITECTURE.md-d6624d.svg)](ARCHITECTURE.md)
 [![Part of Vulos](https://img.shields.io/badge/suite-vulos.org-2c5f4f.svg)](https://vulos.org)
 
@@ -329,7 +329,7 @@ on their actual hardware before it guards a real door.
 **Operators are responsible** for compliance with local fire, building, safety and
 accessibility codes at every installation — lintel has no way to know your
 jurisdiction's rules, your building's occupancy, or your gate's mechanical safety
-features, and doesn't try to. [LICENSE](LICENSE)'s MIT warranty disclaimer means
+features, and doesn't try to. [LICENSE](LICENSE-MIT)'s MIT warranty disclaimer means
 exactly what it says — no warranty, no liability, the software is provided "as is" —
 but that disclaimer is not a substitute for correct installation, and it doesn't
 transfer your legal duties as the installer to anybody else. If you're deploying this
@@ -341,7 +341,9 @@ unsafe outcome? Mail **vulosorg@gmail.com**; see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE) — all of it: gateway, portal, app, controller agent. No cloud, no
-billing system, no paid features. Just the system. Deploying this on a real gate?
-Read [Safety](#safety) above first, and see the safety notice appended to
-[LICENSE](LICENSE).
+[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) — © VulOS. lintel is a VulOS
+project; source and issues at
+[github.com/vul-os/lintel](https://github.com/vul-os/lintel). All of it — gateway,
+portal, app, controller agent. No cloud, no billing system, no paid features. Just
+the system. Deploying this on a real gate? Read [Safety](#safety) above first, and
+see the safety notice appended to [LICENSE-MIT](LICENSE-MIT).
