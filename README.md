@@ -15,7 +15,6 @@ the internet isn't there. Signed, audited, built for trust.
 [![Architecture](https://img.shields.io/badge/read-ARCHITECTURE.md-d6624d.svg)](ARCHITECTURE.md)
 [![Part of Vulos](https://img.shields.io/badge/suite-vulos.org-2c5f4f.svg)](https://vulos.org)
 
-<sub>Part of the <strong><a href="https://vulos.org">VulOS</a></strong> open-source family — see [Part of VulOS](#part-of-vulos) below for exactly how.</sub>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dark/portal-dashboard.png" />
@@ -62,29 +61,6 @@ verified byte-for-byte against the same [`proto/vectors/`](proto/vectors/) fixtu
 What's **not built yet** is the app side (🔨) — nothing on the phone requests, stores or
 presents a grant, so the offline path still doesn't run end-to-end for a real resident.
 Full design and status in [Emergency access](site/docs/emergency-access.md).
-
-## Part of VulOS
-
-**Vulos = free, open-source software + two paid services.** The Vulos OS, all its
-apps, and the app store are OSS and free — you self-host them on a box you provision
-and pay for yourself; Vulos bills only for **Vulos Relay** (reachability) and **backup
-storage**. There is no compute, mail, or app-store billing.
-
-The suite: **Vulos OS** (the web-native desktop shell) · **Vulos Office** (docs,
-sheets, slides, PDF, whiteboards) · **Vulos Files** · **Vulos Relay** · **llmux**
-(sovereign AI gateway) — with mail/calendar/contacts as bring-your-own via
-**lilmail**, and chat/video over established third-party protocols (Matrix/Element,
-Jitsi).
-
-lintel is **not** one of those apps, and it isn't hosted inside the Vulos OS shell —
-it's a sibling open-source product under the same [`github.com/vul-os`](https://github.com/vul-os)
-family, solving a different problem (physical access control) with the same values:
-standalone-first, MIT everything, no hard dependency on anything else in the family.
-The one real touchpoint is optional: when a self-hosted gateway needs a public
-endpoint for its WhatsApp channel, **Vulos Relay** is one convenient tunnel option
-among several (alongside cloudflared, frp, or a self-hosted `vulos-relayd` — see
-[Ingress & reachability](site/docs/ingress.md)) — never a requirement. lintel runs
-to completion with nothing but a box.
 
 ## Features
 
@@ -347,3 +323,10 @@ project; source and issues at
 portal, app, controller agent. No cloud, no billing system, no paid features. Just
 the system. Deploying this on a real gate? Read [Safety](#safety) above first, and
 see the safety notice appended to [LICENSE-MIT](LICENSE-MIT).
+
+---
+
+<p align="center">
+  <a href="https://vulos.org"><img src="docs/assets/vulos-logo.png" alt="vulos" height="20"></a><br>
+  <sub><a href="https://vulos.org"><b>vulos</b></a> — open by design</sub>
+</p>
