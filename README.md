@@ -337,7 +337,7 @@ on a real gate, get your own legal/compliance review before you do; this documen
 isn't one.
 
 Think something here — including this section — is steering an installation toward an
-unsafe outcome? Mail **security@vulos.org**; see [SECURITY.md](SECURITY.md).
+unsafe outcome? Mail **vulosorg@gmail.com**; see [SECURITY.md](SECURITY.md).
 
 ## License
 

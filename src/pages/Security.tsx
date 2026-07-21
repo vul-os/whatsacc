@@ -111,10 +111,10 @@ export default function Security() {
           </div>
           <div className="relative lg:justify-self-end">
             <a
-              href="mailto:security@vulos.org"
+              href="mailto:vulosorg@gmail.com"
               className="inline-flex h-12 px-6 items-center rounded-full bg-paper text-ink font-medium hover:bg-terracotta hover:text-paper transition-colors"
             >
-              security@vulos.org
+              vulosorg@gmail.com
             </a>
           </div>
         </div>

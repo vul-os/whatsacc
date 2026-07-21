@@ -8,7 +8,7 @@ someone who must get in. Please treat disclosure accordingly.
 
 **Report privately. Do not open a public issue for anything exploitable.**
 
-- Email: **security@vulos.org** (maintainer: [imranparuk](https://github.com/imranparuk))
+- Email: **vulosorg@gmail.com** (maintainer: [imranparuk](https://github.com/imranparuk))
 - Or use GitHub's private vulnerability reporting on
   [vul-os/lintel](https://github.com/vul-os/lintel/security/advisories/new)
 

@@ -1,7 +1,7 @@
 {
   "name": "lintel",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Texts that open gates — decentralized chat-driven physical access control (portal app + static site/)",
   "license": "MIT",
   "author": "imranparuk",

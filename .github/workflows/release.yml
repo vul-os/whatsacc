@@ -18,8 +18,26 @@ permissions:
   contents: write
 
 jobs:
+  version-guard:
+    name: tag matches VERSION
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag == VERSION == package.json == tauri.conf.json
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          base="${tag%%-*}"   # v0.1.0-rc1 validates against base 0.1.0
+          ver="$(tr -d '[:space:]' < VERSION)"
+          pkg="$(node -p "require('./package.json').version")"
+          conf="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          echo "tag=$tag base=$base VERSION=$ver package.json=$pkg tauri.conf.json=$conf"
+          [ "$base" = "$ver" ] && [ "$base" = "$pkg" ] && [ "$base" = "$conf" ] || {
+            echo "::error::Version mismatch — bump VERSION, package.json and src-tauri/tauri.conf.json to match the tag before pushing it"; exit 1; }
+
   detect:
     name: detect optional components
+    needs: version-guard
     runs-on: ubuntu-latest
     outputs:
       controller: ${{ steps.check.outputs.controller }}
@@ -35,6 +53,7 @@ jobs:
 
   gateway:
     name: gateway ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: version-guard
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -114,6 +133,7 @@ jobs:
 
   desktop:
     name: desktop app (macOS, unsigned)
+    needs: version-guard
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

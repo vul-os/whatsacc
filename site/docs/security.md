@@ -231,5 +231,5 @@ addendum appended to
 
 ## Reporting
 
-Found something? Mail security@vulos.org — no sales gauntlet, just an engineer who
+Found something? Mail vulosorg@gmail.com — no sales gauntlet, just an engineer who
 built it. We're happy to walk through this model with your IT team or HOA committee.
